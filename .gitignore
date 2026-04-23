@@ -1,0 +1,41 @@
+# ─── Large data & pretrained weights ─────────────────────────────────────────
+TAU-urban-acoustic-scenes-2019-development/
+TAU-urban-acoustic-scenes-2022-mobile-development/
+
+*.zip
+
+# ─── Model checkpoint files (large, reproduced via training) ─────────────────
+# MTRCNN checkpoints are small (~1 MB) and intentionally excluded below
+experiment/**/*.pth
+experiment/**/*.pt
+experiment/**/*.bin
+experiment/**/*.onnx
+experiment/**/*.safetensors
+experiment/**/*.ckpt
+experiment/**/episodic_history.json
+
+# ─── Per-sample prediction files (20 MB+ per split) ─────────────────────────
+audio_classifying/unprocessed_data/*.pt
+utils/__pycache__/
+Reversable_Function/__pycache__/
+loss_function/__pycache__/
+torch_audioset/
+GenRepASD/
+dcase2020_task2_MCM/
+runs/
+FOAC-AIFP_complex/
+
+# ─── Python byte-compiled / cache ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.pt
+*.pth
+
+# ─── Virtual environments ─────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.conda/

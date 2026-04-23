@@ -1,0 +1,376 @@
+================================================================================
+FOAC-AIFP 代码分析与运行指南
+Few-Shot Open-Set Audio Classification Using Attention Information-Fused Prototypes
+================================================================================
+
+【论文信息】
+标题: Few-Shot Open-Set Audio Classification Using Attention Information-Fused Prototypes
+作者: Yanxiong Li (eeyxli@scut.edu.cn), Jiaxin Tan (tanjiaxin@126.com)
+单位: 华南理工大学 电子与信息工程学院
+联系: tanjiaxin@126.com
+
+================================================================================
+一、项目整体架构与运行逻辑
+================================================================================
+
+1. 项目目录结构
+--------------------
+FOAC-AIFP/
+├── main.py                  # 主入口：少样本开放集训练与测试
+├── pretrain.py              # 预训练入口：RPL/GCPL预训练骨干网络
+├── requirements.txt         # 依赖列表
+├── readme.md                # 说明文档
+├── datasets/
+│   ├── __init__.py          # (空)
+│   ├── dataloaders.py       # 元训练/元测试数据加载器构建
+│   ├── nsynth.py            # NSynth-100 数据集类 (NDS + Opennds)
+│   ├── FMC.py               # FSC-89 数据集类 (FSDCLIPS + Openfmc)
+│   └── librispeech.py       # LS-100 数据集类 (LBRS + Openlbrs)
+├── models/
+│   ├── Network.py           # 主网络 (Backbone + My_Net)
+│   └── module/
+│       ├── resnet18_encoder.py          # ResNet-18 编码器 (ImageNet预训练)
+│       ├── prototype_dynamic_aggregation.py  # PAM: 原型动态聚合模块
+│       ├── conditional_information_coupling.py # CIAM: 条件信息耦合模块
+│       └── transformer.py              # NPM: 开放集生成器 + Transformer编码器
+├── trainers/
+│   ├── __init__.py          # (空)
+│   ├── trainer.py           # Train_Manager: 训练/测试管理器
+│   ├── C2_Net_train.py      # 元训练循环 (每个episode的训练逻辑)
+│   └── Pretrainer.py        # BaseTrainer: RPL+GCPL预训练管理器
+├── utils/
+│   └── util.py              # 工具函数 (参数解析、优化器、评估指标等)
+└── (缺失) default.yml       # 配置文件 — 项目中未包含
+    (缺失) loss/             # 损失函数目录 — Pretrainer需要但未包含
+        ├── RPLoss.py        # Reciprocal Point Loss
+        └── GCPLoss.py       # Gaussian Center-based Prototype Loss
+
+
+2. 核心运行流程（两阶段）
+--------------------
+
+【阶段一：预训练 (pretrain.py)】
+  目的: 在基类数据上训练骨干网络(ResNet-18) + RPL/GCPL损失学习类中心
+
+  流程:
+  1. 解析命令行参数 + 加载YAML配置文件
+  2. 根据dataset选择数据集，创建标准DataLoader（非episode式）
+  3. 创建Backbone模型 (ResNet-18 + 音频频谱提取模块)
+  4. 加载ImageNet预训练权重 (args.pretrained_model_path1)
+  5. 初始化RPLoss和GCPLoss损失函数（从 loss/ 模块加载）
+  6. 训练循环：前向传播 → 提取特征 → 计算GCPL loss + RPL loss → 反向传播
+  7. 保存模型：包含 feature_params、RPL_params、GCPL_params
+     - RPL_params['centers']: 开放集权重（每个类多个中心）
+     - GCPL_params['centers']: 闭集类中心（每个类一个中心，shape=[60,512]）
+
+  关键参数:
+    --config: YAML配置文件路径
+    --dataset: Nsynth / FMC / librispeech
+    --pretrained_model_path1: ImageNet预训练权重路径（额外需要一个预训练阶段）
+    --dataroot: 数据集根目录
+    --train_classes: 基类数量（如60）
+    --epoch: 预训练轮数
+    --learning_rate: 初始学习率
+
+【阶段二：元训练 (main.py)】
+  目的: 在少样本开放集场景下训练My_Net
+
+  流程:
+  1. 解析命令行参数 + 加载YAML配置文件
+  2. 构建元训练数据加载器 (episode式) 和元测试数据加载器
+  3. 创建My_Net模型 (mode='train')
+  4. 加载阶段一的预训练权重:
+     - feature_params → 加载编码器权重
+     - RPL_params → 初始化 weight_base_open (开放集原型)
+     - GCPL_params → 初始化 weight_base (闭集原型)
+  5. 元训练循环（C2_Net_train.default_train）:
+     每个episode:
+     a. 采样 N-way 类，分为闭集类和开放集类
+     b. 获取 support/query/open-set 样本
+     c. 编码所有音频为特征
+     d. Task 1 (原始任务):
+        - CIAM: 用query特征增强support特征
+        - PAM: 动态聚合为原型
+        - NPM: 结合基类权重生成假类中心
+        - 余弦度量 → 分类 (N+1-way, 最后一类为"未知")
+     e. Task 2 (数据增强任务):
+        - 用support样本作为query，open-set support和query互换
+        - 同样的CIAM→PAM→NPM→分类流程
+     f. 总损失 = Task1交叉熵 + Task2交叉熵
+  6. 定期在验证集上评估: ACC / AUROC / F-score
+  7. 保存最佳模型
+
+  测试模式 (--test True):
+  - 加载已保存的最佳模型（model_Nsynth_max_auroc.pth）
+  - 加载 weight_base 和 weight_base_open
+  - 在元测试集上评估
+
+
+3. 模型架构详解 (My_Net)
+--------------------
+
+输入: 原始音频波形 (1D tensor)
+  ↓
+音频预处理:
+  Spectrogram提取 (STFT) → Log-Mel FilterBank → BatchNorm → 复制3通道
+  ↓
+ResNet-18 编码器:
+  → 输出两个特征:
+    x: 全局池化后的特征 [B, 512]（用于原型计算）
+    x1: layer4特征图 [B, 512, H, W]（用于CIAM空间注意力）
+  ↓
+三个核心模块:
+  (1) CIAM (条件信息耦合模块):
+      - 非局部注意力机制
+      - query特征引导support特征增强
+      - 输出增强后的support特征图
+
+  (2) PAM (原型动态聚合模块):
+      - 计算每个样本与类均值的余弦相似度作为权重
+      - 加权聚合 + 残差连接 → 得到每个类的原型
+
+  (3) NPM (开放集生成器):
+      - 使用多头注意力从基类权重中获取信息
+      - 结合support原型和基类闭集/开放集权重
+      - 生成假类中心作为第(N+1)类的原型
+
+  ↓
+度量计算:
+  Metric_Cosine: 余弦相似度 + 可学习温度参数
+  → [N+1]-way 分类概率
+
+
+4. Episode 数据组织方式
+--------------------
+每个episode返回:
+  support_xs:    闭集support样本 [n_ways * n_shots, seq_len]
+  support_ys:    闭集support标签 [n_ways * n_shots]
+  query_xs:      闭集query样本 [n_ways * n_queries, seq_len]
+  query_ys:      闭集query标签 [n_ways * n_queries]
+  suppopen_xs:   开放集support样本 [n_open_ways * n_shots, seq_len]
+  suppopen_ys:   开放集support标签
+  openset_xs:    开放集query样本 [n_open_ways * n_queries, seq_len]
+  openset_ys:    开放集query标签
+  base_ids:      未被采样的基类索引（用于获取基类权重）
+  cls_open_ids:  被采样为开放集的类索引
+
+典型参数: n_ways=5, n_shots=5, n_queries=15, n_open_ways=5
+
+================================================================================
+二、预训练模型下载
+================================================================================
+
+1. ImageNet预训练 ResNet-18
+--------------------
+  代码中 resnet18_encoder.py 已内置自动下载:
+  URL: https://download.pytorch.org/models/resnet18-5c106cde.pth
+  下载到: ~/.cache/torch/checkpoints/resnet18-5c106cde.pth
+  → 调用 resnet18(True, args) 时自动触发
+
+2. 论文的预训练模型（阶段一的产出）
+--------------------
+  代码中没有提供预训练模型的下载链接。
+  论文作者未在readme中提供预训练模型下载。
+  GitHub上未找到本论文的官方代码仓库。
+  → 需要自己运行预训练阶段生成。但注意: 预训练阶段依赖 loss/RPLoss.py
+     和 loss/GCPLoss.py，这两个文件在项目中缺失（见第四节）。
+
+3. 可能的参考实现
+--------------------
+  同一作者组的其他工作（FCAC系列）有GitHub仓库:
+  - chester-w-xie/FCAC_datasets: 数据集构建说明
+  - vinceasvp/FCAC: FCAC代码
+  - chester-w-xie/DPL_FCAC: DPL方法代码
+  这些仓库可能包含类似的RPL/GCPL损失实现，可参考补全。
+
+================================================================================
+三、数据集格式要求
+================================================================================
+
+1. NSynth-100 数据集
+--------------------
+  来源: 从Google NSynth数据集构建的100类子集
+  下载: https://www.modelscope.cn/datasets/pp199124903/NSynth-100/summary
+
+  目录结构:
+  dataroot/
+  ├── nsynth-100-fs_train.csv    # 训练集标注CSV
+  ├── nsynth-100-fs_val.csv      # 验证集标注CSV
+  ├── nsynth-100-fs_test.csv     # 测试集标注CSV
+  ├── nsynth-100-fs_vocab.json   # 乐器名称→数字标签映射
+  └── {audio_source}/audio/{filename}.wav  # 音频文件
+
+  CSV列:
+    - instrument: 乐器名称 (字符串，通过vocab.json映射为数字标签)
+    - audio_source: 音频来源子目录
+    - filename: 音频文件名 (不含.wav后缀)
+    - label: 数字标签 (在代码中动态生成)
+
+  数据划分:
+    - 基类: 0 ~ train_classes-1 (如0~59, 60个类)
+    - 新类: train_classes ~ 99
+
+2. FSC-89 数据集
+--------------------
+  来源: 从FSD-MIX-CLIPS数据集构建的89类子集
+  下载: https://www.modelscope.cn/datasets/pp199124903/FSC-89/summary
+
+  目录结构:
+  dataroot/
+  ├── Fsc89-mini-fsci_train.csv
+  ├── Fsc89-mini-fsci_test.csv
+  ├── Fsc89-mini-fsci_val.csv
+  └── audio/{data_folder}/{filename}.wav
+
+  CSV列:
+    - FSD_MIX_SED_filename: 原始文件名
+    - start_time: 起始时间 (秒)
+    - data_folder: 数据子目录
+    - label: 数字标签
+
+  音频文件名生成规则:
+    filename = FSD_MIX_SED_filename.replace('.wav', '_' + str(int(start_time * 44100)) + '.wav')
+  采样率: 44100 Hz
+
+  数据划分:
+    - 基类: 0 ~ train_classes-1 (如0~58, 59个类)
+    - 新类: train_classes ~ 88
+
+3. LS-100 数据集
+--------------------
+  来源: 从LibriSpeech数据集构建的100类说话人子集
+  下载: https://www.modelscope.cn/datasets/pp199124903/LS-100/summary
+
+  目录结构:
+  dataroot/
+  ├── librispeech_fscil_train.csv
+  ├── librispeech_fscil_val.csv
+  ├── librispeech_fscil_test.csv
+  └── 100spks_segments/{filename}  # 音频片段
+
+  CSV列:
+    - filename: 音频文件名
+    - label: 数字标签 (0~99, 对应100个说话人)
+
+  数据划分:
+    - 基类: 0 ~ train_classes-1 (如0~59, 60个类)
+    - 新类: train_classes ~ 99
+
+4. 数据集共同特征
+--------------------
+  - 每个数据集都有 train/val/test CSV 标注文件
+  - 基类用于预训练和元训练，新类仅用于元测试
+  - Episode式数据加载: 每次采样 n_ways 个闭集类 + n_open_ways 个开放集类
+  - 音频加载: 使用 torchaudio.load() 直接加载wav波形
+  - 频谱提取: 在模型forward中动态完成 (STFT → Log-Mel → BN → 3通道复制)
+
+================================================================================
+四、已补全的组件（所有缺失部件已实现）
+================================================================================
+
+1. 已创建: default.yml 配置文件 ✓
+--------------------
+  已为TAU22数据集创建 ./default.yml，包含完整的训练配置:
+    extractor: window_size=1024, hop_size=256, sample_rate=16000, mel_bins=128
+    episode: n_ways=2, n_open_ways=2, n_shots=5, n_queries=15, train_classes=6
+    training: epoch=60, epochs_pre=60, batch_size=64, lr=0.001
+    save_folder: './save_tau22'
+    dataroot: '/coding/TAU-urban-acoustic-scenes-2022-mobile-development'
+
+2. 已创建: loss/RPLoss.py 和 loss/GCPLoss.py ✓
+--------------------
+  loss/RPLoss.py:
+    ReciprocalDist(nn.Module): 可学习的每类反原型中心 [C, 512]
+    RPLoss(nn.Module):
+      - 接口: RPLoss(**vars(args)), .Dist.state_dict() → {'centers': [C, 512]}
+      - forward(features, logits, labels, epoch) → (logits, loss)
+      - 逻辑: 负距离→分类logits, margin loss推远特征+交叉熵+熵正则
+
+  loss/GCPLoss.py:
+    CenterDist(nn.Module): 可学习的每类原型中心 [C, 512]
+    GCPLoss(nn.Module):
+      - 接口: GCPLoss(**vars(args)), .Dist.state_dict() → {'centers': [C, 512]}
+      - forward(features, logits, labels) → (logits, loss)
+      - 逻辑: 余弦相似度→logits, 交叉熵+中心对齐损失
+
+3. 已创建: datasets/TAU22.py ✓
+--------------------
+  TAU22Pretrain(Dataset): 预训练数据集, 返回 (audio_1d, label)
+  OpenTAU22(Dataset): Episode式元训练/测试数据集, 返回10-tuple
+    - base_ids 始终引用基类范围 [0..train_classes-1], 确保weight_base索引合法
+    - 使用 librosa.load() 加载音频 (兼容当前环境)
+
+4. 已修复的Bug ✓
+--------------------
+  a. models/Network.py:
+     - init_representation: view(60,512) → view(args.train_classes, 512)
+     - get_representation: 修复 else 分支 base_ids 为 None 时的 IndexError
+     - get_representation: 添加 len(base_ids)>0 检查防止空索引
+
+  b. models/module/transformer.py:
+     - OpenSetGenerater (NPM): 原始MHA调用 base_weight.transpose(0,1) 导致
+       Linear(512,512) 收到 last_dim!=512 → RuntimeError
+       修复: 重写为显式交叉注意力 _cross_attention(), 使用 Q/K/V 投影
+       + 处理 3D key_value (测试模式 base_weights 为 [1, C, D])
+     - fake_center 输出维度: 原始 unsqueeze(0).unsqueeze(0) 产生5D → 修正为3D
+
+  c. models/module/resnet18_encoder.py:
+     - torch.load 添加 weights_only=False (PyTorch 2.6+ 兼容)
+
+  d. trainers/Pretrainer.py:
+     - pretrained_model_path1: 空值/不存在时跳过加载 (首次运行无预训练权重)
+     - save_3_model 路径: '/data/jessy/...' → args.save_folder
+     - config 默认路径: 修正为 './default.yml'
+     - dataroot 默认值: 修正为 TAU22 数据集路径
+
+  e. trainers/trainer.py:
+     - dataset choices 添加 'TAU22'
+     - 默认 dataset='TAU22', test=False, dataroot 更新
+
+  f. datasets/dataloaders.py:
+     - 添加 TAU22 分支 (meta_train_dataloader + meta_test_dataloader)
+
+5. 已修复的硬编码路径 ✓
+--------------------
+  - Pretrainer.py: save_3_model 保存路径改为 args.save_folder
+  - Pretrainer.py: config 默认路径 './default.yml'
+  - Pretrainer.py: dataroot 默认 TAU22 路径
+  - trainer.py: dataroot 默认 TAU22 路径
+
+================================================================================
+五、TAU22 Few-Shot OSR 运行流程
+================================================================================
+
+数据集 (TAU22):
+  10 个声学场景类, 6 基类 + 4 新类
+  训练集: 6 类 × 5000 = 30000 样本 (airport/tram/bus/public_square/shopping_mall/street_pedestrian)
+  评估集: 10 类 × 1800 = 18000 样本 (含 metro/metro_station/park/street_traffic 4个新类)
+  音频: 1秒, 16kHz, 单声道 WAV
+
+Episode 设置 (适配6基类):
+  n_ways=2, n_open_ways=2, n_shots=5, n_queries=15
+  训练 episode: 从6基类采样2闭集+2开放集, 剩余2基类用于base_ids
+  测试 episode: 从4新类采样2闭集+2开放集, 6基类全部作为base_ids
+
+运行命令:
+  # Step 1: RPL/GCPL 预训练
+  python pretrain.py --config default.yml
+
+  # Step 2: 元训练
+  python main.py --config default.yml --pretrain False --test False
+
+  # Step 3: 测试
+  python main.py --config default.yml --pretrain False --test True
+
+================================================================================
+六、关键注意事项
+================================================================================
+
+1. 所有缺失组件已补全: loss模块、配置文件、数据集类均已就绪 ✓
+2. 原始代码中的多个Bug已修复: 硬编码维度、NPM注意力形状错误、索引越界等 ✓
+3. NPM模块已重写: 原始MHA调用存在维度不匹配, 改为显式交叉注意力
+4. 频谱参数针对TAU22优化: window=1024, hop=256 (1秒音频→59帧, ResNet后~4x4)
+5. 评估指标: ACC (闭集准确率), AUROC (开放集检测), F-score (宏平均F1)
+6. 预训练时 backbone.eval() 冻结编码器, 只训练 RPL/GCPL 参数
+7. 元训练时 encoder 用较小学习率 (0.0002), 其他模块用正常学习率 (0.001)
+8. base_ids 机制: 始终引用基类范围 [0..train_classes-1], 确保权重索引合法

@@ -1,0 +1,60 @@
+# Large data directories
+TAU-urban-acoustic-scenes-2019-development/
+TAU-urban-acoustic-scenes-2022-mobile-development/
+TAU19zips/
+TAU22zips/
+audio_classifying/
+
+# Unrelated project directories
+DESED_2018/
+FOAC-AIFP/
+GenRepASD/
+GraphPainting/
+Reversable_Function/
+dcase-few-shot-bioacoustic/
+loss_function/
+vggish/
+vggish_PT_convert/
+yamnet_PT_convert/
+runs/
+
+# Old/unused scripts
+analyze_phase0.py
+audio_data_analysis.py
+diagnose_flow.py
+exam_tool.py
+feature_analysis.py
+osr_training_model.py
+plot_training.py
+training_model.py
+vggish_inference.py
+vggish_pytorch_model.py
+yamnet_PT_inference.py
+
+# Old flow model files (not used in current episodic pipeline)
+FewShot_FlowAC.py
+FewShot_FlowB.py
+Final_Model.py
+Final_classify_Model.py
+Flow_Models.py
+
+# Old experiment logs
+TAU22_yamnet_osr5.log
+TAU22_yamnet_osr7.log
+
+# Old experiment results (keep yamnet_fewshot_osr12 and osr13)
+experiment/TAU19_1s_audio_analysis/
+experiment/TAU22_1s_audio_analysis/
+experiment/fewshot/
+experiment/yamnet_OSR/
+experiment/yamnet_fewshot_osr/
+experiment/yamnet_fewshot_osr2/
+experiment/yamnet_fewshot_osr3/
+experiment/yamnet_fewshot_osr6/
+experiment/yamnet_fewshot_osr7/
+experiment/yamnet_fewshot_osr8/
+experiment/yamnet_fewshot_osr10/
+experiment/yamnet_fewshot_osr11/
+
+# Compiled/cache
+__pycache__/

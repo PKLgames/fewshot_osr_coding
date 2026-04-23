@@ -1,0 +1,230 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+/coding/episodic_trainer.py:2321: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  self.scheduler.step()
+GPU: NVIDIA GeForce RTX 4090
+VRAM: 23.5 GB
+
+======================================================================
+Few-Shot Open Set Recognition - Episodic Training Pipeline
+Backbone: panns_cnn14
+======================================================================
+
+Loading datasets...
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+
+Base feature extractor already exists: experiment/pann_fewshot_osr2/base_feature_extractor.pth
+PANNsFeatureExtractor: loaded 77/77 backbone parameters from panns_cnn14_16k.pth
+PANNsFeatureExtractor: loaded 108/108 parameters from experiment/pann_fewshot_osr2/base_feature_extractor.pth
+
+======================================================================
+Phase 1: Feature Extraction
+======================================================================
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v19_distil_ast_panns)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v19_distil_ast_panns)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v19_distil_ast_panns)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+
+Computing t-SNE on 5000 samples...
+t-SNE plot saved: experiment/pann_fewshot_osr2/tsne_features.png
+
+======================================================================
+Phase 2: Episodic Meta-Training
+======================================================================
+OOD exposure: disabled (pann_osr2 simplified approach)
+Initializing GMM Boundary Sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=-9.86, 10th percentile=-32.47
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 13,474
+
+Resumed from episode 1950 (Val Acc: 66.00%)
+Continuing from episode 1951 to 10000
+
+======================================================================
+Episodic Meta-Training: 5-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         10000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       150 episodes
+Proto noise std:  0.15
+OOD ratio:          0.0
+LR warmup:        100 episodes
+Stage2 (cls):     200 episodes
+Stage3 (struct):  400 episodes
+Gaussian prior:   starts from ep 1 (co-trained with CE)
+Patience:         2000 episodes (13 evals)
+Training mode:    Single-stage joint (classification + OOD together)
+======================================================================
+
+Ep  2100/10000 | CE: 1.3718 Total: 1.2729 Acc: 49.07% | Val Loss: 1.2815 Acc: 65.67% | LR: 3.91e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  2250/10000 | CE: 1.3919 Total: 1.2929 Acc: 47.23% | Val Loss: 1.2448 Acc: 64.89% | LR: 3.89e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  2400/10000 | CE: 1.3793 Total: 1.2801 Acc: 48.44% | Val Loss: 1.2718 Acc: 64.09% | LR: 3.86e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  2550/10000 | CE: 1.3708 Total: 1.2716 Acc: 49.12% | Val Loss: 1.2864 Acc: 64.80% | LR: 3.82e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  2700/10000 | CE: 1.3521 Total: 1.2527 Acc: 48.75% | Val Loss: 1.2756 Acc: 64.29% | LR: 3.77e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  2850/10000 | CE: 1.3726 Total: 1.2732 Acc: 49.18% | Val Loss: 1.1830 Acc: 66.09% | LR: 3.71e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+  -> Best model saved (Val Acc: 66.09%)
+Ep  3000/10000 | CE: 1.3592 Total: 1.2597 Acc: 49.20% | Val Loss: 1.2720 Acc: 65.29% | LR: 3.63e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  3150/10000 | CE: 1.3484 Total: 1.2489 Acc: 48.57% | Val Loss: 1.1615 Acc: 67.47% | LR: 3.54e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+  -> Best model saved (Val Acc: 67.47%)
+Ep  3300/10000 | CE: 1.3551 Total: 1.2556 Acc: 48.80% | Val Loss: 1.2174 Acc: 66.24% | LR: 3.45e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  3450/10000 | CE: 1.3653 Total: 1.2657 Acc: 49.22% | Val Loss: 1.1646 Acc: 67.64% | LR: 3.35e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+  -> Best model saved (Val Acc: 67.64%)
+Ep  3600/10000 | CE: 1.3363 Total: 1.2367 Acc: 49.26% | Val Loss: 1.1659 Acc: 68.09% | LR: 3.23e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+  -> Best model saved (Val Acc: 68.09%)
+Ep  3750/10000 | CE: 1.3360 Total: 1.2364 Acc: 49.92% | Val Loss: 1.2317 Acc: 66.11% | LR: 3.11e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  3900/10000 | CE: 1.3550 Total: 1.2554 Acc: 47.87% | Val Loss: 1.2133 Acc: 66.67% | LR: 2.99e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  4050/10000 | CE: 1.3285 Total: 1.2288 Acc: 49.25% | Val Loss: 1.1440 Acc: 67.84% | LR: 2.85e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  4200/10000 | CE: 1.3275 Total: 1.2279 Acc: 49.00% | Val Loss: 1.1056 Acc: 68.20% | LR: 2.71e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+  -> Best model saved (Val Acc: 68.20%)
+Ep  4350/10000 | CE: 1.3094 Total: 1.2098 Acc: 50.03% | Val Loss: 1.1334 Acc: 67.36% | LR: 2.57e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  4500/10000 | CE: 1.3040 Total: 1.2042 Acc: 50.18% | Val Loss: 1.1848 Acc: 67.02% | LR: 2.42e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  4650/10000 | CE: 1.3218 Total: 1.2221 Acc: 49.52% | Val Loss: 1.1446 Acc: 67.09% | LR: 2.27e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+Ep  4800/10000 | CE: 1.3199 Total: 1.2202 Acc: 49.53% | Val Loss: 1.1742 Acc: 66.49% | LR: 2.12e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 0.0(≈32) z_std: 0.000(≈1.0)
+
+!!! Early stopping at episode 4800 !!!
+
+Loaded best model (Val Acc: 68.20%, Ep 4200)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 68.20%
+======================================================================
+Episode history saved: experiment/pann_fewshot_osr2/episodic_history.json
+
+======================================================================
+Phase 3: Evaluation & OSR Calibration
+======================================================================
+
+--- Base class few-shot evaluation (train cache) ---
+5w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w1s eval:  14%|█▍        | 14/100 [00:00<00:00, 133.94it/s]5w1s eval:  28%|██▊       | 28/100 [00:00<00:00, 134.83it/s]5w1s eval:  42%|████▏     | 42/100 [00:00<00:00, 135.19it/s]5w1s eval:  56%|█████▌    | 56/100 [00:00<00:00, 135.27it/s]5w1s eval:  70%|███████   | 70/100 [00:00<00:00, 134.59it/s]5w1s eval:  84%|████████▍ | 84/100 [00:00<00:00, 135.20it/s]5w1s eval:  98%|█████████▊| 98/100 [00:00<00:00, 135.64it/s]5w1s eval: 100%|██████████| 100/100 [00:00<00:00, 135.22it/s]
+
+  5-way 1-shot: Acc = 59.91% +/- 2.35% (conf: 82.28%)
+5w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w5s eval:  14%|█▍        | 14/100 [00:00<00:00, 134.48it/s]5w5s eval:  28%|██▊       | 28/100 [00:00<00:00, 134.12it/s]5w5s eval:  42%|████▏     | 42/100 [00:00<00:00, 134.51it/s]5w5s eval:  56%|█████▌    | 56/100 [00:00<00:00, 134.87it/s]5w5s eval:  70%|███████   | 70/100 [00:00<00:00, 134.94it/s]5w5s eval:  84%|████████▍ | 84/100 [00:00<00:00, 133.09it/s]5w5s eval:  98%|█████████▊| 98/100 [00:00<00:00, 133.45it/s]5w5s eval: 100%|██████████| 100/100 [00:00<00:00, 133.86it/s]
+
+  5-way 5-shot: Acc = 69.59% +/- 1.31% (conf: 85.51%)
+5w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w10s eval:  14%|█▍        | 14/100 [00:00<00:00, 133.36it/s]5w10s eval:  28%|██▊       | 28/100 [00:00<00:00, 133.06it/s]5w10s eval:  42%|████▏     | 42/100 [00:00<00:00, 133.11it/s]5w10s eval:  56%|█████▌    | 56/100 [00:00<00:00, 133.21it/s]5w10s eval:  70%|███████   | 70/100 [00:00<00:00, 133.01it/s]5w10s eval:  84%|████████▍ | 84/100 [00:00<00:00, 132.69it/s]5w10s eval:  98%|█████████▊| 98/100 [00:00<00:00, 132.40it/s]5w10s eval: 100%|██████████| 100/100 [00:00<00:00, 132.71it/s]
+
+  5-way 10-shot: Acc = 69.49% +/- 1.14% (conf: 85.75%)
+
+--- Novel class few-shot evaluation (test cache) ---
+4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:  16%|█▌        | 16/100 [00:00<00:00, 150.64it/s]4w1s eval:  32%|███▏      | 32/100 [00:00<00:00, 150.71it/s]4w1s eval:  48%|████▊     | 48/100 [00:00<00:00, 150.87it/s]4w1s eval:  64%|██████▍   | 64/100 [00:00<00:00, 150.67it/s]4w1s eval:  80%|████████  | 80/100 [00:00<00:00, 151.14it/s]4w1s eval:  96%|█████████▌| 96/100 [00:00<00:00, 151.35it/s]4w1s eval: 100%|██████████| 100/100 [00:00<00:00, 150.95it/s]
+
+  4-way 1-shot: Acc = 37.67% +/- 1.82% (conf: 77.15%)
+4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:  15%|█▌        | 15/100 [00:00<00:00, 149.68it/s]4w5s eval:  31%|███       | 31/100 [00:00<00:00, 150.74it/s]4w5s eval:  47%|████▋     | 47/100 [00:00<00:00, 150.33it/s]4w5s eval:  63%|██████▎   | 63/100 [00:00<00:00, 149.18it/s]4w5s eval:  79%|███████▉  | 79/100 [00:00<00:00, 150.22it/s]4w5s eval:  95%|█████████▌| 95/100 [00:00<00:00, 150.11it/s]4w5s eval: 100%|██████████| 100/100 [00:00<00:00, 149.90it/s]
+
+  4-way 5-shot: Acc = 40.97% +/- 1.24% (conf: 77.96%)
+4w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w10s eval:  15%|█▌        | 15/100 [00:00<00:00, 148.95it/s]4w10s eval:  31%|███       | 31/100 [00:00<00:00, 150.42it/s]4w10s eval:  47%|████▋     | 47/100 [00:00<00:00, 153.34it/s]4w10s eval:  63%|██████▎   | 63/100 [00:00<00:00, 155.03it/s]4w10s eval:  79%|███████▉  | 79/100 [00:00<00:00, 156.04it/s]4w10s eval:  95%|█████████▌| 95/100 [00:00<00:00, 157.33it/s]4w10s eval: 100%|██████████| 100/100 [00:00<00:00, 155.51it/s]
+
+  4-way 10-shot: Acc = 43.42% +/- 1.31% (conf: 77.30%)
+NOTE: use_flow=False, skipping flow-dependent methods (z_*, flow_*)
+
+--- OSR FEATURE_MAHALANOBIS calibration (calib data) ---
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-26.45, -3.80] mean=-7.41
+Unknown scores: [-29.40, -3.81] mean=-8.93
+Mean separation: 1.52 (positive = known higher = good)
+
+Threshold (tau): -10.7571
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 19.67%
+
+--- OSR FEATURE_MAHALANOBIS evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   21.33%
+  OSR Score (mean):         58.17%
+
+--- OSR OOD_HEAD calibration (calib data) ---
+
+======================================================================
+OSR Calibration (OOD_HEAD)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [0.97, 1.00] mean=1.00
+Unknown scores: [0.98, 1.00] mean=1.00
+Mean separation: -0.00 (positive = known higher = good)
+
+Threshold (tau): 0.9921
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 5.00%
+
+--- OSR OOD_HEAD evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (OOD_HEAD)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   3.65%
+  OSR Score (mean):         49.32%
+
+======================================================================
+OSR Method Comparison (test data, per-round recalibration)
+======================================================================
+  Method                    TNR      TPR      OSR
+  feature_mahalanobis   95.00%  21.33%  58.17%
+  ood_head              95.00%   3.65%  49.32%
+
+Final model saved: experiment/pann_fewshot_osr2/fewshot_final.pth
+
+======================================================================
+Pipeline complete!
+======================================================================
+
+Generating analysis plots from: TAU22_yamnet_osr7.log
+Output directory: experiment/pann_fewshot_osr2
+
+
+All plots saved to: experiment/pann_fewshot_osr2/

@@ -1,0 +1,231 @@
+改进计划总览
+
+  历史迭代关键教训
+
+  1. **特征质量决定 OSR 上限** - feature_mahalanobis 从 12%→21% (PANN vs YAMNet)
+  2. **复杂方法（z/flow）不稳定** - z_consistency 20%→6%, flow 方法 <8%
+  3. **PANN Base 分类 underfitting** - 68% vs YAMNet 83%
+  4. **PANN Novel 泛化能力更强** - 48% vs YAMNet 44%
+  5. **单阶段训练 + feature_mahalanobis** = 简单有效
+
+  历史结果对比
+
+  ┌────────────────────┬──────────┬──────────┬──────────┬──────────┐
+  │        指标        │ osr13    │ pann1    │ 变化     │ 最佳     │
+  ├────────────────────┼──────────┼──────────┼──────────┼──────────┤
+  │ Backbone           │ YAMNet   │ PANNs    │ -        │ -        │
+  │ Phase 0b epochs    │ 20       │ 20       | -        │ -        │
+  │ Base 5-shot        │ 83.60%   │ 68.33%   │ -15.27%  │ osr13    │
+  │ Novel 5-shot       │ 44.27%   │ 47.93%   │ +3.66%   │ pann1 ✓ │
+  │ feat_mahal TPR     │ 11.87%   │ 21.33%   │ +79.6%   │ pann1 ✓ │
+  │ z_consistency TPR  │ 20.22%   │ 6.34%    │ -68.6%   │ osr13    │
+  │ flow_hybrid TPR    │ ~10%     │ 7.47%    │ -25%     │ osr13    │
+  │ flow_energy TPR    │ ~5%      │ 3.73%    │ -25%     │ osr13    │
+  │ ood_head TPR       │ ~13%     │ 4.66%    | -64%     │ osr13    │
+  └────────────────────┴──────────┴──────────┴──────────┴──────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PANN OSR1 结果分析
+
+  核心发现：
+  1. **特征质量是 OSR 性能的决定因素**
+     → feature_mahalanobis: 11.87% → 21.33% (+79%)
+     → PANN 全局特征显著优于 YAMNet 局部特征
+     → 这是唯一可靠的 OSR 方法
+
+  2. **Base 分类严重 underfitting**
+     → YAMNet 83.60% vs PANN 68.33% (-15%)
+     → PANN fine-tune 不充分（仅 20 epochs, 2 层）
+     → 需要更强训练策略
+
+  3. **Novel 分类改善验证 PANN 优势**
+     → 47.93% vs 44.27% (+3.7%)
+     → 全局时序理解对新类泛化更好
+
+  4. **z/flow 方法全面失效**
+     → z_consistency: 20% → 6% (崩溃)
+     → flow_hybrid: <8% (不可靠)
+     → 复杂方法不稳定，不应作为主要 OSR 策略
+
+  结论：
+  - **OSR = 特征质量 + 简单方法** (feature_mahalanobis)
+  - **PANN 需要更强 fine-tune** (修复 Base 分类)
+  - **放弃复杂方法优化** (z/flow 不可靠)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  当前计划：pann_osr2
+
+  策略转变：从复杂方法优化 → 基础能力强化
+
+  实施步骤：
+
+  1. **强化 PANN fine-tune（修复 Base 分类）**
+     - Phase 0b epochs: 20 → 50
+     - 解冻层: conv_block4-6 (3层 → 4层, 增加 conv_block3)
+     - Backbone LR: 5e-6 → 2e-6 (更慢更稳)
+     - FC LR: 5e-5 → 3e-5
+     - 目标: Base 5-shot >78%
+
+  2. **简化 OSR 方法（仅保留可靠的）**
+     - 主方法: feature_mahalanobis (21.33% TPR, 稳定)
+     - 辅助: 无（放弃 z/flow 优化）
+     - 评估: 仅 feature_mahalanobis
+     - 目标: feat_mahal TPR >22%
+
+  3. **Phase 2 简化配置**
+     - 移除 L_gaussian, L_density, L_entropy
+     - 仅保留基础分类 loss: CE + L_separation
+     - 移除 OOD stop-gradient
+     - 训练更稳定，收敛更快
+
+  4. **配置修改**
+     - backbone: panns_cnn14
+     - experiment_dir: experiment/pann_fewshot_osr2
+     - Phase 0b epochs: 50
+     - backbone_unfreeze_layers: ['conv_block3', 'conv_block4', 'conv_block5', 'conv_block6']
+     - backbone_lr: 2e-6
+     - fc_lr: 3e-5
+
+  5. **移除的组件**
+     - EpisodicFlowClassifier → 简化为 PrototypicalNetwork
+     - GMMBoundarySampler → 简化为随机采样
+     - OOD stop-gradient → 移除
+     - 所有 z/flow loss → 移除
+
+  预期结果：
+  - Base 5-shot: >78% (修复 underfitting)
+  - Novel 5-shot: >50% (保持 PANN 优势)
+  - feat_mahal TPR: >22% (保持稳定)
+  - 训练时间: ~50% 减少 (移除复杂组件)
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PANN OSR2 实际结果
+
+  实际配置：
+    - Phase 0b: 50 epochs, conv_block3-6 unfrozen
+    - backbone_lr: 2e-6, fc_lr: 3e-5
+    - use_flow: False (简化配置)
+
+  实际结果：
+    - Base 5-shot: 69.59% (target: 78%, gap: -8.4%)
+    - Novel 5-shot: 40.97%
+    - feat_mahal TPR: 21.33% (稳定)
+    - ood_head TPR: 3.65% (失效)
+
+  关键发现：
+    1. **Base 分类仍然 underfitting** (69.59% vs 78% target)
+       → PANN fine-tune 策略未达预期
+       → 50 epochs + 4层解冻仍不足
+
+    2. **OSR 性能稳定** (feat_mahal 21.33%)
+       → 验证了简化策略的有效性
+       → 特征质量不是瓶颈
+
+    3. **OOD Head 失效** (TPR 3.65%)
+       → 可能需要 Phase 2 训练优化
+
+  决策：切换至 AST backbone（更强的预训练）
+
+完成后决策（已执行）：
+  - Base 5-shot = 69.59% (<75%) → 切换至 AST backbone
+  - feat_mahal TPR = 21.33% (<25%) → 特征质量未突破
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  当前计划：ast_osr1
+
+  策略：使用 AST backbone + 简化 OSR 配置
+
+  实施步骤：
+
+  1. **AST Backbone 配置**
+     - backbone: ast (Audio Spectrogram Transformer)
+     - 预训练权重: AudioSet pretrained
+     - 解冻层: encoder.layer.10, encoder.layer.11 (2层)
+     - Backbone LR: 5e-6 (更保守)
+     - FC LR: 5e-5
+     - Phase 0b epochs: 20 (AST 更强，更少 epochs)
+
+  2. **简化 OSR 方法（同 pann_osr2）**
+     - use_flow: False
+     - ood_ratio: 0.0
+     - 主方法: feature_mahalanobis
+     - 辅助: ood_head
+
+  3. **配置修改**
+     - experiment_dir: experiment/ast_fewshot_osr1
+     - backbone: ast
+     - Phase 0b epochs: 20
+     - backbone_unfreeze_layers: ['encoder.layer.10', 'encoder.layer.11']
+     - backbone_lr: 5e-6, fc_lr: 5e-5
+
+  预期结果：
+    - Base 5-shot: >75% (修复 PANN underfitting)
+    - Novel 5-shot: >45%
+    - feat_mahal TPR: >20%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  AST OSR1 实际结果
+
+  实际配置：
+    - Phase 0b: 20 epochs, encoder.layer.4-5 unfrozen (2层)
+    - backbone_lr: 5e-6 (Distil-AST: 5e-7)
+    - use_flow: False
+
+  实际结果：
+    - Base 5-shot: 64.67% (target: 75%, gap: -10.33%)
+    - Novel 5-shot: 44.15% (优于 PANN)
+    - feat_mahal TPR: 21.33% (与 PANN 持平)
+
+  关键发现：
+    1. **Base 分类低于预期** (64.67% vs PANN 69.59%)
+       → Distil-AST fine-tune 不足
+       → 20 epochs/2层 可能过于保守
+
+    2. **Novel 分类优于 PANN** (44.15% vs 40.97%)
+       → Transformer 更强的泛化能力
+       → 预训练特征质量更好
+
+    3. **OSR 性能与 PANN 持平** (21.33% TPR)
+       → 验证了特征空间的一致性
+       → feature_mahalanobis 是稳定可靠的方法
+
+  全对比总结：
+    ┌────────────────┬──────────┬──────────┬──────────┐
+    │     指标       │ YAMNet   │ PANN     │ AST      │
+    ├────────────────┼──────────┼──────────┼──────────┤
+    │ Base 5-shot    │ 83.60% ✓ │ 69.59%   │ 64.67%   │
+    │ Novel 5-shot   │ 44.27%   │ 40.97%   │ 44.15% ✓ │
+    │ feat_mahal TPR │ 11.87%   │ 21.33% ✓ │ 21.33% ✓ │
+    └────────────────┴──────────┴──────────┴──────────┘
+
+  结论：YAMNet 仍然是最佳综合选择
+
+完成后决策（已执行）：
+  - Base 5-shot = 64.67% (<70%) → AST 策略未达预期
+  - 建议：回归 YAMNet backbone，优化 OSR 方法
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  最终建议：回归 YAMNet + OSR 优化
+
+  背景：
+    - YAMNet Base 5-shot: 83.60%（远超其他）
+    - YAMNet OSR (feat_mahal): 11.87%（落后 PANN/AST 的 21.33%）
+    - 差距：YAMNet 特征局部性强，OSR 方法未充分利用
+
+  建议方向：
+    1. **使用 YAMNet backbone**（最佳 Base 分类）
+    2. **优化 OSR 方法**（提升 11.87% → 20%+）
+    3. **简化配置**（use_flow=False, 仅 feature_mahalanobis）
+
+  具体计划：yamnet_osr_final
+    - backbone: yamnet
+    - experiment_dir: experiment/yamnet_fewshot_osr18
+    - Phase 0b: 20 epochs, layer14 unfrozen
+    - 优化 OSR: 调整 Mahalanobis 计算或集成多个方法
+    - 目标: Base 5-shot >80%, feat_mahal TPR >15%
