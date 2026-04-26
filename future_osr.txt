@@ -1,231 +1,525 @@
-改进计划总览
+OSR17 重训行动指南 — 基于最新文献启发的全面重构
+================================================
 
-  历史迭代关键教训
+Baseline: FOAC-AIFP (华南理工, Li & Tan)
+  代码位置: /coding/FOAC-AIFP/
+  已有模型: save_tau22/ (pretrain + 3个best模型: acc/auroc/fscore)
+  Backbone: ResNet-18 (ImageNet预训练 → Log-Mel频谱 → 512-dim)
+  OSR方法: RPL互反点预训练 + NPM开放集生成器 + (N+1)-way分类
+  训练策略: 两阶段 (RPL/GCPL预训练 → Episodic元训练)
+  评估指标: ACC (闭集), AUROC (开放集), F-score
+  Episode配置: 2-way 5-shot 15-query (TAU22仅6基类，受限)
 
-  1. **特征质量决定 OSR 上限** - feature_mahalanobis 从 12%→21% (PANN vs YAMNet)
-  2. **复杂方法（z/flow）不稳定** - z_consistency 20%→6%, flow 方法 <8%
-  3. **PANN Base 分类 underfitting** - 68% vs YAMNet 83%
-  4. **PANN Novel 泛化能力更强** - 48% vs YAMNet 44%
-  5. **单阶段训练 + feature_mahalanobis** = 简单有效
+目标: 在FOAC-AIFP baseline之上，融合SupCon特征学习、可学习阈值、
+      互反点增强、Curriculum OOD等思想，实现OSR性能跃升
+前提: 需从头训练完整 Phase 0→1→2→3 流水线
 
-  历史结果对比
+与FOAC-AIFP的关键区别:
+  1. Backbone: YAMNet(64-dim) vs ResNet-18(512-dim) → 我们的更轻量
+  2. 特征学习: SupCon(有监督对比) vs RPL+GCPL → 更强的类间分离
+  3. OSR策略: 多方法融合 vs 单一(N+1)-way → 更鲁棒
+  4. Episode规模: 5-way vs 2-way → 我们评估更充分
 
-  ┌────────────────────┬──────────┬──────────┬──────────┬──────────┐
-  │        指标        │ osr13    │ pann1    │ 变化     │ 最佳     │
-  ├────────────────────┼──────────┼──────────┼──────────┼──────────┤
-  │ Backbone           │ YAMNet   │ PANNs    │ -        │ -        │
-  │ Phase 0b epochs    │ 20       │ 20       | -        │ -        │
-  │ Base 5-shot        │ 83.60%   │ 68.33%   │ -15.27%  │ osr13    │
-  │ Novel 5-shot       │ 44.27%   │ 47.93%   │ +3.66%   │ pann1 ✓ │
-  │ feat_mahal TPR     │ 11.87%   │ 21.33%   │ +79.6%   │ pann1 ✓ │
-  │ z_consistency TPR  │ 20.22%   │ 6.34%    │ -68.6%   │ osr13    │
-  │ flow_hybrid TPR    │ ~10%     │ 7.47%    │ -25%     │ osr13    │
-  │ flow_energy TPR    │ ~5%      │ 3.73%    │ -25%     │ osr13    │
-  │ ood_head TPR       │ ~13%     │ 4.66%    | -64%     │ osr13    │
-  └────────────────────┴──────────┴──────────┴──────────┴──────────┘
+实施路径: osr17a (特征升级+可学习阈值) → osr17b (互反点+curriculum OOD) → osr17c (不确定性建模)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  PANN OSR1 结果分析
+════════════════════════════════════════════════════════════════════
+零、Baseline (FOAC-AIFP) 先行运行
+════════════════════════════════════════════════════════════════════
 
-  核心发现：
-  1. **特征质量是 OSR 性能的决定因素**
-     → feature_mahalanobis: 11.87% → 21.33% (+79%)
-     → PANN 全局特征显著优于 YAMNet 局部特征
-     → 这是唯一可靠的 OSR 方法
+在开始osr17之前，先确保FOAC-AIFP baseline在TAU22上能跑出结果，
+作为论文对比实验的基准数据。
 
-  2. **Base 分类严重 underfitting**
-     → YAMNet 83.60% vs PANN 68.33% (-15%)
-     → PANN fine-tune 不充分（仅 20 epochs, 2 层）
-     → 需要更强训练策略
+已有模型 (save_tau22/):
+  pretrain_model_tau22.pth  — RPL/GCPL预训练权重
+  model_TAU22_max_acc.pth   — 最佳ACC模型
+  model_TAU22_max_auroc.pth — 最佳AUROC模型
+  model_TAU22_max_fscore.pth — 最佳F-score模型
 
-  3. **Novel 分类改善验证 PANN 优势**
-     → 47.93% vs 44.27% (+3.7%)
-     → 全局时序理解对新类泛化更好
+运行测试获取baseline指标:
+  cd /coding/FOAC-AIFP
+  python main.py --config default.yml --pretrain False --test True
 
-  4. **z/flow 方法全面失效**
-     → z_consistency: 20% → 6% (崩溃)
-     → flow_hybrid: <8% (不可靠)
-     → 复杂方法不稳定，不应作为主要 OSR 策略
+记录结果 (填入论文对比表):
+  □ ACC (闭集分类准确率)
+  □ AUROC (开放集检测曲线下面积)
+  □ F-score (宏平均F1)
 
-  结论：
-  - **OSR = 特征质量 + 简单方法** (feature_mahalanobis)
-  - **PANN 需要更强 fine-tune** (修复 Base 分类)
-  - **放弃复杂方法优化** (z/flow 不可靠)
+注意: FOAC-AIFP的Episode是2-way (受限于6基类)，
+      我们的方法用5-way，对比时需注明Episode配置差异。
+      若需公平对比，可调整我们方法的N_way=2跑一组。
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  当前计划：pann_osr2
+════════════════════════════════════════════════════════════════════
+一、osr17a: SupCon特征升级 + 可学习OSR阈值 (优先级1+2)
+════════════════════════════════════════════════════════════════════
 
-  策略转变：从复杂方法优化 → 基础能力强化
+预期收益: 特征质量全面提升 → 所有下游OSR方法受益
+工作量: 小 (改ContrastivePretrainer + 新增LearnableThreshold)
+预计耗时: Phase 0约2h + Phase 2约2h = ~4h
 
-  实施步骤：
+────────────────────────────────────────
+1.1 Phase 0a: SupCon替代SimCLR
+────────────────────────────────────────
 
-  1. **强化 PANN fine-tune（修复 Base 分类）**
-     - Phase 0b epochs: 20 → 50
-     - 解冻层: conv_block4-6 (3层 → 4层, 增加 conv_block3)
-     - Backbone LR: 5e-6 → 2e-6 (更慢更稳)
-     - FC LR: 5e-5 → 3e-5
-     - 目标: Base 5-shot >78%
+原理: SimCLR不知道类别标签，同类样本可能被推远。
+      SupCon利用已知类标签(仅base classes)，确保同类紧凑、异类远离。
+      特征空间越紧凑，feature_mahalanobis的TPR天然越高。
+      FOAC-AIFP的RPL也利用了类标签做互反点，但RPL是分类器级别的，
+      SupCon是特征级别的，更根本。
 
-  2. **简化 OSR 方法（仅保留可靠的）**
-     - 主方法: feature_mahalanobis (21.33% TPR, 稳定)
-     - 辅助: 无（放弃 z/flow 优化）
-     - 评估: 仅 feature_mahalanobis
-     - 目标: feat_mahal TPR >22%
+当前代码位置: ContrastivePretrainer (约L600-850)
+当前使用 NT-Xent (SimCLR) loss:
+  sim_matrix = F.cosine_similarity(z1.unsqueeze(1), z2.unsqueeze(0), dim=2)
+  loss = nt_xent_loss(sim_matrix, temperature)
 
-  3. **Phase 2 简化配置**
-     - 移除 L_gaussian, L_density, L_entropy
-     - 仅保留基础分类 loss: CE + L_separation
-     - 移除 OOD stop-gradient
-     - 训练更稳定，收敛更快
+更改方向:
 
-  4. **配置修改**
-     - backbone: panns_cnn14
-     - experiment_dir: experiment/pann_fewshot_osr2
-     - Phase 0b epochs: 50
-     - backbone_unfreeze_layers: ['conv_block3', 'conv_block4', 'conv_block5', 'conv_block6']
-     - backbone_lr: 2e-6
-     - fc_lr: 3e-5
+Step 1: 修改ContrastivePretrainer.train() (约L700-830):
 
-  5. **移除的组件**
-     - EpisodicFlowClassifier → 简化为 PrototypicalNetwork
-     - GMMBoundarySampler → 简化为随机采样
-     - OOD stop-gradient → 移除
-     - 所有 z/flow loss → 移除
+  # 当前: 完全无监督，batch内所有样本互为负例
+  # 改为: 有监督对比学习，利用base_classes标签
 
-  预期结果：
-  - Base 5-shot: >78% (修复 underfitting)
-  - Novel 5-shot: >50% (保持 PANN 优势)
-  - feat_mahal TPR: >22% (保持稳定)
-  - 训练时间: ~50% 减少 (移除复杂组件)
+  # 新增参数:
+  supervised_contrastive = True  # True=SupCon, False=SimCLR(回退)
 
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 构造batch时同时返回标签:
+  # _get_batch() 已返回 (aug1, aug2, labels)
+  # labels 只对 base_classes 有效，unknown 标记为 -1
 
-  PANN OSR2 实际结果
+  # SupCon loss 实现:
+  def supcon_loss(features, labels, temperature=0.1, mask_unknown=True):
+      """
+      features: (2*B, D) - 两个augmentation拼接
+      labels: (B,) - 类别标签，-1表示不参与
+      temperature: 温度参数
+      """
+      device = features.device
+      batch_size = labels.shape[0]
 
-  实际配置：
-    - Phase 0b: 50 epochs, conv_block3-6 unfrozen
-    - backbone_lr: 2e-6, fc_lr: 3e-5
-    - use_flow: False (简化配置)
+      # 拼接两个view的标签
+      labels = labels.repeat(2)  # (2B,)
+      if mask_unknown:
+          valid_mask = labels >= 0  # 排除unknown类(-1)
+      else:
+          valid_mask = torch.ones(2 * batch_size, dtype=torch.bool, device=device)
 
-  实际结果：
-    - Base 5-shot: 69.59% (target: 78%, gap: -8.4%)
-    - Novel 5-shot: 40.97%
-    - feat_mahal TPR: 21.33% (稳定)
-    - ood_head TPR: 3.65% (失效)
+      # 同类mask: label_i == label_j 且 i≠j 且 都valid
+      label_mask = labels.unsqueeze(0) == labels.unsqueeze(1)  # (2B, 2B)
+      label_mask = label_mask & valid_mask.unsqueeze(1) & valid_mask.unsqueeze(0)
+      diag_mask = ~torch.eye(2 * batch_size, dtype=torch.bool, device=device)
+      label_mask = label_mask & diag_mask  # 排除自身
 
-  关键发现：
-    1. **Base 分类仍然 underfitting** (69.59% vs 78% target)
-       → PANN fine-tune 策略未达预期
-       → 50 epochs + 4层解冻仍不足
+      # 负例mask: 都valid 且 不是同类
+      neg_mask = ~label_mask & diag_mask & valid_mask.unsqueeze(1)
 
-    2. **OSR 性能稳定** (feat_mahal 21.33%)
-       → 验证了简化策略的有效性
-       → 特征质量不是瓶颈
+      # 计算相似度
+      sim = F.cosine_similarity(features.unsqueeze(1), features.unsqueeze(0), dim=2) / temperature
 
-    3. **OOD Head 失效** (TPR 3.65%)
-       → 可能需要 Phase 2 训练优化
+      # 对每个anchor，如果有同类正例，计算SupCon loss
+      has_positive = label_mask.sum(dim=1) > 0
+      if has_positive.sum() == 0:
+          # fallback to SimCLR if no pairs
+          return nt_xent_loss(features[:batch_size], features[batch_size:], temperature)
 
-  决策：切换至 AST backbone（更强的预训练）
+      # log-sum-exp trick
+      exp_sim = torch.exp(sim) * diag_mask
+      log_prob = sim - torch.log(exp_sim.sum(dim=1, keepdim=True) + 1e-8)
 
-完成后决策（已执行）：
-  - Base 5-shot = 69.59% (<75%) → 切换至 AST backbone
-  - feat_mahal TPR = 21.33% (<25%) → 特征质量未突破
+      # 只对有正例的anchor计算loss
+      mean_log_prob = (log_prob * label_mask.float()).sum(dim=1) / (label_mask.float().sum(dim=1) + 1e-8)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      loss = -mean_log_prob[has_positive].mean()
+      return loss
 
-  当前计划：ast_osr1
+  # 训练循环修改:
+  # Phase 0a前半(150 epochs): SimCLR (无监督，所有类参与，学习通用特征)
+  # Phase 0a后半(150 epochs): SupCon (base_classes标签，学习判别性特征)
+  # 这样既保留SimCLR的泛化性，又获得SupCon的判别力
 
-  策略：使用 AST backbone + 简化 OSR 配置
+  if epoch <= 150:
+      loss = nt_xent_loss(z1, z2, temperature)
+  else:
+      features = torch.cat([z1, z2], dim=0)
+      loss = supcon_loss(features, batch_labels, temperature)
 
-  实施步骤：
+Step 2: ContrastivePretrainer需要接受标签:
+  # _get_batch() 返回 (aug1, aug2, labels)
+  # 已有代码只返回 (aug1, aug2)，需修改dataset或collate逻辑
+  # TAUDataset已有get_label()方法
 
-  1. **AST Backbone 配置**
-     - backbone: ast (Audio Spectrogram Transformer)
-     - 预训练权重: AudioSet pretrained
-     - 解冻层: encoder.layer.10, encoder.layer.11 (2层)
-     - Backbone LR: 5e-6 (更保守)
-     - FC LR: 5e-5
-     - Phase 0b epochs: 20 (AST 更强，更少 epochs)
+────────────────────────────────────────
+1.2 可学习OSR阈值 (LearnableThreshold)
+────────────────────────────────────────
 
-  2. **简化 OSR 方法（同 pann_osr2）**
-     - use_flow: False
-     - ood_ratio: 0.0
-     - 主方法: feature_mahalanobis
-     - 辅助: ood_head
+原理: 当前OSRCalibrator.calibrate()用固定percentile设阈值，
+      calib集上表现好但test集下降严重(已观察到此问题)。
+      将阈值作为可学习参数，在episodic训练中优化。
+      FOAC-AIFP没有这个问题因为它用(N+1)-way直接分类，无需阈值。
+      我们的优势: 阈值方法更灵活，可以后处理调整。
 
-  3. **配置修改**
-     - experiment_dir: experiment/ast_fewshot_osr1
-     - backbone: ast
-     - Phase 0b epochs: 20
-     - backbone_unfreeze_layers: ['encoder.layer.10', 'encoder.layer.11']
-     - backbone_lr: 5e-6, fc_lr: 5e-5
+代码位置: 新增类 + 修改EpisodicTrainer.train_episode
 
-  预期结果：
-    - Base 5-shot: >75% (修复 PANN underfitting)
-    - Novel 5-shot: >45%
-    - feat_mahal TPR: >20%
+新增类 (在EpisodicFlowClassifier之后):
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  class LearnableOSRThreshold(nn.Module):
+      """可学习的OSR阈值，替代固定percentile"""
+      def __init__(self, num_scores: int = 1, init_value: float = 0.0):
+          super().__init__()
+          self.thresholds = nn.Parameter(torch.full((num_scores,), init_value))
+          self.temperature = nn.Parameter(torch.tensor(1.0))
 
-  AST OSR1 实际结果
+      def forward(self, scores: torch.Tensor) -> torch.Tensor:
+          """将连续分数转为known/unknown概率"""
+          return torch.sigmoid((scores - self.thresholds) * self.temperature.abs())
 
-  实际配置：
-    - Phase 0b: 20 epochs, encoder.layer.4-5 unfrozen (2层)
-    - backbone_lr: 5e-6 (Distil-AST: 5e-7)
-    - use_flow: False
+      def get_threshold(self) -> float:
+          return self.thresholds.item()
 
-  实际结果：
-    - Base 5-shot: 64.67% (target: 75%, gap: -10.33%)
-    - Novel 5-shot: 44.15% (优于 PANN)
-    - feat_mahal TPR: 21.33% (与 PANN 持平)
+在EpisodicFlowClassifier中添加:
+  self.osr_threshold = LearnableOSRThreshold(num_scores=1, init_value=0.0)
 
-  关键发现：
-    1. **Base 分类低于预期** (64.67% vs PANN 69.59%)
-       → Distil-AST fine-tune 不足
-       → 20 epochs/2层 可能过于保守
+在EpisodicTrainer.train_episode中添加:
+  with torch.no_grad():
+      known_scores = compute_mahalanobis(query_feats, prototypes)
+      if ood_feats is not None:
+          unknown_scores = compute_mahalanobis(ood_feats, prototypes)
 
-    2. **Novel 分类优于 PANN** (44.15% vs 40.97%)
-       → Transformer 更强的泛化能力
-       → 预训练特征质量更好
+  known_probs = self.flow_classifier.osr_threshold(known_scores)
+  unknown_probs = self.flow_classifier.osr_threshold(unknown_scores)
+  L_threshold = -torch.log(known_probs + 1e-8).mean()
+  L_threshold += -torch.log(1 - unknown_probs + 1e-8).mean()
 
-    3. **OSR 性能与 PANN 持平** (21.33% TPR)
-       → 验证了特征空间的一致性
-       → feature_mahalanobis 是稳定可靠的方法
+  loss += 0.1 * L_threshold
 
-  全对比总结：
-    ┌────────────────┬──────────┬──────────┬──────────┐
-    │     指标       │ YAMNet   │ PANN     │ AST      │
-    ├────────────────┼──────────┼──────────┼──────────┤
-    │ Base 5-shot    │ 83.60% ✓ │ 69.59%   │ 64.67%   │
-    │ Novel 5-shot   │ 44.27%   │ 40.97%   │ 44.15% ✓ │
-    │ feat_mahal TPR │ 11.87%   │ 21.33% ✓ │ 21.33% ✓ │
-    └────────────────┴──────────┴──────────┴──────────┘
+在OSRCalibrator.evaluate_osr中使用学习到的阈值:
+  learned_threshold = self.flow_classifier.osr_threshold.get_threshold()
 
-  结论：YAMNet 仍然是最佳综合选择
 
-完成后决策（已执行）：
-  - Base 5-shot = 64.67% (<70%) → AST 策略未达预期
-  - 建议：回归 YAMNet backbone，优化 OSR 方法
+════════════════════════════════════════════════════════════════════
+二、osr17b: 互反点学习 + 3级Curriculum OOD (优先级3+4)
+════════════════════════════════════════════════════════════════════
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+前提: osr17a完成，特征质量已有提升
+预期收益: 互反点增强feat_mahal TPR 5-10%; Curriculum OOD增强ood_head
+工作量: 中
+预计耗时: ~3h (仅Phase 2重训)
 
-  最终建议：回归 YAMNet + OSR 优化
+────────────────────────────────────────
+2.1 互反点学习 (Reciprocal Point, 来自ARPL)
+────────────────────────────────────────
 
-  背景：
-    - YAMNet Base 5-shot: 83.60%（远超其他）
-    - YAMNet OSR (feat_mahal): 11.87%（落后 PANN/AST 的 21.33%）
-    - 差距：YAMNet 特征局部性强，OSR 方法未充分利用
+原理: FOAC-AIFP的RPL预训练已经用了互反点思想！但它是在ResNet-18 backbone
+      的预训练阶段学的，且互反点与backbone耦合。
+      我们的方法: 在episodic训练中学习互反点，与YAMNet特征适配。
+      优势: 互反点随episode动态适应，更灵活。
 
-  建议方向：
-    1. **使用 YAMNet backbone**（最佳 Base 分类）
-    2. **优化 OSR 方法**（提升 11.87% → 20%+）
-    3. **简化配置**（use_flow=False, 仅 feature_mahalanobis）
+在EpisodicFlowClassifier中添加:
 
-  具体计划：yamnet_osr_final
-    - backbone: yamnet
-    - experiment_dir: experiment/yamnet_fewshot_osr18
-    - Phase 0b: 20 epochs, layer14 unfrozen
-    - 优化 OSR: 调整 Mahalanobis 计算或集成多个方法
-    - 目标: Base 5-shot >80%, feat_mahal TPR >15%
+  # __init__:
+  self.num_max_classes = 20
+  self.reciprocal_points = nn.Parameter(
+      torch.randn(self.num_max_classes, input_dim) * 0.1
+  )
+
+  # 新增方法:
+  def compute_reciprocal_loss(self, features, prototypes, labels):
+      B, D = features.shape
+      N = prototypes.shape[0]
+      R = self.reciprocal_points[:N]
+      R_assigned = R[labels]
+
+      # 已知样本应远离互反点
+      dist_to_reciprocal = ((features - R_assigned) ** 2).sum(dim=1)
+      L_push = -torch.log(dist_to_reciprocal + 1.0).mean()
+
+      # 互反点多样化正则
+      proto_R_sim = F.cosine_similarity(
+          prototypes.unsqueeze(1), R.unsqueeze(0), dim=2)
+      L_diverse = -proto_R_sim.mean()
+
+      return L_push + 0.1 * L_diverse
+
+  # 新增OSR评分方法:
+  def score_reciprocal(self, features, prototypes):
+      N = prototypes.shape[0]
+      R = self.reciprocal_points[:N]
+      dist_proto = torch.cdist(features, prototypes, p=2).min(dim=1).values
+      dist_R = torch.cdist(features, R, p=2).min(dim=1).values
+      return -dist_proto + dist_R  # known高, unknown低
+
+在EpisodicTrainer.train_episode中加入:
+  L_reciprocal = self.flow_classifier.compute_reciprocal_loss(
+      query_feats, prototypes, query_labels)
+  loss += 0.05 * L_reciprocal
+
+在OSRCalibrator中新增 reciprocal 评分方法。
+
+────────────────────────────────────────
+2.2 3级Curriculum OOD (来自CROCO/PEELER)
+────────────────────────────────────────
+
+原理: FOAC-AIFP的NPM模块通过交叉注意力从基类权重生成"假类中心"作为
+      (N+1)-way的未知类原型。这是一种全局策略，不随训练进度变化。
+      我们的方法: 3级递进难度的伪未知，像课程学习一样逐步提升。
+      优势: 训练早期用简单OOD稳定分类器，后期用对抗OOD增强鲁棒性。
+
+在EpisodicTrainer中替换现有OOD生成逻辑:
+
+  def generate_curriculum_ood(self, prototypes, features, episode_num, max_episodes):
+      progress = min(episode_num / max_episodes, 1.0)
+
+      if progress < 0.33:
+          # Level 1: Easy — 原型间插值 + 噪声
+          return self._sample_boundary_ood(prototypes, num_samples=15)
+
+      elif progress < 0.66:
+          # Level 2: Medium — Hard Negative组合
+          N = prototypes.shape[0]
+          num_samples = 15
+          ood_feats = []
+          for _ in range(num_samples):
+              n_mix = np.random.randint(2, min(N, 4))
+              chosen = np.random.choice(N, n_mix, replace=False)
+              weights = np.random.dirichlet(np.ones(n_mix) * 0.5)
+              mixed = sum(w * prototypes[c] for w, c in zip(weights, chosen))
+              mixed += torch.randn_like(mixed) * 0.1
+              ood_feats.append(mixed)
+          return torch.stack(ood_feats)
+
+      else:
+          # Level 3: Hard — 对抗性生成
+          num_samples = 15
+          ood_feats = []
+          for _ in range(num_samples):
+              x = prototypes.mean(dim=0) + torch.randn(prototypes.shape[1], device=self.device) * 0.5
+              x = x.clone().detach().requires_grad_(True)
+              optimizer_adv = torch.optim.SGD([x], lr=0.05)
+              for _ in range(5):
+                  log_probs = self.flow_classifier.classify(x.unsqueeze(0), prototypes)
+                  entropy = -(log_probs.exp() * log_probs).sum()
+                  (-entropy).backward()
+                  optimizer_adv.step()
+                  optimizer_adv.zero_grad()
+              ood_feats.append(x.detach())
+          return torch.stack(ood_feats)
+
+  def _sample_boundary_ood(self, prototypes, num_samples=15):
+      N = prototypes.shape[0]
+      ood_feats = []
+      for _ in range(num_samples):
+          i, j = np.random.choice(N, 2, replace=False)
+          alpha = np.random.beta(0.5, 0.5)
+          mixed = alpha * prototypes[i] + (1 - alpha) * prototypes[j]
+          mixed += torch.randn_like(mixed) * 0.2
+          ood_feats.append(mixed)
+      return torch.stack(ood_feats)
+
+
+════════════════════════════════════════════════════════════════════
+三、osr17c: 原型不确定性建模 (优先级5)
+════════════════════════════════════════════════════════════════════
+
+前提: osr17b完成
+预期收益: K=1~3 shot时收益大，K=5时也有边际收益
+工作量: 中
+预计耗时: ~2h
+
+原理: FOAC-AIFP的PAM模块通过余弦相似度加权聚合原型，本质上是一种
+      基于样本质量的加权平均。但它没有显式建模不确定性。
+      我们的方法: 输出分布参数(均值+标准差)，用精度加权的马氏距离。
+
+在EpisodicFlowClassifier.classify()中修改原型计算:
+
+  # 当前:
+  prototype = support_feats[mask].mean(dim=0)
+
+  # 改为分布原型:
+  proto_mean = support_feats[mask].mean(dim=0)
+  if support_feats[mask].shape[0] > 1:
+      proto_std = support_feats[mask].std(dim=0).clamp(min=0.01)
+  else:
+      proto_std = torch.ones_like(proto_mean) * 0.1  # K=1时给较大不确定性
+
+  # 精度加权距离:
+  proto_precision = 1.0 / (proto_std ** 2)
+  diff = query_feats - proto_mean
+  weighted_dist = (diff ** 2 * proto_precision).sum(dim=1)
+
+注意: 这会改变classify()的接口，需同步修改EpisodicTrainer和OSRCalibrator。
+
+
+════════════════════════════════════════════════════════════════════
+四、代码更改汇总 (按文件和区域)
+════════════════════════════════════════════════════════════════════
+
+episodic_trainer.py:
+  ┌──────────────────┬────────────────┬─────────────────────────────────────┐
+  │ 区域              │ 行号约         │ 更改内容                            │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ ContrastivePre-  │ L600-850       │ osr17a: SupCon loss (后半训练)      │
+  │ trainer.train()  │                │ batch返回标签; epoch>150时用SupCon   │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ EpisodicFlow-    │ L1128-1270     │ osr17a: +LearnableOSRThreshold      │
+  │ Classifier       │                │ osr17b: +reciprocal_points参数      │
+  │                  │                │        +compute_reciprocal_loss()    │
+  │                  │                │        +score_reciprocal()           │
+  │                  │                │ osr17c: 分布原型proto_std计算        │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ EpisodicTrainer  │ L1910-2130     │ osr17a: 阈值loss加入train_episode   │
+  │                  │                │ osr17b: curriculum OOD替换现有逻辑   │
+  │                  │                │        generate_curriculum_ood()     │
+  │                  │                │        _sample_boundary_ood()        │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ EpisodicTrainer  │ L2153-2224     │ osr17b: reciprocal loss加入主loss   │
+  │ train_episode()  │                │ osr17a: threshold loss加入主loss     │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ OSRCalibrator    │ L2432-3446     │ osr17a: 评估时用可学习阈值          │
+  │                  │                │ osr17b: 新增reciprocal评分方法       │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ main()           │ L3597-3879     │ experiment_dir改为osr17a/17b/17c     │
+  │                  │                │ 配置开关: 各启发特性的启用/禁用       │
+  │                  │                │ Phase 3: 新增评分方法的评估          │
+  └──────────────────┴────────────────┴─────────────────────────────────────┘
+
+其他文件:
+  - Reversable_Function/ (NSF模块): 不需要改动
+  - utils/TAU22.py (数据集): 不需要改动
+  - Phase 0b (base class finetune): 不需要改动
+
+
+════════════════════════════════════════════════════════════════════
+五、实验时间表
+════════════════════════════════════════════════════════════════════
+
+Step 0: Baseline — FOAC-AIFP测试
+  已有预训练模型，只需运行测试
+  耗时: ~30min
+
+  □ 运行 FOAC-AIFP 测试获取 ACC / AUROC / F-score
+  □ 记录结果作为论文对比基准
+
+Step 1: osr17a — SupCon + 可学习阈值
+  改动: ~80行
+  Phase 0a (SupCon): 300 epochs (~1.5h)
+  Phase 0b: 20 epochs (~10min)
+  Phase 1: 特征提取 (~10min)
+  Phase 2: 6000 episodes (~1.5h)
+  Phase 3: 评估 (~15min)
+  总计: ~4h
+
+  判断标准:
+    Base 5-shot > 63% → 特征质量提升，进入osr17b
+    Base 5-shot < 60% → SupCon后半训练有问题，检查标签传递
+    feat_mahal TPR > 14% → SupCon有效
+    可学习阈值的calib→test TPR衰减 < 3% → 阈值学习有效
+
+Step 2: osr17b — 互反点 + Curriculum OOD
+  改动: ~100行
+  Phase 2重训: 6000 episodes (~1.5h, 复用osr17a的Phase 0)
+  总计: ~2h
+
+  判断标准:
+    reciprocal TPR > 10% → 互反点有OSR信号
+    reciprocal + feat_mahal 融合 TPR > osr17a feat_mahal + 5% → 融合有效
+    ood_head TPR > 13% → curriculum OOD有效
+    Base 5-shot不退化 (> 62%)
+
+Step 3: osr17c — 原型不确定性
+  改动: ~60行
+  Phase 2重训: 6000 episodes (~1.5h, 复用osr17b的Phase 0)
+  总计: ~2h
+
+  判断标准:
+    1-shot Base > 55% → 不确定性建模有效
+    5-shot Base不退化
+
+
+════════════════════════════════════════════════════════════════════
+六、关键检查点
+════════════════════════════════════════════════════════════════════
+
+Baseline (FOAC-AIFP) 检查点:
+  □ 测试正常运行，输出 ACC / AUROC / F-score
+  □ AUROC > 0.6 (论文报告的基准水平)
+  □ ACC > 50% (2-way 5-shot)
+
+osr17a 检查点:
+  □ Phase 0a: epoch 150切换SimCLR→SupCon时loss不应跳变
+  □ Phase 0a: SupCon阶段类内距离减小
+  □ t-SNE: base类簇紧凑、类间分离
+  □ Phase 2: 可学习阈值在前500个episode内快速收敛
+  □ Phase 3: feat_mahal TPR @ 95% TNR
+  □ Phase 3: 可学习阈值在test集上的TPR衰减 (对比percentile方法)
+
+osr17b 检查点:
+  □ reciprocal_points在前1000 episode内学到有意义的位置
+  □ reciprocal score: known高分 vs unknown低分的separation > 0.3
+  □ Curriculum OOD: Level 1→2→3切换时ood_head loss不跳变
+  □ Level 3 对抗样本确实让分类器不确定 (entropy > 1.3 for 5-way)
+  □ ood_head TPR对比osr17a有提升
+
+osr17c 检查点:
+  □ proto_std分布合理: K=1时~0.1, K=5时~0.03, K=10时~0.01
+  □ 1-shot分类精度提升
+  □ feat_mahal使用类条件精度后TPR变化
+
+
+════════════════════════════════════════════════════════════════════
+七、osr15/osr16失败的教训 (设计osr17时必须避免)
+════════════════════════════════════════════════════════════════════
+
+1. 不要联合训练flow+分类器 (osr15教训)
+   osr17: 不使用flow作为主OSR方法，用feature_mahalanobis+互反点
+
+2. 特征质量是OSR上限 (osr13→osr15的经验)
+   → osr17优先投入SupCon特征升级，而非继续优化OSR head
+
+3. 阈值不能只靠校准集percentile (calib→test下降)
+   → osr17使用可学习阈值，在训练中优化
+
+4. 伪未知样本质量决定ood_head上限
+   → osr17使用3级curriculum OOD，而非简单mixup
+
+5. 简单方法优先
+   osr13的z_consistency 20.22% 已经是最好的结果
+   复杂的flow方法(osr15)反而崩溃到3.74%
+   → osr17优先改特征(SupCon)和阈值(可学习)，这些改动风险最小
+
+
+════════════════════════════════════════════════════════════════════
+八、与论文写作的衔接
+════════════════════════════════════════════════════════════════════
+
+论文对比实验表格 (预期):
+
+  ┌───────────────────────┬──────────┬─────────┬─────────┬─────────┐
+  │ 方法                   │ Backbone │ ACC     │ AUROC   │ F-score │
+  ├───────────────────────┼──────────┼─────────┼─────────┼─────────┤
+  │ FOAC-AIFP (baseline)  │ ResNet-18│ (填入)  │ (填入)  │ (填入)  │
+  │ FOAC-AIFP (baseline)  │ ResNet-18│ (填入)  │ (填入)  │ (填入)  │
+  │                       │          │         │         │         │
+  │ Ours (osr17a SupCon)  │ YAMNet   │ >63%    │ >0.65   │ >0.45   │
+  │ Ours (osr17b +Rcp+OOD)│ YAMNet   │ >63%    │ >0.70   │ >0.50   │
+  │ Ours (osr17c +Unc)    │ YAMNet   │ >64%    │ >0.72   │ >0.52   │
+  └───────────────────────┴──────────┴─────────┴─────────┴─────────┘
+
+  注意: 需在我们的评估流程中也计算AUROC和F-score以对齐FOAC-AIFP指标。
+  当前我们主要用 TPR@95%TNR，论文需要补全AUROC。
+
+方法创新点写作框架:
+  1. SupCon有监督对比特征学习 (vs FOAC-AIFP的RPL+GCPL无监督预训练)
+  2. Episodic互反点学习 (vs FOAC-AIFP的预训练阶段固定互反点)
+  3. Curriculum OOD渐进训练 (vs FOAC-AIFP的NPM全局假类中心)
+  4. 端到端可学习OSR阈值 (vs FOAC-AIFP的(N+1)-way直接分类)
+  5. 原型不确定性建模 (vs FOAC-AIFP的PAM确定性加权)
+
+消融实验表格:
+  ┌──────────────┬─────────┬──────────┬──────────┬──────────┐
+  │ 配置          │ Base 5s │ feat_mah │ reciproc │ ood_head │
+  ├──────────────┼─────────┼──────────┼──────────┼──────────┤
+  │ osr17a(SupC) │ >63%    │ >14%     │ —        │ >12%     │
+  │ osr17b(+Rcp) │ >63%    │ >14%     │ >10%     │ >15%     │
+  │ osr17c(+Unc) │ >64%    │ >16%     │ >12%     │ >16%     │
+  └──────────────┴─────────┴──────────┴──────────┴──────────┘
+  TPR @ 95% TNR; 需同时报告AUROC以便与FOAC-AIFP对比

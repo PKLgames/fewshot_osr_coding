@@ -1,0 +1,55 @@
+（三）国内外研究现状和发展动态
+声学场景分类(Acoustic Scenes Classification, ASC)和声音事件检测(Sound Event Detection, SED)技术运用于对声音事件进行归类，可以提升人们对声音信息的查找及利用效率，完成对周边环境的感知和理解[1]。
+目前针对声学场景分类研究中的特征处理方法已有较深入的研究，但仍然未对老人生活空间中的环境声音进行针对性处理。另外，现有声学模型相对单一，未能对特征图中的频域信息进行关注，导致了模型的分类准确率不高，泛化性能不强等问题。针对此问题，江南大学费鸿博等人提出一种基于梅尔频谱特征分离和长距离自校正卷积神经网络的声学场景分类方法，相较于频谱分离后得到的CSH和CSP，将梅尔频谱分离后得到的CMSH、CMSP、和CMSR输入模型进行训练时，模型的分类准确率在两个数据集上平均提高了5.7%和7.9%；且CMSR在含背景噪音较多的空间、儿童玩耍和街头音乐等多个类别的子分类准确率达到最高，验证了其可以针对性地减少背景噪音的影响。相较于自校正网络，LSCNet实现了对特征图中频域信息的关注，在Urbansound8K数据集下，模型准确率平均提升了1.6％，且当模型层数设置为19时分类效果达到最佳，LSCNet-19在两个数据集下的准确率分别达到90.1%和88%，进一步验证了该方法的有效性[2]。
+杨利平等人提出音频标记一致性约束CRNN声音事件检测，采用音频样本的对数梅尔时频谱图作为模型的输入，以DCASE 2019竞赛声音事件检测任务的基线和自建的CRNN特征提取网络为基础，分别在两个模型上增加音频标记一致性约束并对比了增加一致性约束前后两个模型的声音事件检测结果。结果显示：增加音频标记一致性约束前后相比，在验证集和评估集上，DCASE 2019基线模型的声音事件检测F1得分分别提高了5.3%和6.0%，自建CRNN模型的声音事件检测F1得分分别提高了4.1%和3.7%。增加一致性约束前后，模型的错误删除率稍有下降，而错误插入率显著降低了[3]。
+韦娟等人提出一种NMF与CNN联合优化的有监督特征学习算法。该算法利用基于 NMF的特征表示训练CNN 模型，根据标签信息和实际训练效果不断反向优化NMF的过程，自适应的调整特征提取方向以获得更利于分类的判别性特征。在2020年DCASE中与 CNN 结合的无监督 NMF 特征和 SNMF 特征的识别准确率分别高出基线系统 4.9%和 8.8%[4]。
+2021年陈秋菊提出一种基于DenseNet全卷积神经网络的多声音事件检测模型。与目前最先进的方法相比，此算法 F-score 提高了7.4%，ER 降低了3.9%。[5]同年，刘亚灵等人提出一种基于多尺度注意力特征融合CRNN的声音事件检测算法，在AudioSet子数据集上的结果表明：与CNRR相比，MAF-CRNN在评估集ER和F1上分别带来11%和8.3%的改进[6]。
+Ebbers等人在2020年提出了一个卷积递归神经网络，其中两个递归神经网络分类器共享相同的预处理卷积神经网络。在验证集上获得了48.3%的基于事件的F得分，比基线高13.5%[7]。
+2021年DCASE中， Zheng Xu等人提出半监督声音事件检测，在DCASE2021 task4验证数据集的实验情景1和情景2的PSDS得分分别为0.45和0.78，优于基线系统中0.34和0.53的结果[8]。
+2019DCASE上，Hangting Chen等人在声学场景分类中采用了生成对手网络的数据增强方案，部署了两个主要分类器，即集成了标度图特征的一维深度卷积神经网络和集成了Mel滤波器组特征的二维全卷积神经网络。最终的聚变系统A-D在官方提供的评估数据集上达到85%以上的精度[9]。
+2019DCASE的任务1子的子任务1中Khaled Koutini等人提出基于感受野正则化的卷积神经网络的声学场景分类和音频标记方案，在官方提供的评估数据集上达到83.8%的精度，在另外的unseen cities评估数据集中达到78.1%的精度，与第一名仅仅相差0.4%[10]。
+在2019DCASE任务3（声音事件定位和检测）中Slawomir Kapka等人提出了基于CRNN模型的连续集成进行声源检测，定位和分类，使用四个类似CRNN SELDnet的单输出模型，这些模型以连续的方式运行，以恢复发生事件的所有可能信息,在官方的评估数据集中错误率仅为0.08，DOA错误仅有3.7，综合排名第一[11]。
+同样的任务中Yin Cao等人提出了使用强度矢量和广义互相关进行两级声音事件定位和检测，利用对数梅尔特征进行事件检测，并使用强度矢量和 GCC 特征进行定位，在开发集的交叉验证结果中错误率仅为0.13，比基准方法低了20%[12]。
+在2021DCASE任务2中，在领域转移条件下组织了一项先进的无监督ASD（异常声音检测）任务。挑战赛的重点是检测训练样本和测试样本声学特征不同的未知异常声音（即域偏移场景）。这凸显了使用自动识别系统⁵ 所面临的实际挑战[13]。
+2021年初Nikonas Simou等人提出了一种咳嗽检测系统，该系统利用一个声学起始检测器作为预处理步骤，旨在检测音频流中的脉冲模式。在随后的步骤中，将咳嗽事件与其他脉冲声的区分作为二元分类任务进行处理。结果表明，利用长-短时记忆深度神经网络结构，在家庭环境中可以达到90%的敏感性和99%的特异性[14]。
+Shih-Tsung Yang等人在2021年提出了一种时频可分离卷积压缩网络（TFSCCN）作为声音事件定位和检测的系统架构，可以大大减少模型参数的数量，实验结果表明，能有效提高声音事件的定位和检测性能。与其他CNN模型相比，在我们的实验中，它具有最少的参数和最佳的性能[15]。
+2021年5月，Kazuki Shimada等人提出了一个活动耦合笛卡尔DOA表示，简称ACCDOA，它将声音事件活动分配给相应的笛卡尔DOA向量的长度，ACCDOA表示使我们能够用单个目标解决SELD任务，并具有两个优点：避免平衡目标和模型尺寸增加的必要性。在使用 DCASE 2020 任务 3 数据集的实验评估中，ACCDOA 表示在网络规模较小的情况下优于 SELD 指标中的双分支表示。基于ACCDOA的SELD系统在定位和位置相关检测方面也比最先进的SELD系统表现更好[16]。
+Lam Pham等人在2021年发表了一种用于声学场景分类的编码器-解码器网络模型，该模型在前端利用多个低级频谱图功能，通过一个训练有素的CNN-DNN前端编码器转换为高级特征。，然后将高级特征及其组合（通过经过训练的特征组合器）输入到不同的解码器模型中。该系统在DCASE 2019任务1A和1B中分别实现了76.8%和72.8%的成绩[17]。
+2020年，赵薇等人提出了一种基于多特征融合的SVM算法模型，该算法针对声场环境数 据集，提取MFCC、SE、AELF、MT特征，组成多特征融合矩阵，通过对比多种核函数和寻优算法，最终选取ＲＫ核函数建立SVM 模型，采用CV 方法进行SVM参数寻优，对15种声学场景进行分类，最终使得平均分类准确性达到了71.11％，远高于挑战赛给出的基线系 统61％的平均分类准确性[18]。
+蒋晓永在他的研究中设计了一个应用程序,实现实时音频信号采集、降噪和端点检测，并提出了一种新的小波阈值函数来提高降噪效果, 对降噪后的音频信号进行端点检测,采用端点标记正确率作为端点检测效果的评价指标。实验证明表明采用新阈值函数对实时音频信号降噪后信噪比可达19.47dB,比传统软硬阈值去噪法的信噪比提高了5dB，基于改进谱熵的端点检测正确率为90.03%[19]。
+2021年 Zied Mnasri, Stefano Rovetta, Francesco Masulli基于机器学习方法的调查涵盖了一些工作实例，这些实例表明异常声音事件检测可为各种应用提供解决方案。这些应用包括工业设备监测（故障检测和机器状态监测）、音频场景分割（用于摘要和语言获取）和医疗保健监测（使用生物音频信号如心电图和呼吸声进行早期疾病诊断）[20]。
+2023年艾欣提出了一种针对声学场景分类领域中存在的问题的新方法。作者使用了基于扩展谐波冲击源分离（HPSS）的多通道强化通道注意力、传播和聚合能力的时延神经网络（ECAPA-TDNN）。该方法不仅减少了音频重叠产生的过拟合问题，还增强了模型对于复杂环境的识别能力。此外，通过模型融合，解决了不同场景下分类效果差异的问题。使用城市声学场景开发数据集（TAU Urban Acoustic Scenes 2019开发数据集）进行验证：基于ECAPA-TDNN的声学场景分类模型平均分类准确率为70.2%。而改进后的基于HPSS的多通道ECAPA-TDNN模型准确率达到82.8%，相较于前者提升了12.6%。与其他模型构建的融合模型准确率达到85.2%，在各个场景下的准确率均有所提升[21]。
+Kai-Wen Liang提出了一种基于并行胶囊神经网络的声音事件检测系统。该系统利用胶囊神经网络检测重叠物体的能力。它进一步开发了并行架构，并利用不同形状和大小的内核设计，有效地利用特征信息来提高检测精度。实验结果表明，所提系统的性能在误差率下低至52.34%，甚至低于DCASE2017挑战赛中排名第一的系统[22]。
+杨立东、赵飞焱提出了一种基于并行胶囊网络的声学场景分类模型，旨在解决卷积神经网络（CNN）在声学场景分类中存在的问题。该模型利用胶囊网络和双向门控循环单元，弥补了CNN的缺陷。通过音频特征提取、模块优化和场景分类，该方法在“国际声学场景和事件检测及分类（DCASE）挑战赛2019”数据集上获得了71.1%和70.2%的准确率，优于基线系统的准确率,证明了其适用性[23]。
+2021年Andreas L. Teigen和Aya Saad 等人提出了一个新的框架来解决开放世界的学习问题。该解决方案基于few-shot分类策略，并结合离群值检测模块。本工作中使用的few-shot分类器提供了一种基于相似性的分类方案，只需要在适应新类之前使用一些标记的示例，而不需要训练。新类的发现由离群检测模块执行，该模块利用由few-shot分类器创建的相似性空间，从已知类中识别出足够不同的样本，并将它们从分类过程中删除[24]。
+2023年Lakshman Balasubramanian; Jonas Wurst等人提出了一种开放世界学习方法的分层结构。开放世界架构由以下几个部分组成:开放集识别模型、存储缓冲区、离群点检测、类条件生成重播模型和聚类方法。结果表明了该方法的性能优势。此外，对分层开放世界体系结构的每个组件的广泛分析强调了它们在整个体系结构中的重要性[25]。
+2023年曹一鹏、杨凤远、李照奎等人针对小样本遥感图像中实例标注缺失导致的前景类与背景类混淆的问题，提出了结合像素注意力与分类器解耦的小样本遥感图像目标检测方法。该方法设计一种新颖的像素注意力特征金字塔结构以捕获更重要的空间和通道语义信息，从而在抑制背景噪声的同时突出目标的关键特征。提出的方法在两个公共遥感数据集上进行实验，结果表明其检测性能良好[26]。
+本项目将采用一种面向独居老人活动场景估计的小样本开放世界环境声音识别方法，由此来判断老人所处环境是否安全，老人行为是否正常。
+  
+参考文献
+[1]	刘悦. 声学场景分类的方法研究[D].上海师范大学,2021.DOI:10.27312/d.cnki.gshsu.2021.000814.
+[2]	费鸿博,吴伟官,李平,曹毅.基于梅尔频谱分离和LSCNet的声学场景分类方法[J].哈尔滨工业大学学报,2022,54(05):124-130+123.
+[3]	杨利平,郝峻永,辜小花,侯振威.音频标记一致性约束CRNN声音事件检测[J].电子与信息学报,2022,44(03):1102-1110.
+[4]	韦娟,杨皇卫,宁方立.基于NMF与CNN联合优化的声学场景分类[J/OL].系统工程与电子技术:1-8[2022-05-07]
+[5]	陈秋菊.基于DenseNet全卷积神经网络的多声音事件检测[J].信息与电脑(理论版),2021,33(06):28-32.
+[6]	刘亚灵,郭敏,马苗.基于多尺度注意力特征融合CRNN的声音事件检测[J].光电子·激光,2021,32(12):1271-1277.DOI:10.16136/j.joel.2021.12.0235.
+[7]	Janek Ebbers, Reinhold Haeb-Umbach.CONVOLUTIONAL RECURRENT NEURAL NETWORKS FOR WEAKLY LABELED SEMI-SUPERVISED SOUND EVENT DETECTION IN DOMESTIC ENVIRONMENTS[C].Detection and Classification of Acoustic Scenes and Events 2020.
+[8]	Xu Zheng, Han Chen, Yan Song.ZHENG USTC TEAM’S SUBMISSION FOR DCASE2021 TASK4 - SEMI-SUPERVISED SOUND EVENT DETECTION[C]. Detection and Classification of Acoustic Scenes and Events 2021.
+[9]	Hangting Chen , Zuozhen Liu , Zongming Liu , Pengyuan Zhang , Yonghong Yan.INTEGRATING THE DATA AUGMENTATION SCHEME WITH VARIOUS CLASSIFIERS FOR ACOUSTIC SCENE MODELING[C].Detection and Classification of Acoustic Scenes and Events 2019.
+[10]	Khaled Koutini,Hamid Eghbal-zadeh, Gerhard Widmer.CP-JKU SUBMISSIONS TO DCASE’19: ACOUSTIC SCENE CLASSIFICATION AND AUDIO TAGGING WITH RECEPTIVE-FIELD-REGULARIZED CNNS[C].Detection and Classification of Acoustic Scenes and Events 2019.
+[11]	Slawomir Kapka, Mateusz Lewandowski.SOUND SOURCE DETECTION, LOCALIZATION AND CLASSIFICATION USING CONSECUTIVE ENSEMBLE OF CRNN MODELS[C]. Detection and Classification of Acoustic Scenes and Events 2019.
+[12]	Yin Cao, Turab Iqbal, Qiuqiang Kong, Miguel B. Galindo, Wenwu Wang, Mark D. Plumbley. TWO-STAGE SOUND EVENT LOCALIZATION AND DETECTION USING INTENSITY VECTOR AND GENERALIZED CROSS-CORRELATION[C]. Detection and Classification of Acoustic Scenes and Events 2019.
+[13]	DCASE 2021 Challenge Organizers. (2021). Detection and Classification of Acoustic Scenes and Events (DCASE) 2021 Challenge. arXiv preprint arXiv:2106.04492.
+[14]	N. Simou, N. Stefanakis and P. Zervas, "A Universal System for Cough Detection in Domestic Acoustic Environments," 2020 28th European Signal Processing Conference (EUSIPCO), 2021, pp. 111-115, doi: 10.23919/Eusipco47968.2020.9287659.
+[15]	S. -T. Yang, F. -C. Jhou, J. -C. Wang and P. -C. Chang, "Sound Event Localization and Detection Based on Time-Frequency Separable Convolutional Compression Network," 2021 IEEE 10th Global Conference on Consumer Electronics (GCCE), 2021, pp. 432-433, doi: 10.1109/GCCE53005.2021.9622019.
+[16]	K. Shimada, Y. Koyama, N. Takahashi, S. Takahashi and Y. Mitsufuji, "Accdoa: Activity-Coupled Cartesian Direction of Arrival Representation for Sound Event Localization And Detection," ICASSP 2021 - 2021 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP), 2021, pp. 915-919, doi: 10.1109/ICASSP39728.2021.9413609.
+[17]	Lam Pham, Huy Phan, Truc Nguyen, Ramaswamy Palaniappan, Alfred Mertins, Ian McLoughlin, Robust acoustic scene classification using a multi-spectrogram encoder-decoder framework, Digital Signal Processing,Volume 110,2021,102943,ISSN 1051-2004.
+[18]	赵薇,靳聪,涂中文,SRIDHAR Krishnan,刘杉.基于多特征融合的SVM声学场景分类算法研究[J].北京理工大学学报,2020,40(01):69-75.DOI:10.15918/j.tbit1001-0645.2018.171.
+[19]	蒋晓永.基于智能移动终端的音频场景检测方法研究[D].西南科技大学,2020.DOI:10.27415/d.cnki.gxngc.2020.000195.
+[20]	Mnasri, Z., Rovetta, S., & Masulli, F. (2021). Anomalous Sound Event Detection: A Survey of Machine Learning-Based Approaches. Multimedia Tools and Applications, 1-25. DOI: 10.1007/s11042-021-11817-9.
+[21]	艾欣. 基于分层特征提取的声学场景分类研究. 辽宁工程技术大学，2023:33-53.
+[22]	K. -W. Liang, Y. -H. Tseng and P. -C. Chang, "Parallel Capsule Neural Networks for Sound Event Detection," 2019 Asia-Pacific Signal and Information Processing Association Annual Summit and Conference (APSIPA ASC), 2019, pp. 1933-1936, doi: 10.1109/APSIPAASC47483.2019.9023176.
+[23]	赵立东，赵飞焱.基于并行胶囊网络的声学场景分类.内蒙古科技大学，1-10.
+[24]	Teigen Andreas L., Saad Aya;Stahl Annette, Mester Rudolf, Few-shot open world learner. IFAC PapersOnLine. DOI：10.1016/J.IFACOL.2021.10.129
+[25]	Lakshman Balasubramanian; Jonas Wurst; Michael Botsch; Ke Deng, Open-World Learning for Traffic Scenarios Categorisation.  IEEE, DOI: 10.1109/TIV.2023.3260270, 2023.3.22
+[26]	曹一鹏、杨凤远、李照奎. 结合像素注意力与分类器解耦的小样本遥感图像目标检测. 《激光杂志》工程科技Ⅱ辑;信息科技. 分类号：TP751

@@ -1,0 +1,14 @@
+  0%|          | 0/100 [00:00<?, ?it/s]                                       Traceback (most recent call last):
+  File "/coding/FOAC-AIFP/main.py", line 44, in <module>
+    result = tm.run_test_fsl(model,eval_loader)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/coding/FOAC-AIFP/trainers/trainer.py", line 272, in run_test_fsl
+    acc, auroc,fscore = self.eval_fsl_nplus1(labels, probs)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/coding/FOAC-AIFP/trainers/trainer.py", line 337, in eval_fsl_nplus1
+    auroc_result,_,_,fscore= calc_auroc(known_scores,unknown_scores)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/coding/FOAC-AIFP/trainers/trainer.py", line 429, in calc_auroc
+    y_pred = np.where(y_score >= np.sort(y_score)[75], 1, 0) 
+                                 ~~~~~~~~~~~~~~~~^^^^
+IndexError: index 75 is out of bounds for axis 0 with size 60

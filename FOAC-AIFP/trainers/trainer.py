@@ -20,7 +20,7 @@ from datasets.FMC import FSDCLIPS
 from scipy import interpolate
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.integrate import simps
+from scipy.integrate import simpson as simps
 from sklearn.manifold import TSNE
 
 
@@ -426,7 +426,8 @@ def mean_confidence_interval(data, confidence=0.95):
 def calc_auroc(known_scores, unknown_scores):
     y_true = np.array([1] * len(known_scores) + [0] * len(unknown_scores))
     y_score = np.concatenate([known_scores, unknown_scores])
-    y_pred = np.where(y_score >= np.sort(y_score)[75], 1, 0) 
+    threshold_idx = min(75, len(y_score) - 1)
+    y_pred = np.where(y_score >= np.sort(y_score)[threshold_idx], 1, 0) 
     fpr, tpr, thresholds = roc_curve(y_true, y_score)
     fpr95 = float(interpolate.interp1d(tpr, fpr)(0.95))
     auc_pr = average_precision_score(y_true, y_score)

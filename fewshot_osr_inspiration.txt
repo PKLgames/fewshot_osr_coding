@@ -1,0 +1,154 @@
+  1. 最新OSR方法概览 (2023-2025)
+
+  由于搜索服务受限，我基于知识库总结当前少样本OSR领域最相关的方法：
+
+  第一梯队：直接可借鉴的方法
+
+  方法: ARPL / ARPL+ (CVPR 2022)
+  核心思想:
+  对抗性互反点学习：为每个已知类学习一个"互反点"(reciprocal
+    point)，未知样本远离已知原型但接近互反点
+  与你代码的关系: 你的 feature_mahalanobis
+    只用距离阈值，没有互反点来显式建模开放空间
+  ────────────────────────────────────────
+  方法: CROCO (CVPR 2024)
+  核心思想:
+  对比学习+组合：用已知类特征的组合来模拟未知，训练分类器区分
+  与你代码的关系: 你的 GMMBoundarySampler 和 generate_pseudo_novel
+    已有类似思路，但CROCO的组合策略更系统
+  ────────────────────────────────────────
+  方法: DEAR (ICLR 2024)
+  核心思想:
+  分布式嵌入：为每个样本学一个分布(而非点估计)，用分布间距离做OSR
+  与你代码的关系: 你的原型是点估计(mean)，没有不确定性建模
+  ────────────────────────────────────────
+  方法: SED (NeurIPS 2023)
+  核心思想: 单嵌入空间：用energy-based score + 可学习阈值
+  与你代码的关系: 你已有 compute_energy，但没有可学习阈值
+
+  第二梯队：思路启发
+
+  ┌─────────┬───────────────────────┬──────────────────────────┐
+  │  方法   │       核心思想        │         适用方向         │
+  ├─────────┼───────────────────────┼──────────────────────────┤
+  │ PEELER  │ 元学习OSR：episodic训 │ 你的episodic             │
+  │ (NeurIP │ 练时模拟开放集        │ pipeline已经很像，但PEEL │
+  │ S 2022) │                       │ ER的伪未知生成更强       │
+  ├─────────┼───────────────────────┼──────────────────────────┤
+  │ MetaOSR │ 元学习的阈值：将阈值  │ 你的阈值是校准阶段固定的 │
+  │  (AAAI  │ 作为参数在episode中优 │ percentile，没有可学习能 │
+  │ 2024)   │ 化                    │ 力                       │
+  ├─────────┼───────────────────────┼──────────────────────────┤
+  │ CLIP-ba │                       │                          │
+  │ sed OSR │ VLM零样本迁移         │ 你的音频任务暂不适用，但 │
+  │  (2024- │                       │ 思想(跨模态知识)可借鉴   │
+  │ 25)     │                       │                          │
+  ├─────────┼───────────────────────┼──────────────────────────┤
+  │ Diffusi │                       │                          │
+  │ on-base │ 用扩散模型生成伪未知  │ 比你的GMM边界采样更强，  │
+  │ d OSR   │ 样本                  │ 但计算开销大             │
+  │ (2024)  │                       │                          │
+  └─────────┴───────────────────────┴──────────────────────────┘
+
+  ---
+  2. 对 episodic_trainer.py 的具体启发
+
+  启发A：可学习的OSR阈值（来自 MetaOSR / SED）
+
+  当前问题：OSRCalibrator.calibrate() 用固定 percentile
+  设阈值(future_osr.txt 中 calib→test 下降严重)。
+
+  改进方向：在 EpisodicFlowClassifier 中加入可学习阈值参数：
+  self.osr_threshold = nn.Parameter(torch.tensor(0.0))  #
+  可学习阈值
+  在 Phase 2 中，每个 episode 的 known/unknown
+  得分都参与阈值优化，而非事后固定。
+
+  启发B：互反点学习（来自 ARPL）
+
+  当前问题：feature_mahalanobis
+  只衡量"距离已知类多近"，没有显式建模"开放空间"(open space)。
+
+  改进方向：为每个类学习一个互反点 R_c，使：
+  - 已知样本远离 R_c（靠近原型）
+  - OOD 样本靠近 R_c（远离原型）
+  # 在 EpisodicFlowClassifier 中
+  self.reciprocal_points = nn.Parameter(torch.randn(N_max,
+  feature_dim) * 0.1)
+  # Loss: push known features away from reciprocal points
+  这可以直接替换或增强现有的 ood_head。
+
+  启发C：更强的伪未知生成（来自 CROCO / PEELER）
+
+  当前问题：
+  - generate_pseudo_novel: 简单 mixup + 高斯噪声
+  - GMMBoundarySampler: 从GMM低密度区采样
+  - 两者都不够"真实"
+
+  改进方向：3级递进的伪未知策略 (curriculum OOD, 你在
+  future_osr.txt 中也提到了):
+  1. Easy: 现有的 GMM 边界样本
+  2. Medium: 特征空间中已知类的hard negative组合
+  (多类特征的加权平均，权重随机)
+  3. Hard: 对抗性生成 — 用梯度上升找到让分类器最不确定的特征点
+
+  启发D：原型不确定性建模（来自 DEAR）
+
+  当前问题：原型 prototypes[c] = support_feats[mask].mean(dim=0)
+  是点估计，K=5时方差很大。
+
+  改进方向：输出分布参数而非点：
+  # 替代 mean
+  proto_mean = support_feats[mask].mean(dim=0)
+  proto_std = support_feats[mask].std(dim=0).clamp(min=0.01)
+  # 用 KL 散度或 Wasserstein 距离代替 L2
+  这样 5-shot 时不确定性高的原型会被自动降权。
+
+  启发E：训练时的联合OSR优化（你已在做，但可加强）
+
+  你 future_osr.txt 中的 osr15 方向（多空间融合 +
+  联合训练）是正确的。关键改进：
+
+  1. 移除后处理 Z-normalize
+  融合：你已发现后处理归一化失败(z_mahal_fusion 1.78%)，osr15 的
+  multispace_osr_head 是正确方向
+  2. 加入 attention-weighted fusion（你计划中的下一步）：在 7
+  维特征上加 self-attention
+  # 替代固定 MLP
+  self.ms_attention = nn.MultiheadAttention(embed_dim=7,
+  num_heads=1)
+
+  启发F：最关键的一点 — 特征质量
+
+  你的历史教训 feature_mahalanobis 从 12%→21% (PANN vs YAMNet) 说明
+   特征空间的区分度是OSR上限。
+
+  建议：与其继续优化 flow/OSR head（你在 future_osr.txt 中已承认
+  flow 方法不稳定），不如：
+  1. 投入更多精力到 Phase 0a/0b 的特征学习
+  2. 考虑用 supervised contrastive learning (SupCon) 替代 SimCLR —
+  已知类标签可以用来，确保同类紧凑、异类远离
+  3. 特征空间越紧凑，feature_mahalanobis 的 TPR 天然越高
+
+  ---
+  优先级建议
+
+  ┌────────┬───────────────────┬──────────────────────┬────────┐
+  │ 优先级 │       改进        │       预期收益       │ 工作量 │
+  ├────────┼───────────────────┼──────────────────────┼────────┤
+  │ 1      │ SupCon 替代       │ 特征质量全面提升     │ 小     │
+  │        │ SimCLR (Phase 0a) │                      │        │
+  ├────────┼───────────────────┼──────────────────────┼────────┤
+  │        │ 可学习阈值        │                      │        │
+  │ 2      │ (meta-learned     │ 解决 calib→test 下降 │ 小     │
+  │        │ threshold)        │                      │        │
+  ├────────┼───────────────────┼──────────────────────┼────────┤
+  │        │ 互反点            │ 增强                 │        │
+  │ 3      │ (reciprocal       │ feature_mahalanobis  │ 中     │
+  │        │ point)            │                      │        │
+  ├────────┼───────────────────┼──────────────────────┼────────┤
+  │ 4      │ 3级 curriculum    │ 更真实的伪未知       │ 中     │
+  │        │ OOD               │                      │        │
+  ├────────┼───────────────────┼──────────────────────┼────────┤
+  │ 5      │ 原型不确定性      │ K=1~3 时收益大       │ 中     │
+  └────────┴───────────────────┴──────────────────────┴────────┘

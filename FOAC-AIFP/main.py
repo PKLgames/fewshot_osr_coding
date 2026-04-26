@@ -37,12 +37,28 @@ if not args.pretrain:
     
     if args.test:
         model.eval()
-        state_dict = torch.load(os.path.join(args.save_folder, 'model_Nsynth_max_auroc.pth'))
-        model.weight_base = state_dict['weight_base'].to('cuda')
-        model.weight_base_open=state_dict['weight_base_open'].to('cuda')
-        model.load_state_dict(state_dict,strict=False)
-        result = tm.run_test_fsl(model,eval_loader)
-        print(result)
+        ckpt_names = ['model_TAU22_max_acc.pth', 'model_TAU22_max_auroc.pth', 'model_TAU22_max_fscore.pth']
+        test_log_path = os.path.join(args.save_folder, 'TAU22test.log')
+        with open(test_log_path, 'w') as f:
+            for ckpt_name in ckpt_names:
+                ckpt_path = os.path.join(args.save_folder, ckpt_name)
+                if not os.path.exists(ckpt_path):
+                    print(f"Skip {ckpt_name}: not found")
+                    continue
+                state_dict = torch.load(ckpt_path)
+                model.weight_base = state_dict['weight_base'].to('cuda')
+                model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+                model.load_state_dict(state_dict, strict=False)
+                result, loss = tm.run_test_fsl(model, eval_loader)
+                acc, auroc, fscore = result
+                f.write(f"{'='*50}\n")
+                f.write(f"{ckpt_name}\n")
+                f.write(f"ACC:    {acc[0]:.3f} ± {acc[1]:.3f}\n")
+                f.write(f"AUROC:  {auroc[0]:.3f} ± {auroc[1]:.3f}\n")
+                f.write(f"Fscore: {fscore[0]:.3f} ± {fscore[1]:.3f}\n")
+                f.write(f"Loss:   {loss:.5f}\n\n")
+                print(f"{ckpt_name}: ACC={acc[0]:.3f}±{acc[1]:.3f}  AUROC={auroc[0]:.3f}±{auroc[1]:.3f}  Fscore={fscore[0]:.3f}±{fscore[1]:.3f}")
+        print(f"\nResults saved to {test_log_path}")
         exit()
     state_dict = torch.load(args.pretrained_model_path)['feature_params']
     full_params = torch.load(args.pretrained_model_path)

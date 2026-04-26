@@ -352,15 +352,31 @@ Episode 设置 (适配6基类):
   训练 episode: 从6基类采样2闭集+2开放集, 剩余2基类用于base_ids
   测试 episode: 从4新类采样2闭集+2开放集, 6基类全部作为base_ids
 
-运行命令:
-  # Step 1: RPL/GCPL 预训练
+运行命令 (正式训练):
+  # Step 1: RPL/GCPL 预训练 (epoch=60)
+  cd FOAC-AIFP
   python pretrain.py --config default.yml
 
-  # Step 2: 元训练
-  python main.py --config default.yml --pretrain False --test False
+  # Step 2: 元训练 (epoch=60)
+  python main.py --config default.yml
 
-  # Step 3: 测试
-  python main.py --config default.yml --pretrain False --test True
+  # Step 3: 元测试 (加载保存的最佳模型)
+  python main.py --config default.yml --test True
+
+运行命令 (快速试运行, debug.yml: 2 epoch × 5 episodes):
+  # Step 1: 预训练
+  cd FOAC-AIFP
+  python pretrain.py --config debug.yml --epoch 2
+
+  # Step 2: 元训练
+  python main.py --config debug.yml --epoch 2
+
+  # Step 3: 元测试
+  python main.py --config debug.yml --test True
+
+  ※ 注意: argparse --test/--pretrain 的 type=bool 存在陷阱:
+     bool('False') == True, 因此切勿使用 --test False 或 --pretrain False.
+     不传该参数即默认 False, 需要开启时传 --test True 或 --pretrain True.
 
 ================================================================================
 六、关键注意事项
@@ -374,3 +390,6 @@ Episode 设置 (适配6基类):
 6. 预训练时 backbone.eval() 冻结编码器, 只训练 RPL/GCPL 参数
 7. 元训练时 encoder 用较小学习率 (0.0002), 其他模块用正常学习率 (0.001)
 8. base_ids 机制: 始终引用基类范围 [0..train_classes-1], 确保权重索引合法
+9. calc_auroc 硬编码阈值索引75已修复为自适应 min(75, len-1), 适配小batch测试 ✓
+10. main.py 中 cfg.update(vars(args)) 使 argparse 默认值覆盖 YAML, 需通过
+    命令行显式传参 (如 --epoch 2) 才能生效, debug.yml 已验证通过 ✓

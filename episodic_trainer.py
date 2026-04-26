@@ -529,6 +529,8 @@ class FeatureExtractor(nn.Module):
     不从 OSR 模型加载 FC 权重 (OSR 模型的 FC 层已在全类别上训练过).
     """
 
+    BACKBONE_TYPE = 'yamnet'
+
     def __init__(self, pretrained_path: str = None,
                  load_yamnet_pretrained: bool = True):
         super().__init__()
@@ -1142,7 +1144,8 @@ class EpisodicFlowClassifier(nn.Module):
                  use_projection: bool = True,
                  s_clamp_max: float = 3.0,
                  flow_dim: int = 32,
-                 use_flow: bool = False):
+                 use_flow: bool = False,
+                 use_condition_network: bool = True):
         super().__init__()
         if hidden_dims is None:
             hidden_dims = [256, 256]
@@ -1152,6 +1155,7 @@ class EpisodicFlowClassifier(nn.Module):
         self.use_projection = use_projection
         self.flow_dim = flow_dim
         self.use_flow = use_flow
+        self.use_condition_network = use_condition_network
 
         # Feature adapter: trainable transform to refine frozen cached features
         # Learns a class-agnostic rotation/scaling of the feature space
@@ -1182,12 +1186,14 @@ class EpisodicFlowClassifier(nn.Module):
 
             # Condition network: transforms prototype conditions before entering flow
             # Gives flow richer condition info without modifying NSF internals
-            self.condition_network = nn.Sequential(
-                nn.Linear(flow_dim, flow_dim * 2),
-                nn.ReLU(),
-                nn.Linear(flow_dim * 2, flow_dim),
-                nn.LayerNorm(flow_dim),
-            )
+            # osr13 compatibility: set use_condition_network=False to match osr13 structure
+            if use_condition_network:
+                self.condition_network = nn.Sequential(
+                    nn.Linear(flow_dim, flow_dim * 2),
+                    nn.ReLU(),
+                    nn.Linear(flow_dim * 2, flow_dim),
+                    nn.LayerNorm(flow_dim),
+                )
 
             self.flow = NSF_module.ConditionalNSF(
                 input_dim=flow_dim,
@@ -1249,7 +1255,8 @@ class EpisodicFlowClassifier(nn.Module):
             flow_feats = self.projection(flow_feats)
             flow_protos = self.projection(flow_protos)
         # Transform prototype conditions via condition network (gives flow richer conditioning)
-        flow_protos = self.condition_network(flow_protos)
+        if self.use_condition_network:
+            flow_protos = self.condition_network(flow_protos)
         return flow_feats, flow_protos
 
     def project(self, x: torch.Tensor) -> torch.Tensor:
@@ -2313,13 +2320,13 @@ class EpisodicTrainer:
             if ep % accum_steps == 0 or ep == num_episodes:
                 torch.nn.utils.clip_grad_norm_(
                     self.flow_classifier.parameters(), 0.5)
+                self.optimizer.step()
                 if ep <= self.warmup_episodes:
                     warmup_factor = ep / self.warmup_episodes
                     for pg in self.optimizer.param_groups:
                         pg['lr'] = self.base_lr * warmup_factor
                 else:
                     self.scheduler.step()
-                self.optimizer.step()
 
             self.history['train_loss'].append(loss)
             self.history['train_acc'].append(acc)
@@ -3617,16 +3624,20 @@ def main():
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/ast_fewshot_osr1'
+    experiment_dir = 'experiment/yamnet_fewshot_osr13'
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
-    # ---- Backbone selection: 'distil_ast' or 'panns_cnn14' ----
-    # 'distil_ast':  Distil-AST (6-layer, 44M, ~1.7min/ep) — better than full AST
-    # 'panns_cnn14': PANNs Cnn14_16k (CNN, ~5M, ~45s/ep) — fastest, CNN-based
-    backbone_choice = 'distil_ast'
+    # ---- Backbone selection: 'yamnet', 'distil_ast' or 'panns_cnn14' ----
+    backbone_choice = 'yamnet'
 
-    if backbone_choice == 'distil_ast':
+    if backbone_choice == 'yamnet':
+        FeatureExtractorClass = FeatureExtractor
+        backbone_unfreeze_layers = [
+            'layer7', 'layer8', 'layer9', 'layer10',
+            'layer11', 'layer12', 'layer13', 'layer14'
+        ]
+    elif backbone_choice == 'distil_ast':
         FeatureExtractorClass = DistilASTFeatureExtractor
         backbone_unfreeze_layers = [
             'encoder.layer.4', 'encoder.layer.5'  # last 2 of 6 Distil-AST layers
@@ -3657,26 +3668,36 @@ def main():
             print(f"\nBase feature extractor already exists: {base_pretrained_path}")
             feature_extractor = FeatureExtractorClass(pretrained_path=base_pretrained_path)
         else:
-            print(f"\nExisting checkpoint has backbone='{ckpt_backbone}', "
-                  f"need {FeatureExtractorClass.BACKBONE_TYPE} retrain. "
-                  f"Removing old checkpoints.")
-            os.remove(base_pretrained_path)
-            if os.path.exists(contrastive_pretrained_path):
-                os.remove(contrastive_pretrained_path)
+            print(f"\nWARNING: Existing checkpoint has backbone='{ckpt_backbone}', "
+                  f"but need '{FeatureExtractorClass.BACKBONE_TYPE}'. "
+                  f"Will retrain Phase 0 without deleting existing files.")
             _need_retrain = True
 
     if not os.path.exists(base_pretrained_path) or _need_retrain:
-        # Both Distil-AST and PANNs are AudioSet-pretrained → skip SimCLR
-        # Only fine-tune projection head + last 2 backbone layers on base classes
+        # Phase 0a: SimCLR contrastive pre-training (unsupervised, no label leakage)
         print(f"\n{'='*70}")
-        print(f"Phase 0b: Base Class Supervised Fine-tuning ({backbone_choice}, no SimCLR)")
+        print(f"Phase 0a: Contrastive Pre-training (SimCLR)")
+        print("  - Unsupervised: uses ALL classes (no label leakage)")
+        print(f"  - {backbone_choice} last layers unfrozen for acoustic scene adaptation")
+        print("  - FC layers learn discriminative features via NT-Xent loss")
+        print(f"{'='*70}")
+        feature_extractor = FeatureExtractorClass()
+        contrastive_pretrainer = ContrastivePretrainer(
+            feature_extractor, device,
+            lr=3e-4, epochs=300,
+            temperature=0.1,
+            backbone_unfreeze_layers=backbone_unfreeze_layers)
+        feature_extractor = contrastive_pretrainer.train(train_dataset, contrastive_pretrained_path)
+
+        # Phase 0b: Base class supervised fine-tuning
+        print(f"\n{'='*70}")
+        print(f"Phase 0b: Base Class Supervised Fine-tuning")
         print("  - Only base classes (no leakage)")
         print(f"  - Unfreeze: {backbone_unfreeze_layers}")
         print(f"{'='*70}")
-        feature_extractor = FeatureExtractorClass()
         pretrainer = BaseClassPretrainer(
             feature_extractor, base_classes, device,
-            lr=5e-6, epochs=20,
+            lr=1e-5, epochs=20,
             backbone_unfreeze_layers=backbone_unfreeze_layers)
         feature_extractor = pretrainer.train(train_dataset, base_pretrained_path)
 
@@ -3711,17 +3732,23 @@ def main():
     flow_classifier = EpisodicFlowClassifier(
         input_dim=feature_dim,
         condition_dim=feature_dim,
-        num_coupling_layers=0,          # pann_osr2: disable flow
+        num_coupling_layers=4,
         hidden_dims=[128],
         use_projection=True,
         s_clamp_max=3.0,
         flow_dim=32,
-        use_flow=False                  # pann_osr2: simple prototype network only
+        use_flow=True,
+        use_condition_network=False   # osr13: no condition network
     )
 
-    # pann_osr2: Disable OOD exposure (simplified approach)
-    ood_features = {}  # Empty - no OOD exposure
-    print("OOD exposure: disabled (pann_osr2 simplified approach)")
+    # OOD exposure: provide unknown class features for open-set training
+    ood_features = {}
+    for c in unknown_classes:
+        feats = test_cache.get_class_features(c)
+        if len(feats) > 0:
+            ood_features[c] = feats
+    print(f"OOD exposure: {len(ood_features)} unknown classes, "
+          f"{sum(len(v) for v in ood_features.values())} total samples")
 
     trainer = EpisodicTrainer(
         feature_extractor=feature_extractor,
@@ -3736,9 +3763,9 @@ def main():
         K_shot=K_shot,
         Q_query=Q_query,
         lr=5e-5,
-        proto_noise_std=0.15,       # pann_osr2: reset to default
-        ood_ratio=0.0,              # pann_osr2: disabled (no OOD exposure)
-        warmup_episodes=100,        # pann_osr2: shorter warmup (no complex losses)
+        proto_noise_std=0.15,
+        ood_ratio=0.3,
+        warmup_episodes=200,
         task_aug_drop_rate=0.2,
         gradient_accum_steps=gradient_accum_steps,
         device=device

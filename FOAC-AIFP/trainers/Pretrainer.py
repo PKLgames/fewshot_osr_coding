@@ -190,6 +190,7 @@ class BaseTrainer(object):
             print(train_msg)
             if epoch % 5 == 0 or epoch==self.args.epoch:
                 self.save_3_model(epoch,'mini_last')
+                self.save_3_model(epoch,'pretrain_model_{}'.format(self.args.dataset.lower()))
                 print('The Best Meta 1(5)-shot Acc {:.4f}({:.4f}) in Epoch {}({})'.format(trlog['max_1shot_meta'],trlog['max_5shot_meta'],trlog['max_1shot_epoch'],trlog['max_5shot_epoch']))
             if epoch % 15 == 0 :
                 self.save_3_model(epoch,'mini_15epoch')
