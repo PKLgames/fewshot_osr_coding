@@ -1252,7 +1252,8 @@ class EpisodicFlowClassifier(nn.Module):
                  s_clamp_max: float = 3.0,
                  flow_dim: int = 32,
                  use_flow: bool = False,
-                 use_condition_network: bool = True):
+                 use_condition_network: bool = True,
+                 condition_alpha: float = 0.5):
         super().__init__()
         if hidden_dims is None:
             hidden_dims = [256, 256]
@@ -1263,6 +1264,14 @@ class EpisodicFlowClassifier(nn.Module):
         self.flow_dim = flow_dim
         self.use_flow = use_flow
         self.use_condition_network = use_condition_network
+        self._condition_alpha_init = condition_alpha
+
+        # osr18: learnable alpha for interpolating between raw and conditioned prototypes
+        # alpha=0 → no conditioning (osr13), alpha=1 → full conditioning (osr17)
+        if use_condition_network and use_flow:
+            import math
+            init_logit = math.log(condition_alpha / max(1 - condition_alpha, 1e-6))
+            self.log_condition_alpha = nn.Parameter(torch.tensor(init_logit))
 
         # Feature adapter: trainable transform to refine frozen cached features
         # Learns a class-agnostic rotation/scaling of the feature space
@@ -1370,9 +1379,12 @@ class EpisodicFlowClassifier(nn.Module):
         if self.use_projection:
             flow_feats = self.projection(flow_feats)
             flow_protos = self.projection(flow_protos)
-        # Transform prototype conditions via condition network (gives flow richer conditioning)
+        # osr18: alpha-interpolated condition network
+        # conditioned_proto = alpha * condition_network(proto) + (1-alpha) * proto
         if self.use_condition_network:
-            flow_protos = self.condition_network(flow_protos)
+            conditioned = self.condition_network(flow_protos)
+            alpha = self.condition_alpha_val()
+            flow_protos = alpha * conditioned + (1 - alpha) * flow_protos
         return flow_feats, flow_protos
 
     def project(self, x: torch.Tensor) -> torch.Tensor:
@@ -1391,6 +1403,19 @@ class EpisodicFlowClassifier(nn.Module):
         adapted_feats = self.feature_adapter(features)
         adapted_protos = self.feature_adapter(prototypes)
         return adapted_feats, adapted_protos
+
+    def condition_alpha_val(self) -> float:
+        """Get current condition alpha value (sigmoid of learnable logit)."""
+        if hasattr(self, 'log_condition_alpha'):
+            return torch.sigmoid(self.log_condition_alpha).item()
+        return self._condition_alpha_init
+
+    def set_condition_alpha(self, alpha: float):
+        """Set condition alpha to a specific value (for eval-time search)."""
+        if hasattr(self, 'log_condition_alpha'):
+            import math
+            alpha = max(1e-4, min(1 - 1e-4, alpha))
+            self.log_condition_alpha.data.fill_(math.log(alpha / (1 - alpha)))
 
     def _compute_flow_log_probs(self, proj_feats: torch.Tensor,
                                 proj_protos: torch.Tensor) -> torch.Tensor:
@@ -1746,10 +1771,12 @@ class EpisodicLoss(nn.Module):
                  lambda_entropy: float = 0.05,
                  lambda_separation: float = 0.02,
                  lambda_pseudo_novel: float = 0.05,
-                 lambda_latent_repel: float = 0.1,
-                 latent_repel_margin: float = 64.0,
-                 lambda_gaussian: float = 0.3,  # osr17e: 0.1→0.3, counteract z-expansion forces
-                 lambda_non_gaussian: float = 0.05,
+                 lambda_latent_repel: float = 0.10,      # osr18c: gentle z-space repulsion
+                 latent_repel_margin: float = 48.0,      # osr18c: moderate margin
+                 lambda_gaussian: float = 0.15,           # osr18c: moderate normalization
+                 lambda_non_gaussian: float = 0.08,       # osr18c: gentle anti-normalization
+                 lambda_energy_margin: float = 0.25,      # osr18c: primary OSR signal
+                 non_gaussian_target_factor: float = 1.3, # osr18c: target ||z||² > 1.3*D (moderate)
                  lambda_z_contrastive: float = 0.05,
                  lambda_z_contrastive_known: float = 0.7,
                  lambda_z_contrastive_unknown: float = 0.3,
@@ -1768,6 +1795,8 @@ class EpisodicLoss(nn.Module):
         self.latent_repel_margin = latent_repel_margin
         self.lambda_gaussian = lambda_gaussian
         self.lambda_non_gaussian = lambda_non_gaussian
+        self.lambda_energy_margin = lambda_energy_margin
+        self.non_gaussian_target_factor = non_gaussian_target_factor
         self.lambda_z_contrastive = lambda_z_contrastive
         self.lambda_z_contrastive_known = lambda_z_contrastive_known
         self.lambda_z_contrastive_unknown = lambda_z_contrastive_unknown
@@ -1876,11 +1905,24 @@ class EpisodicLoss(nn.Module):
         L_non_gaussian = torch.tensor(0.0, device=log_probs.device)
         if z_all is not None and z_all.size(1) > 1 and scale_struct > 0:
             z_wrong_norm_sq = (z_all ** 2).sum(dim=2)  # (B, N)
-            target = self.feature_dim * 1.5  # 50% above Gaussian mean
+            target = self.feature_dim * self.non_gaussian_target_factor  # osr18b: configurable (default 2.0*D)
             penalty = torch.clamp(target - z_wrong_norm_sq, min=0.0)  # (B, N)
             mask = torch.ones(B, N, device=z_all.device)
             mask[torch.arange(B, device=z_all.device), query_labels] = 0.0
             L_non_gaussian = (penalty * mask).sum() / mask.sum().clamp(min=1.0) / self.feature_dim
+
+        # 8b. osr18: L_energy_margin — explicit energy gap between known and pseudo-OOD
+        #     Ensures flow assigns higher likelihood to known (correct class) than to OOD.
+        #     Only active in Phase 3 (scale_struct > 0) to avoid conflicting with L_gaussian.
+        L_energy_margin = torch.tensor(0.0, device=log_probs.device)
+        if pseudo_novel_log_probs is not None and pseudo_novel_log_probs.size(0) > 0 and scale_struct > 0:
+            # known energy: negative log-prob of correct class (lower = more likely)
+            known_logp = log_probs.gather(1, query_labels.unsqueeze(1)).mean()  # scalar, higher = more likely
+            # OOD energy: max log-prob across classes (higher = flow thinks it's more likely)
+            ood_max_logp = torch.logsumexp(pseudo_novel_log_probs.clamp(max=10.0), dim=1).mean()
+            # margin loss: want known_logp > ood_max_logp + margin
+            energy_margin = 2.0
+            L_energy_margin = torch.clamp(energy_margin - (known_logp - ood_max_logp), min=0.0)
 
         # 9. L_z_contrastive: Create tighter known clusters + more compact unknown regions
         #    For known samples: z_correct (from correct proto) pulled toward class centroid
@@ -1965,6 +2007,7 @@ class EpisodicLoss(nn.Module):
                  + scale_struct * self.lambda_pseudo_novel * L_pseudo
                  + scale_struct * self.lambda_latent_repel * L_latent_repel
                  + scale_struct * self.lambda_non_gaussian * L_non_gaussian
+                 + scale_struct * self.lambda_energy_margin * L_energy_margin
                  + scale_gaussian * self.lambda_z_contrastive * L_z_contrastive)
 
         info = {
@@ -1976,6 +2019,7 @@ class EpisodicLoss(nn.Module):
             'L_latent_repel': L_latent_repel.detach(),
             'L_gaussian': L_gaussian.detach(),
             'L_non_gaussian': L_non_gaussian.detach(),
+            'L_energy_margin': L_energy_margin.detach(),
             'L_z_contrastive': L_z_contrastive.detach(),
             'L_z_contrastive_known': L_z_contrastive_known.detach(),
             'L_z_contrastive_unknown': L_z_contrastive_unknown.detach(),
@@ -2336,22 +2380,22 @@ class EpisodicTrainer:
         self.calib_cache = calib_cache
         self.test_cache = test_cache
 
-        # Loss: explicit Gaussian matching + inter-class repulsion
-        # Auxiliary losses ramp up after warmup (controlled by aux_scale in forward)
-        # Key change: much stronger gaussian prior (0.03→0.3) — the foundation of OSR
-        # pann_osr2: Simplified loss - only CE + separation
-        # All z/flow losses disabled (set to 0)
+        # Loss: osr18c — gentle anti-normalization, energy margin as primary OSR signal
+        # Key: anti-normalization/normalization ≈ 0.5:1 (not 3.2:1 like osr18b)
+        # Primary OSR tool: L_energy_margin (directly optimizes density gap)
         self.criterion = EpisodicLoss(
             N_way=self.N_way,
-            lambda_density=0.0,          # pann_osr2: disabled
-            lambda_entropy=0.0,           # pann_osr2: disabled
-            lambda_separation=0.05,       # pann_osr2: increased for better inter-class separation
-            lambda_pseudo_novel=0.0,       # pann_osr2: disabled
-            lambda_latent_repel=0.0,      # pann_osr2: disabled
-            latent_repel_margin=32.0,
-            lambda_gaussian=0.0,           # pann_osr2: disabled (no flow)
-            lambda_non_gaussian=0.0,       # pann_osr2: disabled
-            lambda_z_contrastive=0.0,      # pann_osr2: disabled
+            lambda_density=0.0,
+            lambda_entropy=0.0,
+            lambda_separation=0.05,
+            lambda_pseudo_novel=0.05,         # OOD repulsion
+            lambda_latent_repel=0.10,          # osr18c: gentle z-space separation
+            latent_repel_margin=48.0,          # osr18c: moderate margin
+            lambda_gaussian=0.15,              # osr18c: moderate normalization
+            lambda_non_gaussian=0.08,          # osr18c: gentle anti-normalization
+            lambda_energy_margin=0.25,         # osr18c: primary OSR signal
+            non_gaussian_target_factor=1.3,    # osr18c: z_wrong target ||z||² > 1.3*D
+            lambda_z_contrastive=0.0,
             lambda_z_contrastive_known=0.0,
             lambda_z_contrastive_unknown=0.0,
             z_contrastive_temperature=0.1,
@@ -2442,25 +2486,25 @@ class EpisodicTrainer:
         # Project prototypes for separation loss (in projected space)
         projected_protos = self.flow_classifier.project(prototypes)
 
-        # Staged aux loss ramping (single-stage joint training):
-        #   Phase 1 (ep ≤ warmup): CE + gaussian prior (从第1个episode启动归一化)
-        #   Phase 2 (warmup < ep ≤ warmup+stage2_len): classification helpers ramp 0→1
-        #   Phase 3 (after stage2): structure + OSR losses ramp, gaussian at full weight
+        # Staged aux loss ramping (osr18c: moderate gaussian from start):
+        #   Phase 1 (ep ≤ warmup): CE + light gaussian (0.2×)
+        #   Phase 2 (warmup < ep ≤ warmup+stage2_len): gaussian 0.2→0.8 + cls helpers
+        #   Phase 3 (after stage2): full gaussian + OSR losses
         w = self.warmup_episodes
         s2 = self.stage2_len
         s3 = self.stage3_len
 
         if current_episode <= w:
-            # Phase 1: CE + gaussian (z空间从第1个episode就逐步对齐N(0,I))
+            # Phase 1: CE + light gaussian (0.2× — not 0, not 0.5)
             scale_cls = 0.0
             scale_struct = 0.0
-            scale_gaussian = 0.5
+            scale_gaussian = 0.2       # osr18c: moderate (osr18b=0 too low, osr18a=0.5 too high)
         elif current_episode <= w + s2:
-            # Phase 2: add classification helpers + gaussian继续增强
+            # Phase 2: gaussian ramp + classification helpers
             progress = (current_episode - w) / s2
-            scale_cls = min(1.0, progress * 0.8)        # gentler ramp (80% at end)
+            scale_cls = min(1.0, progress * 0.8)
             scale_struct = 0.0
-            scale_gaussian = min(1.0, 0.5 + progress * 0.5)  # 50%→100%
+            scale_gaussian = min(0.8, 0.2 + progress * 0.6)  # osr18c: 0.2→0.8
         else:
             # Phase 3: full classification + structural + gaussian
             scale_cls = 1.0
@@ -2544,25 +2588,33 @@ class EpisodicTrainer:
         if scale_struct > 0 and query_labels.max() < self.flow_classifier.num_max_classes:
             L_reciprocal = self.flow_classifier.compute_reciprocal_loss(
                 query_feats, prototypes, query_labels)
-            loss = loss + 6.0 * scale_struct * L_reciprocal  # osr17d: 10.0→6.0 to stop crushing flow losses
+            loss = loss + 3.0 * scale_struct * L_reciprocal  # osr18c: 6.0→3.0, reduce crushing of flow losses
 
-        # osr17e: Direct z_norm² + z_std regularization (fixes osr17d detached tensor bug)
-        # osr17d used info['L_gaussian'].detach() → zero gradient → penalty was non-functional
-        # Now: direct computation from z_all with proper gradient flow
-        if z_all is not None:
+        # osr18c: Direct z_norm² + z_std regularization (moderate + phase-gated)
+        # osr18b weights (0.05) were too low; osr18a (0.3/0.5) too high
+        # osr18c: 0.10/0.10 — moderate, keeps z-space stable without crushing it
+        if z_all is not None and scale_gaussian > 0:
             target_norm = self.criterion.feature_dim  # 32 for flow_dim=32
             z_correct = z_all[torch.arange(z_all.size(0), device=z_all.device), query_labels]
             z_norm_sq = (z_correct ** 2).sum(dim=1).mean()
             z_std_per_dim = z_correct.std(dim=0).mean()
 
-            # Quadratic z_norm² penalty: strong gradient pulling toward target
+            # Moderate quadratic penalty (0.10, between osr18a's 0.3 and osr18b's 0.05)
             overshoot = z_norm_sq / target_norm - 1.0
-            z_norm_penalty = 0.3 * overshoot ** 2
+            z_norm_penalty = 0.10 * overshoot ** 2
 
-            # z_std penalty: prevent dimension collapse (target std=1.0)
-            z_std_penalty = 0.5 * (z_std_per_dim - 1.0) ** 2
+            # Moderate z_std penalty
+            z_std_penalty = 0.10 * (z_std_per_dim - 1.0) ** 2
 
-            loss = loss + z_norm_penalty + z_std_penalty
+            # Gate with scale_gaussian
+            loss = loss + scale_gaussian * (z_norm_penalty + z_std_penalty)
+
+        # osr18b: condition_alpha regularization — prevent collapse to 0 or 1
+        # Encourages alpha ≈ 0.5 so the model uses both raw and conditioned prototypes
+        if self.flow_classifier.use_condition_network and scale_cls > 0:
+            alpha = torch.sigmoid(self.flow_classifier.log_condition_alpha)  # tensor, differentiable
+            L_alpha_reg = 0.01 * (alpha - 0.5).abs()
+            loss = loss + L_alpha_reg
 
         # Skip episode if loss is NaN/Inf (prevents model corruption)
         if not torch.isfinite(loss):
@@ -2572,6 +2624,23 @@ class EpisodicTrainer:
         # Backward with accumulation scaling (caller handles zero_grad + step)
         scaled_loss = loss * accum_scale
         scaled_loss.backward()
+
+        # osr18: Periodic bg_flow update — train background flow on pseudo-OOD samples
+        # This makes likelihood_ratio = log p(x|class) - log p(x|bg) discriminative
+        if (self.flow_classifier.use_flow and current_episode % 50 == 0
+                and current_episode > self.warmup_episodes):
+            bg_samples = self._ood_sampler.sample(256, current_episode=current_episode)
+            bg_conds = torch.zeros(256, 1, device=self.device)  # unconditional
+            # Project bg_samples through flow pipeline
+            bg_adapted = self.flow_classifier.feature_adapter(bg_samples)
+            bg_projected = self.flow_classifier.flow_dim_adapter(bg_adapted)
+            if self.flow_classifier.use_projection:
+                bg_projected = self.flow_classifier.projection(bg_projected)
+            bg_projected = self.flow_classifier.flow_pre_norm(bg_projected)
+            bg_logp = self.flow_classifier.bg_flow.log_prob(bg_projected, bg_conds)
+            bg_loss = -bg_logp.mean()  # bg_flow learns pseudo-OOD distribution
+            # Use lower LR for bg_flow via gradient scaling
+            (0.1 * bg_loss).backward()
 
         # Accuracy
         preds = log_probs.argmax(dim=1)
@@ -2586,6 +2655,10 @@ class EpisodicTrainer:
                 z_stats['z_std'] = z_correct.std(dim=0).mean().item()
                 z_stats['gaussian'] = info['L_gaussian'].item()
                 z_stats['non_gaussian'] = info['L_non_gaussian'].item()
+                z_stats['energy_margin'] = info['L_energy_margin'].item()
+        # osr18: log condition alpha
+        if self.flow_classifier.use_condition_network:
+            z_stats['condition_alpha'] = self.flow_classifier.condition_alpha_val()
         else:
             z_stats['z_norm_sq'] = 0.0
             z_stats['z_std'] = 0.0
@@ -2673,7 +2746,7 @@ class EpisodicTrainer:
         print(f"LR warmup:        {self.warmup_episodes} episodes")
         print(f"Stage2 (cls):     {self.stage2_len} episodes")
         print(f"Stage3 (struct):  {self.stage3_len} episodes")
-        print(f"Gaussian prior:   starts from ep 1 (co-trained with CE)")
+        print(f"Gaussian prior:   delayed to Phase 2 (ep {self.warmup_episodes+1})")
         print(f"Patience:         {self.patience_episodes} episodes ({self.patience_episodes // eval_every} evals)")
         print(f"Training mode:    Single-stage joint (classification + OOD together)")
         print(f"{'='*70}\n")
@@ -3168,6 +3241,10 @@ class OSRCalibrator:
             return self.score_samples_z_gap(features, prototypes, batch_size)
         if method == 'z_mahal_fusion':
             return self.score_samples_z_mahal_fusion(features, prototypes, batch_size)
+        if method == 'likelihood_ratio_v2':
+            return self.score_samples_likelihood_ratio_v2(features, prototypes, batch_size)
+        if method == 'adaptive_fusion':
+            return self.score_samples_adaptive_fusion(features, prototypes, batch_size)
         return self.score_samples_mahalanobis(features, prototypes, batch_size)
 
     # ---- Neural OOD head (trained during episodic meta-training) ----
@@ -3243,6 +3320,69 @@ class OSRCalibrator:
         mahal_normed = (mahal_scores - mahal_mu) / (mahal_std + 1e-8)
 
         alpha = getattr(self, '_geo_fusion_alpha', 0.5)
+        return alpha * anti_normed + (1 - alpha) * mahal_normed
+
+    def score_samples_likelihood_ratio_v2(self, features: torch.Tensor,
+                                           prototypes: torch.Tensor,
+                                           batch_size: int = 4096) -> torch.Tensor:
+        """osr18: Likelihood ratio v2 using bg_flow trained on pseudo-OOD.
+        Score = log p(x|class) - log p(x|bg), where bg_flow models the OOD distribution.
+        Higher = more likely known."""
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                # Conditional flow log-likelihood
+                log_probs = self.flow(batch, prototypes)  # (B, N)
+                max_logp, _ = log_probs.max(dim=1)  # (B,)
+
+                # Background flow log-likelihood (unconditional)
+                proj_feats, _ = self.flow._prepare_flow_features(batch, prototypes[:1])
+                # Only need the feature projection, not prototype
+                proj_batch = self.flow.flow_dim_adapter(self.flow.feature_adapter(batch))
+                if self.flow.use_projection:
+                    proj_batch = self.flow.projection(proj_batch)
+                proj_batch = self.flow.flow_pre_norm(proj_batch)
+                bg_conds = torch.zeros(proj_batch.size(0), 1, device=self.device)
+                bg_logp = self.flow.bg_flow.log_prob(proj_batch, bg_conds)  # (B,)
+
+                lr = max_logp - bg_logp  # higher = more class-specific
+                all_scores.append(lr.cpu())
+        return torch.cat(all_scores)
+
+    def score_samples_adaptive_fusion(self, features: torch.Tensor,
+                                       prototypes: torch.Tensor,
+                                       batch_size: int = 4096) -> torch.Tensor:
+        """osr18: Adaptive fusion of multiple methods with learned weights.
+        Uses cached normalization stats and fusion alphas from calibration.
+        Falls back to geo_fusion if not calibrated."""
+        # Get individual method scores
+        anti_scores = self.score_anti_prototype_all(features, prototypes, batch_size)
+        mahal_scores = self.score_samples_feat_mahalanobis(features, prototypes, batch_size)
+
+        # Z-normalize
+        anti_mu = getattr(self, '_adapt_anti_mu', anti_scores.mean().item())
+        anti_std = getattr(self, '_adapt_anti_std', anti_scores.std().item())
+        mahal_mu = getattr(self, '_adapt_mahal_mu', mahal_scores.mean().item())
+        mahal_std = getattr(self, '_adapt_mahal_std', mahal_scores.std().item())
+
+        anti_normed = (anti_scores - anti_mu) / (anti_std + 1e-8)
+        mahal_normed = (mahal_scores - mahal_mu) / (mahal_std + 1e-8)
+
+        # If flow is available, add z_consistency signal
+        if self.flow.use_flow:
+            z_scores = self.score_samples_z_consistency(features, prototypes, batch_size)
+            z_mu = getattr(self, '_adapt_z_mu', z_scores.mean().item())
+            z_std = getattr(self, '_adapt_z_std', z_scores.std().item())
+            z_normed = (z_scores - z_mu) / (z_std + 1e-8)
+
+            w_anti = getattr(self, '_adapt_w_anti', 0.4)
+            w_mahal = getattr(self, '_adapt_w_mahal', 0.3)
+            w_z = getattr(self, '_adapt_w_z', 0.3)
+            return w_anti * anti_normed + w_mahal * mahal_normed + w_z * z_normed
+
+        alpha = getattr(self, '_adapt_alpha', 0.5)
         return alpha * anti_normed + (1 - alpha) * mahal_normed
 
     def score_samples_z_norm(self, features: torch.Tensor,
@@ -3509,12 +3649,18 @@ class OSRCalibrator:
         prototypes = self.compute_prototypes(K_shot)
         print(f"Prototypes: {prototypes.shape} from {len(self.base_classes)} base classes")
 
+        # osr18: Search optimal condition_alpha for flow-based methods
+        if method in ('z_consistency', 'z_reconstruction', 'z_mahal_fusion',
+                       'flow_energy', 'flow_hybrid', 'adaptive_fusion'):
+            print("Searching optimal condition_alpha...")
+            self._search_condition_alpha(prototypes, method, target_fpr)
+
         if method in ('flow_mahalanobis', 'flow_hybrid'):
             print("Computing latent space statistics...")
             self.compute_latent_stats(prototypes)
 
         if method in ('flow_hybrid', 'feature_mahalanobis', 'feat_mahalanobis_relative',
-                       'z_mahal_fusion', 'anti_prototype', 'geo_fusion'):
+                       'z_mahal_fusion', 'anti_prototype', 'geo_fusion', 'adaptive_fusion'):
             print("Computing feature-space statistics...")
             self.compute_feat_stats()
 
@@ -3709,6 +3855,98 @@ class OSRCalibrator:
             print(f"  Mahal scores:  mu={self._geo_mahal_mu:.3f} std={self._geo_mahal_std:.3f}")
             print(f"  Fusion weight: alpha={best_alpha:.2f} (Youden J={best_j:.3f})")
 
+        # osr18: likelihood_ratio_v2 calibration
+        if method == 'likelihood_ratio_v2':
+            print("Training background flow on base features for likelihood ratio v2...")
+            base_feats = torch.cat([
+                self.cache.get_class_features(c) for c in self.base_classes])
+            self.flow.train_background_flow(base_feats, self.device)
+
+        # osr18: adaptive_fusion calibration — compute stats + optimize weights
+        if method == 'adaptive_fusion':
+            print("Computing adaptive fusion normalization stats...")
+            self.compute_feat_stats()
+            known_anti_all, known_mahal_all, known_z_all = [], [], []
+            for c in self.base_classes:
+                feats = self.cache.get_class_features(c)
+                known_anti_all.append(self.score_anti_prototype_all(feats, prototypes))
+                known_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                if self.flow.use_flow:
+                    known_z_all.append(self.score_samples_z_consistency(feats, prototypes))
+            all_anti = torch.cat(known_anti_all)
+            all_mahal = torch.cat(known_mahal_all)
+            self._adapt_anti_mu = all_anti.mean().item()
+            self._adapt_anti_std = all_anti.std().item()
+            self._adapt_mahal_mu = all_mahal.mean().item()
+            self._adapt_mahal_std = all_mahal.std().item()
+            if self.flow.use_flow and known_z_all:
+                all_z = torch.cat(known_z_all)
+                self._adapt_z_mu = all_z.mean().item()
+                self._adapt_z_std = all_z.std().item()
+
+            # Compute unknown scores for weight optimization
+            unknown_anti_all, unknown_mahal_all, unknown_z_all = [], [], []
+            for c in self.unknown_classes:
+                feats = self.cache.get_class_features(c)
+                if len(feats) > 0:
+                    unknown_anti_all.append(self.score_anti_prototype_all(feats, prototypes))
+                    unknown_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                    if self.flow.use_flow:
+                        unknown_z_all.append(self.score_samples_z_consistency(feats, prototypes))
+            has_unknown = len(unknown_anti_all) > 0
+            if has_unknown:
+                norm_unknown_anti = (torch.cat(unknown_anti_all) - self._adapt_anti_mu) / (self._adapt_anti_std + 1e-8)
+                norm_unknown_mahal = (torch.cat(unknown_mahal_all) - self._adapt_mahal_mu) / (self._adapt_mahal_std + 1e-8)
+                if self.flow.use_flow and unknown_z_all:
+                    norm_unknown_z = (torch.cat(unknown_z_all) - self._adapt_z_mu) / (self._adapt_z_std + 1e-8)
+
+            # Grid search over weight combinations
+            best_j = -1.0
+            norm_known_anti = (all_anti - self._adapt_anti_mu) / (self._adapt_anti_std + 1e-8)
+            norm_known_mahal = (all_mahal - self._adapt_mahal_mu) / (self._adapt_mahal_std + 1e-8)
+            if self.flow.use_flow and known_z_all:
+                norm_known_z = (all_z - self._adapt_z_mu) / (self._adapt_z_std + 1e-8)
+                for w_anti in [0.2, 0.3, 0.4, 0.5]:
+                    for w_mahal in [0.2, 0.3, 0.4]:
+                        w_z = 1.0 - w_anti - w_mahal
+                        if w_z < 0.1:
+                            continue
+                        combined_known = w_anti * norm_known_anti + w_mahal * norm_known_mahal + w_z * norm_known_z
+                        sorted_k = combined_known.sort()[0]
+                        idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                        thresh = sorted_k[idx]
+                        if has_unknown and unknown_z_all:
+                            combined_unknown = w_anti * norm_unknown_anti + w_mahal * norm_unknown_mahal + w_z * norm_unknown_z
+                            tpr = (combined_unknown > thresh).float().mean().item()
+                        else:
+                            tpr = 0.0
+                        tnr = (combined_known >= thresh).float().mean().item()
+                        j = tnr + tpr - 1.0
+                        if j > best_j:
+                            best_j = j
+                            self._adapt_w_anti = w_anti
+                            self._adapt_w_mahal = w_mahal
+                            self._adapt_w_z = w_z
+                print(f"  Fusion weights: anti={self._adapt_w_anti:.1f} mahal={self._adapt_w_mahal:.1f} z={self._adapt_w_z:.1f} (J={best_j:.3f})")
+            else:
+                # 2-method fusion
+                best_alpha, best_j = 0.5, -1.0
+                for alpha in [0.3, 0.4, 0.5, 0.6, 0.7]:
+                    combined_known = alpha * norm_known_anti + (1-alpha) * norm_known_mahal
+                    sorted_k = combined_known.sort()[0]
+                    idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                    thresh = sorted_k[idx]
+                    if has_unknown:
+                        combined_unknown = alpha * norm_unknown_anti + (1-alpha) * norm_unknown_mahal
+                        tpr = (combined_unknown > thresh).float().mean().item()
+                    else:
+                        tpr = 0.0
+                    j = (combined_known >= thresh).float().mean().item() + tpr - 1.0
+                    if j > best_j:
+                        best_j, best_alpha = j, alpha
+                self._adapt_alpha = best_alpha
+                print(f"  Fusion alpha: {best_alpha:.2f} (J={best_j:.3f})")
+
         # Score known samples
         known_scores_list = []
         for c in self.base_classes:
@@ -3753,6 +3991,49 @@ class OSRCalibrator:
         self.threshold = threshold
         return threshold
 
+    def _search_condition_alpha(self, prototypes: torch.Tensor,
+                                 method: str,
+                                 target_fpr: float = 0.05) -> float:
+        """osr18: Search for optimal condition_alpha by evaluating OSR at different alphas.
+        Returns the best alpha value. Only applicable when flow uses condition_network."""
+        if not (self.flow.use_flow and self.flow.use_condition_network
+                and hasattr(self.flow, 'log_condition_alpha')):
+            return self.flow.condition_alpha_val()
+
+        original_alpha = self.flow.condition_alpha_val()
+        best_alpha, best_j = original_alpha, -1.0
+
+        for trial_alpha in [0.1, 0.2, 0.3, 0.5, 0.7, 1.0]:
+            self.flow.set_condition_alpha(trial_alpha)
+            try:
+                known_list, unknown_list = [], []
+                for c in self.base_classes:
+                    feats = self.cache.get_class_features(c)
+                    known_list.append(self.score_samples(feats, prototypes, method))
+                for c in self.unknown_classes:
+                    feats = self.cache.get_class_features(c)
+                    if len(feats) > 0:
+                        unknown_list.append(self.score_samples(feats, prototypes, method))
+                if not unknown_list:
+                    continue
+                known_scores = torch.cat(known_list)
+                unknown_scores = torch.cat(unknown_list)
+                sorted_k, _ = known_scores.sort()
+                idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                tau = sorted_k[idx].item()
+                tnr = (known_scores >= tau).float().mean().item()
+                tpr = (unknown_scores > tau).float().mean().item()
+                j = tnr + tpr - 1.0
+                if j > best_j:
+                    best_j, best_alpha = j, trial_alpha
+            except Exception:
+                continue
+
+        # Restore best alpha
+        self.flow.set_condition_alpha(best_alpha)
+        print(f"  condition_alpha: {best_alpha:.2f} (Youden J={best_j:.3f})")
+        return best_alpha
+
     def evaluate_osr(self, threshold: float = None,
                      K_shot: int = 50,
                      num_rounds: int = 10,
@@ -3785,6 +4066,10 @@ class OSRCalibrator:
 
         for round_i in range(num_rounds):
             prototypes = self.compute_prototypes(K_shot, seed=round_i)
+
+            # osr18: Per-round condition_alpha search for flow methods
+            if method in ('z_consistency', 'flow_energy', 'flow_hybrid', 'adaptive_fusion'):
+                self._search_condition_alpha(prototypes, method, target_fpr)
 
             # Transductive refinement: use subset of known samples as queries
             # to refine prototypes before scoring
@@ -3960,6 +4245,53 @@ class OSRCalibrator:
             # For 'learned_ensemble': retrain OOD head per round
             if method == 'learned_ensemble':
                 self.train_ood_head(prototypes, target_fpr, verbose=False)
+
+            # osr18: likelihood_ratio_v2 per-round — retrain bg_flow
+            if method == 'likelihood_ratio_v2':
+                base_feats = torch.cat([
+                    self.cache.get_class_features(c) for c in self.base_classes])
+                self.flow.train_background_flow(
+                    base_feats, self.device, epochs=10, verbose=False)
+
+            # osr18: adaptive_fusion per-round — update stats + re-optimize weights
+            if method == 'adaptive_fusion':
+                self.compute_feat_stats()
+                known_anti_all, known_mahal_all, known_z_all = [], [], []
+                for c in self.base_classes:
+                    feats = self.cache.get_class_features(c)
+                    known_anti_all.append(self.score_anti_prototype_all(feats, prototypes))
+                    known_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                    if self.flow.use_flow:
+                        known_z_all.append(self.score_samples_z_consistency(feats, prototypes))
+                all_anti = torch.cat(known_anti_all)
+                all_mahal = torch.cat(known_mahal_all)
+                self._adapt_anti_mu = all_anti.mean().item()
+                self._adapt_anti_std = all_anti.std().item()
+                self._adapt_mahal_mu = all_mahal.mean().item()
+                self._adapt_mahal_std = all_mahal.std().item()
+                if self.flow.use_flow and known_z_all:
+                    all_z = torch.cat(known_z_all)
+                    self._adapt_z_mu = all_z.mean().item()
+                    self._adapt_z_std = all_z.std().item()
+                    # Quick weight re-optimization (fewer grid points than calibrate)
+                    norm_known_anti = (all_anti - self._adapt_anti_mu) / (self._adapt_anti_std + 1e-8)
+                    norm_known_mahal = (all_mahal - self._adapt_mahal_mu) / (self._adapt_mahal_std + 1e-8)
+                    norm_known_z = (all_z - self._adapt_z_mu) / (self._adapt_z_std + 1e-8)
+                    best_j = -1.0
+                    for w_anti in [0.3, 0.4, 0.5]:
+                        for w_mahal in [0.2, 0.3]:
+                            w_z = 1.0 - w_anti - w_mahal
+                            if w_z < 0.1:
+                                continue
+                            combined = w_anti * norm_known_anti + w_mahal * norm_known_mahal + w_z * norm_known_z
+                            sorted_k = combined.sort()[0]
+                            idx = min(int(len(sorted_k) * 0.05), len(sorted_k) - 1)
+                            j = (combined >= sorted_k[idx]).float().mean().item()
+                            if j > best_j:
+                                best_j = j
+                                self._adapt_w_anti = w_anti
+                                self._adapt_w_mahal = w_mahal
+                                self._adapt_w_z = w_z
 
             # Score known samples
             known_scores_list = []
@@ -4198,7 +4530,7 @@ def main():
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr17'  # osr17d: normalized features + balanced losses + condition_net
+    experiment_dir = 'experiment/yamnet_fewshot_osr18'  # osr18: calibrated conditioning + energy-aware training
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
@@ -4326,7 +4658,8 @@ def main():
         s_clamp_max=3.0,
         flow_dim=32,
         use_flow=True,
-        use_condition_network=True    # osr17d: enable for richer flow conditioning
+        use_condition_network=True,   # osr17d: enable for richer flow conditioning
+        condition_alpha=0.5           # osr18: learnable condition interpolation
     )
 
     # OOD exposure: provide unknown class features for open-set training
@@ -4394,10 +4727,11 @@ def main():
 
     # Select OSR methods based on flow availability
     if trainer.flow_classifier.use_flow:
-        # osr17g: added geo_fusion (anti_prototype + feat_mahal), anti_prototype center fix
+        # osr18: added likelihood_ratio_v2, adaptive_fusion
         osr_methods = ['feature_mahalanobis', 'anti_prototype', 'geo_fusion',
                        'reciprocal', 'z_consistency', 'z_reconstruction',
-                       'z_mahal_fusion', 'flow_hybrid', 'flow_energy', 'ood_head']
+                       'z_mahal_fusion', 'flow_hybrid', 'flow_energy',
+                       'likelihood_ratio_v2', 'adaptive_fusion', 'ood_head']
     else:
         # When use_flow=False, only use feature-space methods (skip all z/flow methods)
         osr_methods = ['feature_mahalanobis', 'ood_head']
