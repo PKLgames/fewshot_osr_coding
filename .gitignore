@@ -33,6 +33,7 @@ __pycache__/
 .Python
 *.pt
 *.pth
+*.ckpt
 
 # ─── Virtual environments ─────────────────────────────────────────────────────
 .venv/
