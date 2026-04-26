@@ -523,3 +523,139 @@ osr17c 检查点:
   │ osr17c(+Unc) │ >64%    │ >16%     │ >12%     │ >16%     │
   └──────────────┴─────────┴──────────┴──────────┴──────────┘
   TPR @ 95% TNR; 需同时报告AUROC以便与FOAC-AIFP对比
+
+
+════════════════════════════════════════════════════════════════════
+九、Reciprocal Loss 实现修复记实 (2026-04-26)
+════════════════════════════════════════════════════════════════════
+
+背景: osr17b 实现中发现 reciprocal_points 从未被训练，一直保持随机初始化状态
+
+问题排查过程:
+
+1. 初步症状
+   - best checkpoint (ep 150) 的 reciprocal_points std=0.0995 ≈ N(0, 0.1²) 初始值
+   - final checkpoint (ep 2250) 的 reciprocal_points 完全相同
+   - 训练日志显示 scale_struct 在 ep 600+ 激活，但参数未更新
+
+2. 根因分析
+
+   2.1 优化器不包含该参数
+   - old checkpoint 的 optimizer 只有 53 个参数
+   - reciprocal_points [20, 64] 不在 optimizer 中
+   - 原因: 代码更新后 resume 加载了旧的 optimizer state
+
+   2.2 损失函数设计缺陷
+   - 原始损失: L = -log(dist + 1) + 0.1 * cos(P, R)
+   - 问题: dist ≈ 64 时，log(65) ≈ 4.17，梯度 ≈ 1/(64+1) * 2*64 ≈ 2，太小
+   - 更严重: 改为 margin loss 后，realistic dist ~2000，ReLU(50-2000)=0，无梯度
+
+   2.3 损失权重太小
+   - 原始: 0.05 * scale_struct
+   - ep 301 时 scale_struct=0.003，有效权重 = 0.00015
+   - 即使有梯度，更新步长也微乎其微
+
+   2.4 梯度裁剪限制
+   - 全局 gradient clipping: max_norm=0.5
+   - reciprocal_points 梯度 norm ~4-36，被裁剪到 0.5
+   - 削弱了 ~90% 的更新幅度
+
+3. 修复方案
+
+   3.1 优化器兼容性修复 (episodic_trainer.py:2443-2454)
+   ```python
+   # Resume from checkpoint 时添加缺失参数
+   current_param_ids = set(id(p) for p in self.flow_classifier.parameters())
+   optim_param_ids = set()
+   for group in self.optimizer.param_groups:
+       for p in group['params']:
+           optim_param_ids.add(id(p))
+   missing_params = [p for p in self.flow_classifier.parameters()
+                    if id(p) not in optim_param_ids]
+   if missing_params:
+       print(f"  [FIX] Adding {len(missing_params)} new parameters to optimizer")
+       self.optimizer.add_param_group({'params': missing_params})
+   ```
+
+   3.2 损失函数重设计 (episodic_trainer.py:1650-1661)
+   - 放弃: 伪未知样本推离 (在 64-dim 特征空间难以定义合理 margin)
+   - 采用: 原型吸引损失
+   ```python
+   def compute_reciprocal_loss(self, features, prototypes, labels):
+       N = prototypes.shape[0]
+       R = self.reciprocal_points[:N]
+       # 移动 R 靠近原型 (间接推离特征)
+       dist_R_to_proto = ((R - prototypes) ** 2).sum(dim=1)
+       return dist_R_to_proto.mean()
+   ```
+   - 效果: loss ~1645，梯度 norm ~36，强信号
+
+   3.3 权重提升 (episodic_trainer.py:2350)
+   - 从 0.05 → 5.0 (100x)
+   - ep 301 时有效贡献 = 5.0 * 0.003 * 17.59 ≈ 0.22 (显著)
+
+   3.4 梯度裁剪豁免 (episodic_trainer.py:2512-2518)
+   ```python
+   params_to_clip = [p for p in self.flow_classifier.parameters()
+                    if p is not self.flow_classifier.reciprocal_points]
+   if params_to_clip:
+       torch.nn.utils.clip_grad_norm_(params_to_clip, 0.5)
+   ```
+
+4. 验证结果
+
+   - 测试配置: 500 episodes, Phase 3 从 ep 301 开始
+   - 诊断输出 (ep 301):
+     * L_reciprocal = 17.59
+     * weighted contribution = 0.22
+     * Parameter [0,0] changed: 0.000050
+     * Mean absolute change: 0.001348
+   - ✅ reciprocal_points 成功被训练
+
+5. 重要启发
+
+   5.1 特征空间的 scale 决定损失函数设计
+   - 64-dim YAMNet 特征: 典型距离 ~2000
+   - 512-dim ResNet 特征: 典型距离可能更大
+   - 固定 margin (如 50) 完全失效
+   - 必须: 使用相对尺度 (如除以特征 norm) 或原型吸引
+
+   5.2 梯度流检查清单
+   1. 参数是否在 optimizer 中? (optimizer.param_groups)
+   2. 梯度是否存在且非零? (p.grad is not None and p.grad.abs().sum() > 0)
+   3. 梯度是否被裁剪? (检查 clip_grad_norm_ 调用)
+   4. 学习率是否合理? (lr * grad 的量级应 > 1e-6 才有可见更新)
+   5. 损失权重是否足够大? (总损失中占比 > 1%)
+
+   5.3 checkpoint resume 的陷阱
+   - state_dict 加载不会自动更新 optimizer
+   - 新增参数必须手动 add_param_group
+   - 建议: 从头训练或保存完整 checkpoint (含 optimizer)
+
+   5.4 诊断日志的重要性
+   - 第一次激活时打印: scale_struct, loss 值, weighted contribution
+   - 检查关键参数的更新: 记录 optimizer.step() 前后的值
+   - 对比预期更新 vs 实际更新 (lr * grad)
+
+   5.5 互反点重新理解
+   - 原始论文: 推离已知样本 (难以定义合理 margin)
+   - 实用方案: 靠近原型 (简单有效)
+   - OSR 评分: score = -dist(prototype) + dist(reciprocal)
+   - 如果 reciprocal 靠近 prototype，known 样本得高分，unknown 得低分
+   - 这与原意图等价: reciprocal 是"反向原型"，但定义在特征空间而非反向空间
+
+6. 对 osr17b 实施的影响
+
+   - ✅ reciprocal loss 现已可工作
+   - ⚠️ 但需要更长训练才能看到 OSR 性能提升
+   - 建议: 增加 episodes 到 6000，确保 Phase 3 充分训练
+   - 评估: 在 Phase 3 评估中添加 'reciprocal' 方法
+
+7. 代码改动位置
+
+   episodic_trainer.py:
+   - L2443-2454: 优化器兼容性修复
+   - L1650-1661: 损失函数重设计
+   - L2350: 权重调整 (0.05 → 5.0)
+   - L2512-2518: 梯度裁剪豁免
+

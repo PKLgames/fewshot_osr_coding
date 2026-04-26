@@ -61,7 +61,7 @@ train:
   open_weight_sum_cali: 0.3  # was 0.5
 
   # ========== Paths ==========
-  save_folder: './save_tau22'
+  save_folder: './tau22_v2'
   dataroot: '/coding/TAU-urban-acoustic-scenes-2022-mobile-development'
   pretrained_model_path1: ''
   pretrained_model_path: './save_tau22/pretrain_model_tau22.pth'

@@ -15,7 +15,8 @@ def meta_train_dataloader(args):
         trainset =  Openfmc(root=args.dataroot,index=class_index,args=args,partition='train', fix_seed=True)
     elif args.dataset == 'TAU22':
         trainset = OpenTAU22(args=args, index=class_index, root=args.dataroot, partition='train', fix_seed=True)
-    loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=False, num_workers=8)
+    loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=False,
+                                         num_workers=8, pin_memory=True, persistent_workers=True)
 
     return loader
 
@@ -32,6 +33,7 @@ def meta_test_dataloader(args):
     elif args.dataset == 'TAU22':
         testset = OpenTAU22(args=args, index=np.arange(args.train_classes,10), root=args.dataroot, partition='test', fix_seed=True)
 
-    loader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=8)
+    loader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False,
+                                         num_workers=8, pin_memory=True, persistent_workers=True)
 
     return loader

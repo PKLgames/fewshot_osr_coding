@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import librosa
 import pandas as pd
+from tqdm import tqdm
 
 
 # Label mapping (from vocabulary.csv)
@@ -40,6 +41,14 @@ class TAU22Pretrain(Dataset):
             self.data, self.targets = self._select_from_classes(
                 self.all_test_df, index)
 
+        # Cache all audio in memory (~1.9GB for 30k samples)
+        print(f'Preloading {len(self.data)} audio samples into memory...')
+        self.audio_cache = []
+        for path in tqdm(self.data, desc='Caching audio'):
+            audio, _ = librosa.load(path, sr=16000, mono=True)
+            self.audio_cache.append(torch.tensor(audio, dtype=torch.float32))
+        print('Done.')
+
     def _select_from_classes(self, df, index):
         data_tmp = []
         targets_tmp = []
@@ -56,9 +65,7 @@ class TAU22Pretrain(Dataset):
         return len(self.data)
 
     def __getitem__(self, i):
-        path, target = self.data[i], self.targets[i]
-        audio, _ = librosa.load(path, sr=16000, mono=True)
-        return torch.tensor(audio, dtype=torch.float32), target
+        return self.audio_cache[i], self.targets[i]
 
 
 class OpenTAU22(Dataset):
@@ -103,6 +110,15 @@ class OpenTAU22(Dataset):
         for p, lbl in zip(datapath, labels):
             self.data.setdefault(lbl, []).append(p)
 
+        # Preload all audio into memory
+        all_paths = set(p for paths in self.data.values() for p in paths)
+        print(f'Preloading {len(all_paths)} unique audio files into memory...')
+        self._audio_cache = {}
+        for p in tqdm(all_paths, desc='Caching audio'):
+            audio, _ = librosa.load(p, sr=16000, mono=True)
+            self._audio_cache[p] = torch.tensor(audio, dtype=torch.float32)
+        print('Done.')
+
     # ------------------------------------------------------------------
     def _select_from_classes(self, df, index):
         data_tmp = []
@@ -138,7 +154,7 @@ class OpenTAU22(Dataset):
         # ---- Closed-set: support + query ----
         for idx, the_cls in enumerate(cls_sampled):
             paths = self.data[the_cls]
-            audio = [torch.tensor(librosa.load(p, sr=16000, mono=True)[0], dtype=torch.float32) for p in paths]
+            audio = [self._audio_cache[p] for p in paths]
 
             support_ids = np.random.choice(len(audio), self.n_shots, False)
             support_xs.extend([audio[i].view(1, -1) for i in support_ids])
@@ -158,7 +174,7 @@ class OpenTAU22(Dataset):
 
         for idx, the_cls in enumerate(cls_open_ids):
             paths = self.data[the_cls]
-            audio = [torch.tensor(librosa.load(p, sr=16000, mono=True)[0], dtype=torch.float32) for p in paths]
+            audio = [self._audio_cache[p] for p in paths]
 
             suppopen_ids = np.random.choice(len(audio), self.n_shots, False)
             suppopen_xs.extend([audio[i].view(1, -1) for i in suppopen_ids])

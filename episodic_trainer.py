@@ -165,7 +165,6 @@ class BaseClassPretrainer:
         for epoch in range(1, self.epochs + 1):
             self.model.train()
             self.classifier.train()
-            scaler = torch.amp.GradScaler('cuda', enabled=False)
 
             running_loss = 0.0
             correct = 0
@@ -176,31 +175,30 @@ class BaseClassPretrainer:
                 targets = item['target'].squeeze(1)  # (B, 10)
                 labels = self._remap_label(targets).to(self.device)
 
-                with torch.amp.autocast('cuda'):
-                    features = self.model(audio)          # (B, 64)
-                    logits = self.classifier(features)    # (B, num_classes)
+                # NOTE: No autocast! YAMNet BatchNorm1d produces NaN in fp16.
+                # Use pure fp32 for base class supervised fine-tuning.
+                features = self.model(audio)          # (B, 64)
+                logits = self.classifier(features)    # (B, num_classes)
 
-                    loss = criterion(logits, labels)
+                loss = criterion(logits, labels)
 
-                    # Mixup augmentation (30% probability per batch) for smoother decision boundaries
-                    if random.random() < 0.3 and features.size(0) > 1:
-                        lam = np.random.beta(0.4, 0.4)
-                        perm = torch.randperm(features.size(0), device=self.device)
-                        mixed_features = lam * features + (1 - lam) * features[perm]
-                        mixed_logits = self.classifier(mixed_features.detach())
-                        mixed_labels = lam * F.one_hot(labels, self.num_classes).float() + \
-                                       (1 - lam) * F.one_hot(labels[perm], self.num_classes).float()
-                        loss = loss + 0.3 * -(mixed_labels * F.log_softmax(mixed_logits, dim=1)).sum(dim=1).mean()
+                # Mixup augmentation (30% probability per batch) for smoother decision boundaries
+                if random.random() < 0.3 and features.size(0) > 1:
+                    lam = np.random.beta(0.4, 0.4)
+                    perm = torch.randperm(features.size(0), device=self.device)
+                    mixed_features = lam * features + (1 - lam) * features[perm]
+                    mixed_logits = self.classifier(mixed_features.detach())
+                    mixed_labels = lam * F.one_hot(labels, self.num_classes).float() + \
+                                   (1 - lam) * F.one_hot(labels[perm], self.num_classes).float()
+                    loss = loss + 0.3 * -(mixed_labels * F.log_softmax(mixed_logits, dim=1)).sum(dim=1).mean()
 
                 self.optimizer.zero_grad()
-                scaler.scale(loss).backward()
-                scaler.unscale_(self.optimizer)
+                loss.backward()
                 torch.nn.utils.clip_grad_norm_(
                     [p for p in self.model.parameters() if p.requires_grad] +
                     list(self.classifier.parameters()),
                     max_norm=1.0)
-                scaler.step(self.optimizer)
-                scaler.update()
+                self.optimizer.step()
 
                 running_loss += loss.item()
                 _, predicted = logits.max(1)
@@ -344,7 +342,9 @@ class ContrastivePretrainer:
                  batch_size: int = 2048,
                  num_workers: int = 16,
                  prefetch_factor: int = 4,
-                 backbone_unfreeze_layers: List[str] = None):
+                 backbone_unfreeze_layers: List[str] = None,
+                 supervised_contrastive: bool = True,
+                 base_classes: List[int] = None):
         self.model = feature_extractor.to(device)
         self.device = device
         self.temperature = temperature
@@ -353,6 +353,8 @@ class ContrastivePretrainer:
         self.num_workers = num_workers
         self.prefetch_factor = prefetch_factor
         self.backbone_unfreeze_layers = backbone_unfreeze_layers or []
+        self.supervised_contrastive = supervised_contrastive
+        self.base_classes = base_classes or []  # class indices for SupCon
 
         feat_dim = 64  # output dim of feature extractor
 
@@ -407,8 +409,11 @@ class ContrastivePretrainer:
         """
         B = z1.size(0)
         z = torch.cat([z1, z2], dim=0)           # (2B, D)
-        z = F.normalize(z, dim=1)
+        # eps prevents NaN from zero-norm vectors (silent audio clips)
+        z = F.normalize(z, dim=1, eps=1e-8)
 
+        # Force float32 for the large similarity matrix to prevent fp16 overflow
+        z = z.float()
         sim = torch.mm(z, z.T) / temperature     # (2B, 2B)
         # Mask out self-similarity on the diagonal (use fp16-safe value)
         sim.masked_fill_(
@@ -422,21 +427,80 @@ class ContrastivePretrainer:
 
         return F.cross_entropy(sim, labels)
 
+    @staticmethod
+    def supcon_loss(features: torch.Tensor, labels: torch.Tensor,
+                    temperature: float = 0.1) -> torch.Tensor:
+        """
+        Supervised Contrastive (SupCon) loss.
+
+        Args:
+            features: (2B, D) two augmented views concatenated
+            labels: (B,) class labels for first view; -1 = exclude from loss
+            temperature: scaling temperature
+        """
+        device = features.device
+        B = labels.shape[0]
+
+        # Force float32 for numerical stability
+        features = features.float()
+
+        # Repeat labels for both views
+        labels_2b = labels.repeat(2)  # (2B,)
+
+        # Valid mask: exclude samples with label -1 (unknown classes)
+        valid = labels_2b >= 0
+
+        # Positive pair mask: same label, both valid, not self
+        label_eq = labels_2b.unsqueeze(0) == labels_2b.unsqueeze(1)  # (2B, 2B)
+        diag_mask = ~torch.eye(2 * B, dtype=torch.bool, device=device)
+        pos_mask = label_eq & valid.unsqueeze(1) & valid.unsqueeze(0) & diag_mask
+
+        # At least one positive pair?
+        has_pos = pos_mask.sum(dim=1) > 0
+        if has_pos.sum() == 0:
+            # Fallback: treat as NT-Xent (pair i ↔ i+B)
+            return F.cross_entropy(
+                F.cosine_similarity(features.unsqueeze(1), features.unsqueeze(0), dim=2) / temperature,
+                torch.cat([torch.arange(B, 2 * B), torch.arange(0, B)]).to(device))
+
+        # Cosine similarity matrix
+        feats_norm = F.normalize(features, dim=1, eps=1e-8)
+        sim = torch.mm(feats_norm, feats_norm.T) / temperature  # (2B, 2B)
+        sim.masked_fill_(~diag_mask, -1e4)  # mask diagonal
+
+        # log-softmax over negatives (all j ≠ i)
+        log_sum_exp = torch.logsumexp(sim, dim=1, keepdim=True)
+        log_prob = sim - log_sum_exp
+
+        # Mean log-prob over positives, for anchors that have positives
+        mean_log_prob = (log_prob * pos_mask.float()).sum(dim=1) / (pos_mask.float().sum(dim=1) + 1e-8)
+        loss = -mean_log_prob[has_pos].mean()
+        return loss
+
     def train(self, dataset, save_path: str = None):
-        """Run contrastive pretraining on the full dataset (unsupervised)."""
+        """Run contrastive pretraining: SimCLR first half → SupCon second half (osr17)."""
         loader = DataLoader(
             dataset, batch_size=self.batch_size, shuffle=True,
             num_workers=self.num_workers, pin_memory=True, drop_last=True,
             prefetch_factor=self.prefetch_factor)
 
+        supcon_start = self.epochs // 2  # switch at halfway point
+        use_supcon = self.supervised_contrastive and len(self.base_classes) > 0
+
         print(f"\n{'='*70}")
-        print("Phase 0a: Contrastive Pre-training (SimCLR)")
+        print("Phase 0a: Contrastive Pre-training")
         print(f"{'='*70}")
         print(f"Samples:         {len(loader.dataset)}")
         print(f"Epochs:          {self.epochs}")
         print(f"Batch size:      {self.batch_size}")
         print(f"Temperature:     {self.temperature}")
         print(f"Backbone unfreeze: {self.backbone_unfreeze_layers}")
+        if use_supcon:
+            print(f"Mode:            SimCLR (ep 1-{supcon_start}) → "
+                  f"SupCon (ep {supcon_start+1}-{self.epochs})")
+            print(f"Base classes:    {self.base_classes}")
+        else:
+            print(f"Mode:            SimCLR (all epochs)")
         print(f"{'='*70}\n")
 
         augment = AudioAugmentation(sample_rate=16000)
@@ -444,46 +508,70 @@ class ContrastivePretrainer:
         for epoch in range(1, self.epochs + 1):
             self.model.train()
             self.projection.train()
-            scaler = torch.amp.GradScaler('cuda', enabled=False)
 
             running_loss = 0.0
             num_batches = 0
+            use_supcon_epoch = use_supcon and epoch > supcon_start
 
             for item in loader:
                 audio = item['source_audio'].to(self.device)
+
+                # Fix zero-norm samples (silent clips) with tiny noise
+                # instead of skipping — keeps all data in training
+                audio_norms = audio.abs().amax(dim=1)  # (B,)
+                silent_mask = audio_norms < 1e-8
+                if silent_mask.any():
+                    audio[silent_mask] = torch.randn_like(audio[silent_mask]) * 1e-6
 
                 # Two independently augmented views
                 view1 = augment(audio)
                 view2 = augment(audio)
 
-                with torch.amp.autocast('cuda'):
-                    # Encode
-                    h1 = self.model(view1)          # (B, 64)
-                    h2 = self.model(view2)          # (B, 64)
+                # NOTE: No autocast here! YAMNet backbone has BatchNorm1d layers
+                # that produce NaN in fp16 (output range [-45,45] overflows BN stats).
+                # Use pure fp32 for contrastive pretraining — YAMNet is small enough
+                # that mixed precision provides negligible speedup.
+                h1 = self.model(view1)          # (B, 64)
+                h2 = self.model(view2)          # (B, 64)
 
-                    # Project
-                    z1 = self.projection(h1)        # (B, proj_dim)
-                    z2 = self.projection(h2)        # (B, proj_dim)
+                # Project
+                z1 = self.projection(h1)        # (B, proj_dim)
+                z2 = self.projection(h2)        # (B, proj_dim)
 
+                if use_supcon_epoch:
+                    # Extract integer class labels from one-hot target
+                    # target shape: (B, 1, num_classes) — squeeze middle dim
+                    targets = item['target'].squeeze(1)  # (B, num_classes)
+                    labels = targets.argmax(dim=1).to(self.device)  # (B,)
+                    # Mark non-base classes as -1 (excluded from SupCon)
+                    base_set = set(self.base_classes)
+                    label_mask = torch.tensor(
+                        [l.item() in base_set for l in labels],
+                        dtype=torch.bool, device=self.device)
+                    labels_for_supcon = labels.clone()
+                    labels_for_supcon[~label_mask] = -1
+
+                    features = torch.cat([z1, z2], dim=0)  # (2B, D)
+                    loss = self.supcon_loss(features, labels_for_supcon, self.temperature)
+                else:
                     loss = self.nt_xent_loss(z1, z2, self.temperature)
 
                 self.optimizer.zero_grad()
-                scaler.scale(loss).backward()
-                scaler.unscale_(self.optimizer)
+                loss.backward()
                 torch.nn.utils.clip_grad_norm_(
                     list(self.model.parameters()) +
                     list(self.projection.parameters()),
                     max_norm=1.0)
-                scaler.step(self.optimizer)
-                scaler.update()
+                self.optimizer.step()
 
                 running_loss += loss.item()
                 num_batches += 1
 
             self.scheduler.step()
-            avg_loss = running_loss / num_batches
+            avg_loss = running_loss / max(num_batches, 1)
             lr = self.optimizer.param_groups[-1]['lr']
-            print(f"Epoch {epoch:>2d}/{self.epochs} | "
+            mode_str = "SupCon" if use_supcon_epoch else "SimCLR"
+            print(f"Epoch {epoch:>2d}/{self.epochs} [{mode_str}] | "
                   f"Loss: {avg_loss:.4f} | LR: {lr:.2e}")
 
         if save_path:
@@ -493,7 +581,7 @@ class ContrastivePretrainer:
                 'model_state_dict': self.model.state_dict(),
                 'config': {
                     'backbone': backbone,
-                    'pretrained_on': 'contrastive_simclr',
+                    'pretrained_on': 'contrastive_simclr_supcon' if use_supcon else 'contrastive_simclr',
                     'backbone_unfreeze_layers': self.backbone_unfreeze_layers,
                 }
             }, save_path)
@@ -1240,6 +1328,15 @@ class EpisodicFlowClassifier(nn.Module):
             nn.Linear(16, 1),  # logit for known(1) / unknown(0)
         )
 
+        # osr17a: Learnable OSR threshold (trained during episodic training)
+        self.osr_threshold = LearnableOSRThreshold(num_scores=1, init_value=0.0)
+
+        # osr17b: Reciprocal points for OSR scoring (one per max possible class)
+        self.num_max_classes = 20
+        self.reciprocal_points = nn.Parameter(
+            torch.randn(self.num_max_classes, input_dim) * 0.1
+        )
+
     def _prepare_flow_features(self, features: torch.Tensor,
                                 prototypes: torch.Tensor):
         """Prepare features for flow: adapt → dim-reduce → pre-norm → project.
@@ -1549,6 +1646,48 @@ class EpisodicFlowClassifier(nn.Module):
         # neg_energy = T * logsumexp(log_probs / T)
         neg_energy = temperature * torch.logsumexp(log_probs / temperature, dim=1)
         return neg_energy
+
+    def compute_reciprocal_loss(self, features, prototypes, labels):
+        """osr17b: Reciprocal point loss.
+        Move reciprocal points TOWARDS prototypes (indirectly pushes away from features)."""
+        N = prototypes.shape[0]
+        R = self.reciprocal_points[:N]
+
+        # Move each reciprocal point towards its corresponding prototype
+        # This creates a "reciprocal" point that's near the prototype
+        # The OSR score uses: -dist_to_proto + dist_to_reciprocal
+        # So if R is near prototype, known samples have high scores, unknown have low scores
+        dist_R_to_proto = ((R - prototypes) ** 2).sum(dim=1)
+        L = dist_R_to_proto.mean()
+
+        return L
+
+    def score_reciprocal(self, features, prototypes):
+        """osr17b: Reciprocal point OSR score.
+        High score = known (close to prototype, far from reciprocal).
+        Low score = unknown."""
+        N = prototypes.shape[0]
+        R = self.reciprocal_points[:N]
+        dist_proto = torch.cdist(features, prototypes, p=2).min(dim=1).values
+        dist_R = torch.cdist(features, R, p=2).min(dim=1).values
+        return -dist_proto + dist_R  # known high, unknown low
+
+
+class LearnableOSRThreshold(nn.Module):
+    """Learnable OSR threshold: replaces fixed percentile calibration.
+    Trained end-to-end during episodic training to produce known/unknown
+    probabilities from a continuous OSR score (e.g. Mahalanobis distance)."""
+    def __init__(self, num_scores: int = 1, init_value: float = 0.0):
+        super().__init__()
+        self.thresholds = nn.Parameter(torch.full((num_scores,), init_value))
+        self.temperature = nn.Parameter(torch.tensor(1.0))
+
+    def forward(self, scores: torch.Tensor) -> torch.Tensor:
+        """Convert continuous score → known probability via sigmoid."""
+        return torch.sigmoid((scores - self.thresholds) * self.temperature.abs())
+
+    def get_threshold(self) -> float:
+        return self.thresholds.item()
 
 
 # ============================================================
@@ -1903,6 +2042,169 @@ class GMMBoundarySampler:
         return self._pool[idx]
 
 
+class CurriculumOODSampler:
+    """
+    osr17b: Curriculum OOD采样器 - 3级难度递进
+
+    Level 1 (ep 1-1000): 简单扰动 - mixup + 高斯噪声
+        - 伪未知样本 = 随机混合 base类特征 + 添加噪声
+        - 目的：让 OOD head 学习基本边界
+
+    Level 2 (ep 1001-2000): 中等难度 - 特征插值 + 低密度样本
+        - 伪未知样本 = GMM边界样本（类间低密度区域）
+        - 目的：让 OOD head 学习更精确的边界
+
+    Level 3 (ep 2001+): 困难模式 - 对抗样本
+        - 伪未知样本 = 靠近决策边界的混淆样本
+        - 目的：让 OOD head 学习鲁棒性
+
+    自动切换：根据当前 episode 选择合适的难度
+    """
+
+    def __init__(self, base_features: torch.Tensor, base_classes: List[int],
+                 device: str = 'cuda', n_components: int = 6):
+        """
+        Args:
+            base_features: (N, D) base类特征
+            base_classes: base类ID列表
+            device: 'cuda' or 'cpu'
+            n_components: GMM分量数
+        """
+        self.device = device
+        self.base_classes = base_classes
+        self.feature_dim = base_features.shape[1]
+
+        # Level 1: 简单扰动不需要预计算
+        print("  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)")
+
+        # Level 2: GMM边界采样器
+        print("  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...")
+        self._gmm_sampler = GMMBoundarySampler(
+            base_features, device, n_components=n_components, pool_size=5000)
+
+        # Level 3: 对抗采样器（延迟初始化，需要分类器）
+        self._adversarial_sampler = None
+        self._flow_classifier = None
+
+        # 缓存 base_features 用于 Level 1 和 Level 3
+        self._base_features = base_features
+        self._base_by_class = {
+            c: base_features[i * (len(base_features) // len(base_classes)):
+                      (i + 1) * (len(base_features) // len(base_classes))]
+            for i, c in enumerate(base_classes)
+        }
+
+    def set_flow_classifier(self, flow_classifier):
+        """设置分类器用于 Level 3 对抗采样"""
+        self._flow_classifier = flow_classifier
+
+    def get_level(self, current_episode: int) -> int:
+        """
+        根据当前 episode 返回 curriculum 难度等级
+        Level 1: ep 1-1000
+        Level 2: ep 1001-2000
+        Level 3: ep 2001+
+        """
+        if current_episode <= 1000:
+            return 1
+        elif current_episode <= 2000:
+            return 2
+        else:
+            return 3
+
+    def sample(self, n: int, level: int = None, current_episode: int = 0) -> torch.Tensor:
+        """
+        采样 n 个伪 OOD 样本
+
+        Args:
+            n: 样本数量
+            level: 指定难度等级（None则自动根据episode计算）
+            current_episode: 当前episode（用于自动计算level）
+
+        Returns:
+            (n, D) 伪 OOD 特征
+        """
+        if level is None:
+            level = self.get_level(current_episode)
+
+        if level == 1:
+            return self._sample_level1(n)
+        elif level == 2:
+            return self._sample_level2(n)
+        elif level == 3:
+            return self._sample_level3(n)
+        else:
+            raise ValueError(f"Unknown level: {level}")
+
+    def _sample_level1(self, n: int) -> torch.Tensor:
+        """
+        Level 1: 简单扰动 - mixup + 高斯噪声
+
+        40% mixup: 随机混合两个不同类的特征
+        60% perturbation: 单个特征加高斯噪声
+        """
+        pseudo = []
+
+        # Mixup样本 (40%)
+        n_mixup = int(0.4 * n)
+        for _ in range(n_mixup):
+            c1, c2 = random.sample(self.base_classes, 2)
+            f1 = self._base_by_class[c1][
+                random.randint(0, len(self._base_by_class[c1]) - 1)]
+            f2 = self._base_by_class[c2][
+                random.randint(0, len(self._base_by_class[c2]) - 1)]
+            alpha = random.uniform(0.2, 0.8)
+            pseudo.append(alpha * f1 + (1 - alpha) * f2)
+
+        # 强扰动样本 (60%)
+        n_perturb = n - n_mixup
+        for _ in range(n_perturb):
+            c = random.choice(self.base_classes)
+            f = self._base_by_class[c][
+                random.randint(0, len(self._base_by_class[c]) - 1)]
+            noise = torch.randn_like(f) * random.uniform(0.3, 0.8)
+            pseudo.append(f + noise)
+
+        return torch.stack(pseudo).to(self.device)
+
+    def _sample_level2(self, n: int) -> torch.Tensor:
+        """Level 2: 中等难度 - GMM边界样本"""
+        return self._gmm_sampler.sample(n)
+
+    def _sample_level3(self, n: int) -> torch.Tensor:
+        """
+        Level 3: 困难模式 - 靠近决策边界的对抗样本
+
+        策略：在特征空间中找到"让分类器不确定"的点
+        - 随机采样候选点
+        - 计算分类熵（熵越高 = 越不确定）
+        - 选择熵最高的点作为伪OOD
+        """
+        if self._flow_classifier is None:
+            # 如果分类器未设置，回退到 Level 2
+            return self._sample_level2(n)
+
+        # 生成候选样本 (GMM边界附近)
+        candidates = self._gmm_sampler.sample(n * 5)  # 多生成一些
+
+        # 计算每个候选的分类熵
+        with torch.no_grad():
+            # 使用随机原型计算分数
+            random_protos = torch.stack(
+                [self._base_by_class[c][:5].mean(dim=0)
+                 for c in self.base_classes[:5]]
+            ).to(self.device)
+
+            log_probs = self._flow_classifier.classify(candidates, random_protos)
+            probs = F.softmax(log_probs, dim=1)
+            entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1)
+
+            # 选择熵最高的 n 个样本（最不确定的）
+            _, indices = torch.topk(entropy, n)
+
+        return candidates[indices]
+
+
 # ============================================================
 # 6. Episodic Trainer
 # ============================================================
@@ -1977,10 +2279,10 @@ class EpisodicTrainer:
             [train_cache.get_class_features(c) for c in base_classes], dim=0
         ).to(device)
 
-        # GMM boundary sampler: pre-computed low-density OOD samples
-        print("Initializing GMM Boundary Sampler...")
-        self._gmm_sampler = GMMBoundarySampler(
-            self._base_all, device, n_components=len(base_classes))
+        # osr17b: Curriculum OOD sampler with 3 difficulty levels
+        print("Initializing Curriculum OOD Sampler (3-level progressive training)...")
+        self._ood_sampler = CurriculumOODSampler(
+            self._base_all, base_classes, device, n_components=len(base_classes))
 
         # Freeze feature extractor
         self.feature_extractor = feature_extractor.freeze()
@@ -2089,11 +2391,15 @@ class EpisodicTrainer:
             real_idx = torch.randint(0, len(self._ood_all), (num_real,), device=self.device)
             ood_parts = [self._ood_all[real_idx]]
 
-            # Pseudo-OOD: GMM boundary sampling (替代纯随机噪声)
-            # GMM低密度区样本更接近真实unknown分布（在特征边界附近，而非脱离流形）
+            # Pseudo-OOD: osr17b Curriculum OOD sampling (3-level progressive)
+            # Level 1 (ep 1-1000): mixup + noise
+            # Level 2 (ep 1001-2000): GMM boundary
+            # Level 3 (ep 2001+): adversarial near decision boundary
             if num_pseudo > 0:
-                gmm_ood = self._gmm_sampler.sample(num_pseudo)
-                ood_parts.append(gmm_ood)
+                # Pass current_episode for automatic level selection
+                curriculum_ood = self._ood_sampler.sample(
+                    num_pseudo, current_episode=current_episode)
+                ood_parts.append(curriculum_ood)
 
             ood_feats = torch.cat(ood_parts, dim=0)
             # v5: OOD forward through flow with stop-gradient
@@ -2180,6 +2486,34 @@ class EpisodicTrainer:
 
             loss = loss + scale_cls * 0.1 * ood_loss
 
+        # osr17a: Learnable threshold loss
+        # Train the LearnableOSRThreshold to output high prob for known, low for unknown
+        if scale_cls > 0:
+            with torch.no_grad():
+                # Compute min L2 distance to prototypes as OSR score (negative = closer = more known)
+                adapted_q, adapted_p = self.flow_classifier.adapt_features(query_feats, prototypes)
+                dist_q = torch.cdist(adapted_q, adapted_p, p=2).min(dim=1).values
+                known_scores = -dist_q  # higher = more known
+            known_probs = self.flow_classifier.osr_threshold(known_scores)
+            L_threshold = -torch.log(known_probs + 1e-8).mean()
+
+            if ood_log_probs is not None and ood_feats is not None and ood_feats.size(0) > 0:
+                with torch.no_grad():
+                    adapted_o, _ = self.flow_classifier.adapt_features(ood_feats, adapted_p)
+                    dist_o = torch.cdist(adapted_o, adapted_p, p=2).min(dim=1).values
+                    unknown_scores = -dist_o
+                unknown_probs = self.flow_classifier.osr_threshold(unknown_scores)
+                L_threshold = L_threshold + -torch.log(1 - unknown_probs + 1e-8).mean()
+
+            loss = loss + 0.1 * L_threshold
+
+        # osr17b: Reciprocal point loss (stage 3+)
+        # Weight increased to 5.0 to ensure meaningful gradients
+        if scale_struct > 0 and query_labels.max() < self.flow_classifier.num_max_classes:
+            L_reciprocal = self.flow_classifier.compute_reciprocal_loss(
+                query_feats, prototypes, query_labels)
+            loss = loss + 5.0 * scale_struct * L_reciprocal
+
         # Adaptive z_norm² penalty: pull z back when it diverges too far from N(0,I)
         # Only active when structure losses are ramping (stage 3+)
         if z_all is not None and scale_struct > 0:
@@ -2263,6 +2597,18 @@ class EpisodicTrainer:
                 self.flow_classifier.load_state_dict(ckpt['flow_state_dict'])
                 if 'optimizer' in ckpt:
                     self.optimizer.load_state_dict(ckpt['optimizer'])
+                    # FIX: Add any new parameters to optimizer that weren't in the checkpoint
+                    # This handles cases where model architecture was updated after checkpoint was saved
+                    current_param_ids = set(id(p) for p in self.flow_classifier.parameters())
+                    optim_param_ids = set()
+                    for group in self.optimizer.param_groups:
+                        for p in group['params']:
+                            optim_param_ids.add(id(p))
+                    missing_params = [p for p in self.flow_classifier.parameters()
+                                     if id(p) not in optim_param_ids]
+                    if missing_params:
+                        print(f"  [FIX] Adding {len(missing_params)} new parameters to optimizer")
+                        self.optimizer.add_param_group({'params': missing_params})
                 start_episode = ckpt.get('episode', 1) + 1
                 best_val_acc = ckpt.get('val_acc', 0.0)
                 self.best_val_acc = best_val_acc
@@ -2272,6 +2618,11 @@ class EpisodicTrainer:
             else:
                 print(f"\nCheckpoint not found at {checkpoint_path}, starting from scratch")
                 resume = False
+
+        # osr17b: Set flow_classifier for CurriculumOODSampler Level 3 (adversarial)
+        if hasattr(self, '_ood_sampler'):
+            self._ood_sampler.set_flow_classifier(self.flow_classifier)
+            print("Curriculum OOD Sampler configured with flow classifier")
 
         print(f"\n{'='*70}")
         print(f"Episodic Meta-Training: {self.N_way}-way {self.K_shot}-shot")
@@ -2318,8 +2669,13 @@ class EpisodicTrainer:
 
             # Step optimizer at end of accumulation cycle
             if ep % accum_steps == 0 or ep == num_episodes:
-                torch.nn.utils.clip_grad_norm_(
-                    self.flow_classifier.parameters(), 0.5)
+                # Gradient clipping: exclude reciprocal_points to allow them to train
+                params_to_clip = [p for p in self.flow_classifier.parameters()
+                                 if p is not self.flow_classifier.reciprocal_points]
+                if params_to_clip:
+                    torch.nn.utils.clip_grad_norm_(params_to_clip, 0.5)
+
+                self.optimizer.step()
                 self.optimizer.step()
                 if ep <= self.warmup_episodes:
                     warmup_factor = ep / self.warmup_episodes
@@ -2755,6 +3111,8 @@ class OSRCalibrator:
             return self.score_samples_likelihood_ratio(features, prototypes, batch_size)
         if method == 'ood_head':
             return self.score_samples_ood_head(features, prototypes, batch_size)
+        if method == 'reciprocal':
+            return self.score_samples_reciprocal(features, prototypes, batch_size)
         if method == 'z_norm':
             return self.score_samples_z_norm(features, prototypes, batch_size)
         if method == 'z_consistency':
@@ -2792,6 +3150,19 @@ class OSRCalibrator:
                 ood_feats = torch.cat([min_d, dist_ratio, softmax_max, entropy, feat_norm], dim=1)
                 logits = self.flow.ood_head(ood_feats)
                 scores = torch.sigmoid(logits).squeeze(1)  # P(known)
+                all_scores.append(scores.cpu())
+        return torch.cat(all_scores)
+
+    def score_samples_reciprocal(self, features: torch.Tensor,
+                                  prototypes: torch.Tensor,
+                                  batch_size: int = 4096) -> torch.Tensor:
+        """osr17b: Reciprocal point OOD score. Higher = more known."""
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                scores = self.flow.score_reciprocal(batch, prototypes)
                 all_scores.append(scores.cpu())
         return torch.cat(all_scores)
 
@@ -3624,7 +3995,7 @@ def main():
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr13'
+    experiment_dir = 'experiment/yamnet_fewshot_osr17'
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
@@ -3674,19 +4045,21 @@ def main():
             _need_retrain = True
 
     if not os.path.exists(base_pretrained_path) or _need_retrain:
-        # Phase 0a: SimCLR contrastive pre-training (unsupervised, no label leakage)
+        # Phase 0a: Contrastive pre-training (SimCLR → SupCon, osr17)
         print(f"\n{'='*70}")
-        print(f"Phase 0a: Contrastive Pre-training (SimCLR)")
-        print("  - Unsupervised: uses ALL classes (no label leakage)")
+        print(f"Phase 0a: Contrastive Pre-training (SimCLR → SupCon)")
+        print("  - First half: SimCLR (all classes, no label leakage)")
+        print("  - Second half: SupCon (base classes only, discriminative)")
         print(f"  - {backbone_choice} last layers unfrozen for acoustic scene adaptation")
-        print("  - FC layers learn discriminative features via NT-Xent loss")
         print(f"{'='*70}")
         feature_extractor = FeatureExtractorClass()
         contrastive_pretrainer = ContrastivePretrainer(
             feature_extractor, device,
-            lr=3e-4, epochs=300,
+            lr=3e-4, epochs=200,
             temperature=0.1,
-            backbone_unfreeze_layers=backbone_unfreeze_layers)
+            backbone_unfreeze_layers=backbone_unfreeze_layers,
+            supervised_contrastive=True,
+            base_classes=base_classes)
         feature_extractor = contrastive_pretrainer.train(train_dataset, contrastive_pretrained_path)
 
         # Phase 0b: Base class supervised fine-tuning
@@ -3806,7 +4179,7 @@ def main():
 
     # Select OSR methods based on flow availability
     if trainer.flow_classifier.use_flow:
-        osr_methods = ['feature_mahalanobis', 'z_consistency', 'z_gap', 'z_mahal_fusion', 'flow_hybrid', 'flow_energy', 'ood_head']
+        osr_methods = ['feature_mahalanobis', 'reciprocal', 'z_consistency', 'z_gap', 'z_mahal_fusion', 'flow_hybrid', 'flow_energy', 'ood_head']
     else:
         # When use_flow=False, only use feature-space methods (skip all z/flow methods)
         osr_methods = ['feature_mahalanobis', 'ood_head']

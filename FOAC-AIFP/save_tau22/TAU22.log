@@ -1,1 +1,16 @@
-[04/26 05:13:12] start training!
+[04/26 05:38:01] start training!
+[04/26 05:38:03] 
+[04/26 05:38:03] epoch 1/1, iter 5:
+[04/26 05:38:03] train_loss: 7.36415
+[04/26 05:38:03] train_acc: 0.593
+[04/26 05:38:03] train_auroc: 0.523
+[04/26 05:38:04] val_5-way-5-shot_acc: 65.333	22.018
+[04/26 05:38:04] val_5-way-5-shot_auroc: 53.133	15.298
+[04/26 05:38:04] val_5-way-5-shot_fscore: 35.194	2.958
+[04/26 05:38:04] BEST ACC!
+[04/26 05:38:04] BEST Auroc!
+[04/26 05:38:04] BEST Fscore!
+[04/26 05:38:04] training finished!
+[04/26 05:38:04] ------------------------
+[04/26 05:38:04] the best epoch is 1/1
+[04/26 05:38:04] the best 5-way 5-shot val acc is 65.333
