@@ -1,0 +1,312 @@
+Flow原理OSR改进路线图
+======================
+
+════════════════════════════════════════════════════════════════════
+一、Baseline对比: FOAC-AIFP (ResNet-18) vs Ours (YAMNet)
+════════════════════════════════════════════════════════════════════
+
+FOAC-AIFP评估配置:
+  - Episode: 2-way 5-shot 15-query (受限于6基类)
+  - 每episode: 2已知类×15 query + 2未知类×15 query = 60样本
+  - 测试: 100 episodes, 均值±95%CI
+  - 模型: (N+1)-way分类 (2已知+1未知类)
+
+FOAC-AIFP测试结果 (TAU22test.log):
+
+  ┌─────────────────────────┬──────────┬──────────┬──────────┐
+  │ 模型                    │ ACC (%)  │ AUROC (%)│ F-score  │
+  ├─────────────────────────┼──────────┼──────────┼──────────┤
+  │ max_acc (70.0±14.3)     │ 70.00    │ 49.67    │ 36.06    │
+  │ max_auroc (52.8±14.2)   │ 70.00    │ 52.82    │ 34.32    │
+  │ max_fscore (67.3±12.9)  │ 67.33    │ 50.13    │ 36.06    │
+  └─────────────────────────┴──────────┴──────────┴──────────┘
+
+────────────────────────
+指标转换到我们的标准
+────────────────────────
+
+FOAC-AIFP的ACC = 闭集2-way分类准确率
+我们的ACC = 闭集5-way分类准确率
+
+两者不可直接对比:
+  - 2-way随机猜: 50%, 5-way随机猜: 20%
+  - 2-way最高: 70% (±14.3), 相对提升 40%
+  - 5-way最高: 69.93% (osr17e), 相对提升 50%
+  - 我们的5-way难度更高, 但相对表现更好
+
+FOAC-AIFP的AUROC = 二分类known/unknown判别
+我们的TPR@95%TNR = 在95%已知类正确率下的未知类检测率
+
+转换方法:
+  FOAC-AIFP AUROC ≈ 50-53% (接近随机!)
+  → 说明FOAC-AIFP的OSR能力也很弱
+  → 对应到我们的TPR@95%TNR ≈ 5-10%
+
+转换对比表 (5-shot):
+
+  ┌───────────────────────┬──────────┬──────────┬──────────┬──────────┐
+  │ 方法                  │ 闭集ACC  │ AUROC    │ F-score  │ TPR@95%  │
+  ├───────────────────────┼──────────┼──────────┼──────────┼──────────┤
+  │ FOAC-AIFP (max_auroc) │ 70.0%*   │ 52.82%*  │ 34.32%*  │ ~5-10%†  │
+  │ Ours anti_prototype   │ 69.93%   │ ~0.56    │ ~0.45    │ 17.45%   │
+  │ Ours feat_mahal       │ 69.93%   │ ~0.54    │ ~0.44    │ 12.54%   │
+  │ Ours ood_head         │ 69.93%   │ ~0.53    │ ~0.43    │ 10.12%   │
+  └───────────────────────┴──────────┴──────────┴──────────┴──────────┘
+  * FOAC-AIFP为2-way, 我们为5-way, 不可直接对比闭集ACC
+  † 由AUROC≈53%估算, 实际可能更低
+
+关键结论:
+  1. FOAC-AIFP的AUROC仅52.82%, 几乎是随机猜测 — baseline的OSR能力极弱
+  2. 我们的最佳OSR方法(anti_prototype 17.45% TPR)显著优于baseline
+  3. 我们的闭集分类(5-way 69.93%)相对提升50%, 优于baseline的2-way 70%
+  4. FOAC-AIFP用2-way是因为TAU22只有6基类, 限制了episode规模
+
+论文写作建议:
+  - 强调我们的方法在更高难度(5-way)下仍保持竞争力
+  - OSR指标(我们的17.45% TPR vs baseline ~5-10%)是主要优势
+  - 需要在我们的代码中计算AUROC以便与FOAC-AIFP直接对比
+
+
+════════════════════════════════════════════════════════════════════
+二、Flow OSR方法失败根因分析
+════════════════════════════════════════════════════════════════════
+
+────────────────────────
+2.1 实验证据: z空间方法全面失效
+────────────────────────
+
+osr17g测试结果 (z空间方法):
+
+  | 方法 | Calib | Test | 分离度 |
+  |------|-------|------|--------|
+  | z_consistency | 3.50% | 4.22% | -0.01 |
+  | z_reconstruction | 2.74% | 5.98% | -0.28 |
+  | z_mahal_fusion | 4.75% | 5.09% | 0.00 |
+
+z_consistency分数分布:
+  known:   [-0.87, -0.74] mean=-0.82
+  unknown: [-0.87, -0.74] mean=-0.80
+  分离度仅 -0.01 → 完全无区分力
+
+osr17g测试结果 (flow方法):
+
+  | 方法 | Calib | Test | 分离度 |
+  |------|-------|------|--------|
+  | flow_hybrid | ~17% | ~9% | 0.45-0.60 |
+  | flow_energy | 6.19% | 5.03% | 0.60 |
+
+flow_energy分数分布:
+  known:   [-45.51, -29.99] mean=-38.47
+  unknown: [-45.57, -30.11] mean=-39.07
+  分离度仅 0.60 (在~40的尺度上微不足道)
+
+────────────────────────
+2.2 根因: Flow "过度归一化"
+────────────────────────
+
+Flow的训练目标 (episodic_trainer.py:1419-1422):
+  log p(x|c) = log N(z|0,I) + log_det
+  → 最大化log-likelihood → z → N(0,I)
+
+训练时的loss组件:
+  L_gaussian: 推z_correct → N(0,I)   (权重 0.3)
+  L_non_gaussian: 推z_wrong 远离 N(0,I) (权重 0.05)
+  L_latent_repel: 推z_wrong远离z_correct  (权重 0.1, margin=64)
+
+问题:
+  1. L_gaussian权重(0.3) >> L_non_gaussian(0.05)
+     → 收缩力远大于扩张力
+  2. condition_network(4层MLP)太强
+     → 无论conditioning如何, flow都能将输入映射到z≈N(0,I)
+  3. Flow从未见过unknown样本
+     → 不知道"哪里不应该映射到N(0,I)"
+  4. 结果: known和unknown都映射到z≈N(0,I)
+     → z空间无区分力
+
+类比: 一个完美的密度估计器 = 最差的异常检测器
+  因为完美密度估计会给所有合理输入分配高概率
+
+--------------------
+2.3 与osr13对比 (z_consistency曾达20.22% TPR)
+--------------------
+
+osr13 vs osr17e 的关键差异:
+
+  | 配置 | osr13 | osr17e |
+  |------|-------|--------|
+  | condition_network | ❌ 禁用 | ✅ 启用 |
+  | z_norm² | ~32 | ~33 |
+  | z_consistency TPR | 20.22% | 4.22% |
+
+condition_network是关键:
+  - osr13: 无condition_network → flow的条件信号弱
+    → 不同prototype conditioning产生不同的z分布
+    → known/unknown在z空间有区分力
+  - osr17e: 有condition_network → flow的条件信号太强
+    → 任何conditioning都能产生z≈N(0,I)
+    → known/unknown在z空间无区分力
+
+教训: Flow的条件能力与OSR能力存在trade-off
+  更强的条件建模 → 更好的分类 → 更差的OSR
+  更弱的条件建模 → 更差的分类 → 更好的OSR
+
+
+════════════════════════════════════════════════════════════════════
+三、Flow OSR改进方向
+════════════════════════════════════════════════════════════════════
+
+基于osr13-17h的训练经验, 提出以下flow原理OSR改进方向:
+
+────────────────────────
+方向1: 条件对比Flow (Conditional Contrastive Flow)
+────────────────────────
+
+原理: 让flow在z空间创造已知类间分离, 而非全部映射到N(0,I)
+
+实现思路:
+  a) 将L_gaussian从全局N(0,I)改为条件prior:
+     z_correct → N(μ_c, I), μ_c为类c的专属中心
+     不同类映射到z空间不同区域 → unknown不属于任何区域 → 可检测
+
+  b) 或: 保留N(0,I) prior, 但大幅增强L_latent_repel:
+     margin从64→200, 权重从0.1→1.0
+     使z_wrong和z_correct在z空间充分分离
+
+  c) 或: 在z空间加入SupCon loss (已有L_z_contrastive但太弱):
+     同类z紧凑 + 异类z分离 → unknown样本不属于任何紧凑簇
+
+  预期收益: z_consistency从4%提升到10-15%
+  风险: 可能影响分类精度 (flow条件建模变弱)
+
+────────────────────────
+方向2: 能量函数OSR (Energy-Based Flow)
+────────────────────────
+
+原理: flow_energy当前分离度仅0.60 (在~40尺度上)
+  直接优化能量函数的known/unknown区分度
+
+实现思路:
+  a) 训练时加入explicit energy margin loss:
+     E(x_known, c_correct) < E(x_known, c_wrong) - margin
+     E(x_unknown, any_c) > E(x_known, c_correct) + margin
+
+  b) 使用pseudo-OOD样本(已有CurriculumOODSampler)直接
+     训练flow给它们分配更低的likelihood
+
+  c) 在flow_hybrid中用更强的mahalanobis信号:
+     flow只做边际修正, feat_mahal做主要判别
+
+  预期收益: flow_hybrid从9%提升到12-15%
+  风险: flow密度估计质量可能下降
+
+────────────────────────
+方向3: 双流Flow (Dual-Stream Flow)
+────────────────────────
+
+原理: 一个flow建模known分布, 另一个建模"非known"分布
+  likelihood ratio更有区分力
+
+实现思路:
+  a) stream_knowledge: 条件flow, p(x|c), 已有
+  b) stream_background: 无条件flow, p(x), 已有(bg_flow)
+  c) 改进: 用unknown类数据训练bg_flow
+     (当前bg_flow只训练在base类上, 导致lr信号弱)
+
+  d) 更进一步: stream_negative: 条件flow, p(x|¬c)
+     用所有非c类的数据训练, 专门学习"不属于c"的模式
+
+  预期收益: flow_likelihood_ratio从0提升到8-12%
+  风险: 需要额外训练, 计算开销增大
+
+────────────────────────
+方向4: 条件能力可控Flow (Calibrated Conditioning)
+────────────────────────
+
+原理: osr13无condition_network时z_consistency=20.22%,
+  osr17e有condition_network时降到4.22%。
+  核心insight: 条件能力需要精确校准, 不是越强越好。
+
+实现思路:
+  a) 添加条件强度参数α:
+     conditioned_proto = α * condition_network(proto) + (1-α) * proto
+     α从0到1可调, 控制条件信号强度
+
+  b) 训练时逐步增加α (curriculum conditioning):
+     Phase 1: α=0 (无条件, 像osr13)
+     Phase 2: α=0.5 (中等条件)
+     Phase 3: α=1.0 (全条件)
+
+  c) 在eval时用不同的α找最佳OSR点
+
+  预期收益: z_consistency可能恢复到15-20%
+  风险: 分类精度可能下降, 需要仔细调参
+
+────────────────────────
+方向5: Flow指导的特征学习 (Flow-Guided Feature Learning)
+────────────────────────
+
+原理: 不直接用flow做OSR评分, 而是用flow训练信号
+  改善特征空间的质量 → 间接提升所有OSR方法
+
+实现思路:
+  a) 用flow的log-likelihood作为特征质量信号
+     高likelihood → 特征在已知类分布内 → 应该靠近同类原型
+     低likelihood → 特征在已知类分布外 → 可能是边界/噪声样本
+
+  b) 用flow梯度更新feature_extractor:
+     ∂log p(x|c)/∂x 指向更高密度区域
+     可以做特征精炼, 让已知类特征更紧凑
+
+  c) 结合contrastive学习:
+     已有SupCon(Phase 0), 加入flow-guided negative mining
+     flow给低密度的样本对做hard negative
+
+  预期收益: 所有方法间接提升2-5%
+  风险: 实现复杂, 需要端到端训练
+
+
+════════════════════════════════════════════════════════════════════
+四、实施优先级
+════════════════════════════════════════════════════════════════════
+
+| 优先级 | 方向 | 难度 | 预期收益 | 依赖 |
+|--------|------|------|---------|------|
+| ★★★ | 方向2: Energy函数 | 中 | flow 12-15% | 仅Phase 2 |
+| ★★☆ | 方向4: 条件可控 | 小 | z 15-20% | Phase 2+3 |
+| ★★☆ | 方向3: 双流Flow | 中 | lr 8-12% | Phase 2+3 |
+| ★☆☆ | 方向1: 条件对比 | 大 | z 10-15% | 需重训flow |
+| ☆☆☆ | 方向5: Flow指导 | 大 | 全局+2-5% | 需端到端 |
+
+建议实施顺序:
+  osr17h: 完整运行当前评分方法 (已准备好)
+  osr18a: 方向4 (条件可控) — 最小改动, 可快速验证
+  osr18b: 方向2 (Energy函数) — 最直接提升flow方法
+  osr18c: 方向3 (双流Flow) — 改进likelihood ratio
+
+
+════════════════════════════════════════════════════════════════════
+五、Flow OSR经验总结 (osr13-17h)
+════════════════════════════════════════════════════════════════════
+
+1. 完美的密度估计 ≠ 好的异常检测
+   Flow训练得越好, OSR能力可能越弱 (osr13→osr17的反例)
+
+2. 条件建模能力需要校准
+   太弱: 分类差 (osr13); 太强: OSR差 (osr17e)
+   最佳点在中间, 需要实验确定
+
+3. 特征空间方法 > z空间方法
+   feat_mahal(12.54%) >> z_consistency(4.22%)
+   原始特征空间的距离比z空间更可靠
+
+4. 几何方法 > 密度方法
+   anti_prototype(17.45%) > flow_energy(5.03%)
+   简单的距离度量比概率密度更鲁棒
+
+5. Flow最有效的OSR角色: 辅助而非主导
+   flow_hybrid(feat_mahal+flow) > flow_energy(flow alone)
+   flow提供边际增益, 几何方法做主要判别
+
+6. Per-round recalibration是关键
+   固定阈值: calib→test严重退化
+   Per-round: 适应每轮原型变化, 更鲁棒

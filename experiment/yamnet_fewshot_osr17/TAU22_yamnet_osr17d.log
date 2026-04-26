@@ -1,0 +1,113 @@
+GPU: NVIDIA GeForce RTX 4090
+VRAM: 23.5 GB
+
+======================================================================
+Few-Shot Open Set Recognition - Episodic Training Pipeline
+Backbone: yamnet
+======================================================================
+
+Loading datasets...
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+
+Base feature extractor already exists: experiment/yamnet_fewshot_osr17/base_feature_extractor.pth
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr17/base_feature_extractor.pth
+
+======================================================================
+Phase 1: Feature Extraction
+======================================================================
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+
+Computing t-SNE on 5000 samples...
+t-SNE plot saved: experiment/yamnet_fewshot_osr17/tsne_features.png
+
+======================================================================
+Phase 2: Episodic Meta-Training
+======================================================================
+OOD exposure: 4 unknown classes, 7200 total samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=141.59, 10th percentile=89.07
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 1,051,716
+
+Checkpoint not found at experiment/yamnet_fewshot_osr17/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with flow classifier
+
+======================================================================
+Episodic Meta-Training: 5-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         6000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       150 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        200 episodes
+Stage2 (cls):     400 episodes
+Stage3 (struct):  1200 episodes
+Gaussian prior:   starts from ep 1 (co-trained with CE)
+Patience:         3000 episodes (20 evals)
+Training mode:    Single-stage joint (classification + OOD together)
+======================================================================
+
+Ep   150/6000 | CE: 2.0867 Total: 2.0967 Acc: 60.95% | Val Loss: 1.5578 Acc: 58.07% | LR: 3.75e-05 cls:0.0 gau:0.5 str:0.0 | z_norm²: 44.6(≈32) z_std: 0.652(≈1.0)
+  -> Best model saved (Val Acc: 58.07%)
+Ep   300/6000 | CE: 1.3681 Total: 1.6480 Acc: 56.46% | Val Loss: 1.4862 Acc: 54.93% | LR: 5.00e-05 cls:0.2 gau:0.6 str:0.0 | z_norm²: 61.6(≈32) z_std: 0.613(≈1.0)
+Ep   450/6000 | CE: 1.2785 Total: 1.6906 Acc: 56.19% | Val Loss: 1.4706 Acc: 54.09% | LR: 4.98e-05 cls:0.5 gau:0.8 str:0.0 | z_norm²: 137.0(≈32) z_std: 0.542(≈1.0)
+Ep   600/6000 | CE: 1.2294 Total: 1.6436 Acc: 57.52% | Val Loss: 1.5806 Acc: 53.78% | LR: 4.95e-05 cls:0.8 gau:1.0 str:0.0 | z_norm²: 139.2(≈32) z_std: 0.480(≈1.0)
+Ep   750/6000 | CE: 1.2188 Total: 24.8455 Acc: 57.93% | Val Loss: 1.4988 Acc: 59.27% | LR: 4.90e-05 cls:1.0 gau:1.0 str:0.1 | z_norm²: 145.3(≈32) z_std: 0.502(≈1.0)
+  -> Best model saved (Val Acc: 59.27%)
+Ep   900/6000 | CE: 1.2416 Total: 63.9467 Acc: 56.82% | Val Loss: 1.4708 Acc: 57.93% | LR: 4.83e-05 cls:1.0 gau:1.0 str:0.2 | z_norm²: 154.9(≈32) z_std: 0.504(≈1.0)
+Ep  1050/6000 | CE: 1.2356 Total: 102.8511 Acc: 58.64% | Val Loss: 1.5150 Acc: 56.89% | LR: 4.76e-05 cls:1.0 gau:1.0 str:0.4 | z_norm²: 178.0(≈32) z_std: 0.517(≈1.0)
+Ep  1200/6000 | CE: 1.2472 Total: 138.3343 Acc: 57.73% | Val Loss: 1.4562 Acc: 58.44% | LR: 4.67e-05 cls:1.0 gau:1.0 str:0.5 | z_norm²: 187.2(≈32) z_std: 0.477(≈1.0)
+Ep  1350/6000 | CE: 1.2129 Total: 188.5445 Acc: 59.39% | Val Loss: 1.4084 Acc: 59.98% | LR: 4.56e-05 cls:1.0 gau:1.0 str:0.6 | z_norm²: 201.2(≈32) z_std: 0.486(≈1.0)
+  -> Best model saved (Val Acc: 59.98%)
+Ep  1500/6000 | CE: 1.1521 Total: 221.3289 Acc: 60.40% | Val Loss: 1.4747 Acc: 58.98% | LR: 4.44e-05 cls:1.0 gau:1.0 str:0.8 | z_norm²: 192.2(≈32) z_std: 0.511(≈1.0)
+Ep  1650/6000 | CE: 1.1977 Total: 259.2134 Acc: 58.76% | Val Loss: 1.4262 Acc: 58.76% | LR: 4.31e-05 cls:1.0 gau:1.0 str:0.9 | z_norm²: 186.3(≈32) z_std: 0.521(≈1.0)
+Ep  1800/6000 | CE: 1.1918 Total: 303.5695 Acc: 60.13% | Val Loss: 1.5326 Acc: 58.16% | LR: 4.17e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 194.2(≈32) z_std: 0.506(≈1.0)
+Ep  1950/6000 | CE: 1.1796 Total: 317.0989 Acc: 60.42% | Val Loss: 1.4336 Acc: 60.44% | LR: 4.02e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 200.6(≈32) z_std: 0.513(≈1.0)
+  -> Best model saved (Val Acc: 60.44%)
+Ep  2100/6000 | CE: 1.2127 Total: 315.1913 Acc: 60.20% | Val Loss: 1.4436 Acc: 59.91% | LR: 3.86e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 190.6(≈32) z_std: 0.523(≈1.0)
+Ep  2250/6000 | CE: 1.1445 Total: 313.4138 Acc: 60.61% | Val Loss: 1.4139 Acc: 60.38% | LR: 3.70e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 188.1(≈32) z_std: 0.502(≈1.0)

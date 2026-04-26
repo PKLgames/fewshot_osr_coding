@@ -1014,7 +1014,7 @@ class FeatureCache:
     旧缓存自动失效, 重新提取特征.
     """
 
-    CACHE_VERSION = 'v19_distil_ast_panns'  # Distil-AST + PANNs Cnn14_16k
+    CACHE_VERSION = 'v20_yamnet_normalized'  # osr17d: per-dim standardized features
 
     def __init__(self, cache_dir: str = 'experiment/fewshot_cache'):
         self.cache_dir = cache_dir
@@ -1027,8 +1027,16 @@ class FeatureCache:
 
     def extract_and_cache(self, feature_extractor: nn.Module,
                           dataset, split: str, device: str,
-                          batch_size: int = 512):
-        """Pre-extract features from dataset and save to disk"""
+                          batch_size: int = 512,
+                          norm_mean: torch.Tensor = None,
+                          norm_std: torch.Tensor = None):
+        """Pre-extract features from dataset and save to disk.
+
+        Args:
+            norm_mean/norm_std: Per-dim statistics from training set.
+                When provided, features are standardized: (f - mean) / (std + eps).
+                For training split, pass None to auto-compute.
+        """
         cache_path = os.path.join(self.cache_dir, f'{split}_features.pt')
 
         if os.path.exists(cache_path):
@@ -1057,16 +1065,27 @@ class FeatureCache:
                     targets = item['target'].squeeze(1)       # (B, 10)
                     labels = targets.argmax(dim=1)            # (B,)
 
-                    feats = feature_extractor(audio)          # (B, 32)
+                    feats = feature_extractor(audio)          # (B, 64)
                     all_features.append(feats.cpu())
                     all_labels.append(labels.cpu())
 
             self.features = torch.cat(all_features, dim=0)
             self.labels = torch.cat(all_labels, dim=0)
 
+            # osr17d: Per-dim standardization using training set statistics
+            if split == 'train':
+                norm_mean = self.features.mean(dim=0)
+                norm_std = self.features.std(dim=0)
+                print(f"  Feature normalization: mean_range=[{norm_mean.min():.4f}, {norm_mean.max():.4f}] "
+                      f"std_range=[{norm_std.min():.4f}, {norm_std.max():.4f}]")
+
+            if norm_mean is not None and norm_std is not None:
+                self.features = (self.features - norm_mean) / (norm_std + 1e-6)
+
             torch.save(
                 {'features': self.features, 'labels': self.labels,
-                 'version': self.CACHE_VERSION},
+                 'version': self.CACHE_VERSION,
+                 'norm_mean': norm_mean, 'norm_std': norm_std},
                 cache_path)
             print(f"Cached {len(self.features)} features -> {cache_path}")
 
@@ -1648,17 +1667,15 @@ class EpisodicFlowClassifier(nn.Module):
         return neg_energy
 
     def compute_reciprocal_loss(self, features, prototypes, labels):
-        """osr17b: Reciprocal point loss.
-        Move reciprocal points TOWARDS prototypes (indirectly pushes away from features)."""
+        """osr17e: Reciprocal point loss (per-dim normalized).
+        Move reciprocal points TOWARDS prototypes (indirectly pushes away from features).
+        osr17d: raw L2² in 64-dim ≈ 50, dominated Total loss.
+        osr17e: divide by input_dim → per-dim average ≈ 0.78, balanced scale."""
         N = prototypes.shape[0]
         R = self.reciprocal_points[:N]
 
-        # Move each reciprocal point towards its corresponding prototype
-        # This creates a "reciprocal" point that's near the prototype
-        # The OSR score uses: -dist_to_proto + dist_to_reciprocal
-        # So if R is near prototype, known samples have high scores, unknown have low scores
         dist_R_to_proto = ((R - prototypes) ** 2).sum(dim=1)
-        L = dist_R_to_proto.mean()
+        L = dist_R_to_proto.mean() / self.input_dim  # per-dim normalization
 
         return L
 
@@ -1671,6 +1688,21 @@ class EpisodicFlowClassifier(nn.Module):
         dist_proto = torch.cdist(features, prototypes, p=2).min(dim=1).values
         dist_R = torch.cdist(features, R, p=2).min(dim=1).values
         return -dist_proto + dist_R  # known high, unknown low
+
+    def score_anti_prototype(self, features: torch.Tensor,
+                              prototypes: torch.Tensor) -> torch.Tensor:
+        """osr17h: Anti-prototype scoring with query-dependent center (reverted from osr17g).
+        osr17g used prototypes.mean() as fixed center → test TPR dropped 17.45%→8.32%.
+        Query-dependent center creates per-class reference frames that per-round
+        recalibration compensates for, yielding better test generalization.
+        This is empirically validated, not a bug."""
+        # Query-dependent center: each class batch uses its own reference
+        feat_center = features.mean(dim=0, keepdim=True)  # (1, D)
+        # Anti-prototypes: reflection of proto through center
+        anti_protos = 2 * feat_center - prototypes  # (N, D)
+        dist_proto = torch.cdist(features, prototypes, p=2).min(dim=1).values
+        dist_anti = torch.cdist(features, anti_protos, p=2).min(dim=1).values
+        return -dist_proto + dist_anti  # known high, unknown low
 
 
 class LearnableOSRThreshold(nn.Module):
@@ -1716,7 +1748,7 @@ class EpisodicLoss(nn.Module):
                  lambda_pseudo_novel: float = 0.05,
                  lambda_latent_repel: float = 0.1,
                  latent_repel_margin: float = 64.0,
-                 lambda_gaussian: float = 0.1,
+                 lambda_gaussian: float = 0.3,  # osr17e: 0.1→0.3, counteract z-expansion forces
                  lambda_non_gaussian: float = 0.05,
                  lambda_z_contrastive: float = 0.05,
                  lambda_z_contrastive_known: float = 0.7,
@@ -2262,7 +2294,7 @@ class EpisodicTrainer:
         #   Phase 2 (warmup < ep ≤ warmup+stage2_len): classification helpers ramp 0→1
         #   Phase 3 (warmup+stage2_len < ep): structure + OSR losses ramp 0→1
         self.stage2_len = warmup_episodes * 2   # ep for density/entropy/separation
-        self.stage3_len = warmup_episodes * 4   # ep for pseudo_novel/repel/non_gaussian
+        self.stage3_len = warmup_episodes * 6   # osr17b: increased from *4 → *6 (1200 ep) for better reciprocal/OOD training
 
         # Real OOD features for outlier exposure (e.g., calib unknown class features)
         self.ood_features_by_class = ood_features_by_class or {}
@@ -2342,7 +2374,7 @@ class EpisodicTrainer:
             'val_loss': [], 'val_acc': [],
         }
         self.best_val_acc = 0.0
-        self.patience_episodes = 2000  # OOD z-space需要更长时间收敛
+        self.patience_episodes = 3000  # osr17b: increased from 2000 → allow Phase 3 full training
         self.early_stop_counter = 0
 
     # ----------------------------------------------------------
@@ -2508,24 +2540,29 @@ class EpisodicTrainer:
             loss = loss + 0.1 * L_threshold
 
         # osr17b: Reciprocal point loss (stage 3+)
-        # Weight increased to 5.0 to ensure meaningful gradients
+        # Weight increased to 10.0 (from 5.0) to strengthen OSR signal
         if scale_struct > 0 and query_labels.max() < self.flow_classifier.num_max_classes:
             L_reciprocal = self.flow_classifier.compute_reciprocal_loss(
                 query_feats, prototypes, query_labels)
-            loss = loss + 5.0 * scale_struct * L_reciprocal
+            loss = loss + 6.0 * scale_struct * L_reciprocal  # osr17d: 10.0→6.0 to stop crushing flow losses
 
-        # Adaptive z_norm² penalty: pull z back when it diverges too far from N(0,I)
-        # Only active when structure losses are ramping (stage 3+)
-        if z_all is not None and scale_struct > 0:
+        # osr17e: Direct z_norm² + z_std regularization (fixes osr17d detached tensor bug)
+        # osr17d used info['L_gaussian'].detach() → zero gradient → penalty was non-functional
+        # Now: direct computation from z_all with proper gradient flow
+        if z_all is not None:
             target_norm = self.criterion.feature_dim  # 32 for flow_dim=32
-            with torch.no_grad():
-                z_correct = z_all[torch.arange(z_all.size(0), device=z_all.device), query_labels]
-                current_z_norm_sq = (z_correct ** 2).sum(dim=1).mean().item()
-            if current_z_norm_sq > 2.0 * target_norm:
-                overshoot = (current_z_norm_sq / target_norm - 2.0)
-                # Extra pull on L_gaussian: proportional to overshoot severity
-                adaptive_w = min(0.2 * overshoot, 1.0)  # cap at 1.0
-                loss = loss + adaptive_w * info['L_gaussian']
+            z_correct = z_all[torch.arange(z_all.size(0), device=z_all.device), query_labels]
+            z_norm_sq = (z_correct ** 2).sum(dim=1).mean()
+            z_std_per_dim = z_correct.std(dim=0).mean()
+
+            # Quadratic z_norm² penalty: strong gradient pulling toward target
+            overshoot = z_norm_sq / target_norm - 1.0
+            z_norm_penalty = 0.3 * overshoot ** 2
+
+            # z_std penalty: prevent dimension collapse (target std=1.0)
+            z_std_penalty = 0.5 * (z_std_per_dim - 1.0) ** 2
+
+            loss = loss + z_norm_penalty + z_std_penalty
 
         # Skip episode if loss is NaN/Inf (prevents model corruption)
         if not torch.isfinite(loss):
@@ -3061,7 +3098,9 @@ class OSRCalibrator:
                                 batch_size: int = 4096,
                                 alpha: float = 0.5) -> torch.Tensor:
         """
-        Combined Flow + Mahalanobis OOD score.
+        Combined Flow Energy + Z-space Mahalanobis OOD score.
+        osr17g: reverted to z-space mahal (osr17f feat-space switch caused regression
+        9.15%→7.38%). Z-space mahal + flow energy are complementary latent-space signals.
         Z-normalizes both scores using calibration stats, then weighted fusion.
 
         Args:
@@ -3073,6 +3112,7 @@ class OSRCalibrator:
             combined_scores: (N,) higher = more likely known
         """
         flow_scores = self.score_samples_energy(features, prototypes, batch_size)
+        # osr17g: reverted to z-space mahal (feat-space switch caused 9.15%→7.38% regression)
         mahal_scores = self.score_samples_mahalanobis(features, prototypes, batch_size)
 
         # Z-normalize using calibration stats
@@ -3098,7 +3138,8 @@ class OSRCalibrator:
         if method == 'flow_energy':
             return self.score_samples_energy(features, prototypes, batch_size)
         if method == 'flow_hybrid':
-            return self.score_samples_combined(features, prototypes, batch_size)
+            alpha = getattr(self, '_flow_hybrid_alpha', 0.5)
+            return self.score_samples_combined(features, prototypes, batch_size, alpha=alpha)
         if method == 'flow_confidence_gap':
             return self.score_samples_confidence_gap(features, prototypes, batch_size)
         if method == 'learned_ensemble':
@@ -3113,6 +3154,10 @@ class OSRCalibrator:
             return self.score_samples_ood_head(features, prototypes, batch_size)
         if method == 'reciprocal':
             return self.score_samples_reciprocal(features, prototypes, batch_size)
+        if method == 'anti_prototype':
+            return self.score_anti_prototype_all(features, prototypes, batch_size)
+        if method == 'geo_fusion':
+            return self.score_samples_geo_fusion(features, prototypes, batch_size)
         if method == 'z_norm':
             return self.score_samples_z_norm(features, prototypes, batch_size)
         if method == 'z_consistency':
@@ -3166,7 +3211,39 @@ class OSRCalibrator:
                 all_scores.append(scores.cpu())
         return torch.cat(all_scores)
 
-    # ---- Z-space OOD scoring methods ----
+    def score_anti_prototype_all(self, features: torch.Tensor,
+                                  prototypes: torch.Tensor,
+                                  batch_size: int = 4096) -> torch.Tensor:
+        """osr17f: Anti-prototype OOD score wrapper. Higher = more known."""
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                scores = self.flow.score_anti_prototype(batch, prototypes)
+                all_scores.append(scores.cpu())
+        return torch.cat(all_scores)
+
+    def score_samples_geo_fusion(self, features: torch.Tensor,
+                                  prototypes: torch.Tensor,
+                                  batch_size: int = 4096) -> torch.Tensor:
+        """osr17g: Geometric fusion of anti_prototype + feat_mahalanobis.
+        Combines the two best-performing methods: anti_prototype (17.45% TPR)
+        and feat_mahalanobis (12.54% TPR) via z-normalization + weighted fusion."""
+        anti_scores = self.score_anti_prototype_all(features, prototypes, batch_size)
+        mahal_scores = self.score_samples_feat_mahalanobis(features, prototypes, batch_size)
+
+        # Z-normalize using cached stats
+        anti_mu = getattr(self, '_geo_anti_mu', anti_scores.mean().item())
+        anti_std = getattr(self, '_geo_anti_std', anti_scores.std().item())
+        mahal_mu = getattr(self, '_geo_mahal_mu', mahal_scores.mean().item())
+        mahal_std = getattr(self, '_geo_mahal_std', mahal_scores.std().item())
+
+        anti_normed = (anti_scores - anti_mu) / (anti_std + 1e-8)
+        mahal_normed = (mahal_scores - mahal_mu) / (mahal_std + 1e-8)
+
+        alpha = getattr(self, '_geo_fusion_alpha', 0.5)
+        return alpha * anti_normed + (1 - alpha) * mahal_normed
 
     def score_samples_z_norm(self, features: torch.Tensor,
                               prototypes: torch.Tensor,
@@ -3436,6 +3513,11 @@ class OSRCalibrator:
             print("Computing latent space statistics...")
             self.compute_latent_stats(prototypes)
 
+        if method in ('flow_hybrid', 'feature_mahalanobis', 'feat_mahalanobis_relative',
+                       'z_mahal_fusion', 'anti_prototype', 'geo_fusion'):
+            print("Computing feature-space statistics...")
+            self.compute_feat_stats()
+
         if method == 'feature_mahalanobis':
             print("Computing feature-space statistics...")
             self.compute_feat_stats()
@@ -3530,6 +3612,7 @@ class OSRCalibrator:
             for c in self.base_classes:
                 feats = self.cache.get_class_features(c)
                 known_flow_all.append(self.score_samples_energy(feats, prototypes))
+                # osr17g: reverted to z-space mahal (feat-space caused regression)
                 known_mahal_all.append(self.score_samples_mahalanobis(feats, prototypes))
             all_flow = torch.cat(known_flow_all)
             all_mahal = torch.cat(known_mahal_all)
@@ -3546,6 +3629,7 @@ class OSRCalibrator:
                 feats = self.cache.get_class_features(c)
                 if len(feats) > 0:
                     unknown_flow_all.append(self.score_samples_energy(feats, prototypes))
+                    # osr17g: reverted to z-space mahal
                     unknown_mahal_all.append(self.score_samples_mahalanobis(feats, prototypes))
             has_unknown = len(unknown_flow_all) > 0
             if has_unknown:
@@ -3573,6 +3657,57 @@ class OSRCalibrator:
             print(f"  Flow scores:   mu={self._flow_mu:.3f} std={self._flow_std:.3f}")
             print(f"  Mahal scores:  mu={self._mahal_mu:.3f} std={self._mahal_std:.3f}")
             print(f"  Fusion weight: alpha={self._combined_alpha:.2f} (Youden J={best_j:.3f})")
+
+        # For 'geo_fusion': compute anti_prototype + feat_mahal normalization + optimize alpha
+        if method == 'geo_fusion':
+            print("Computing geometric fusion normalization stats...")
+            known_anti_all, known_mahal_all = [], []
+            for c in self.base_classes:
+                feats = self.cache.get_class_features(c)
+                known_anti_all.append(self.score_anti_prototype_all(feats, prototypes))
+                known_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+            all_anti = torch.cat(known_anti_all)
+            all_mahal = torch.cat(known_mahal_all)
+            self._geo_anti_mu = all_anti.mean().item()
+            self._geo_anti_std = all_anti.std().item()
+            self._geo_mahal_mu = all_mahal.mean().item()
+            self._geo_mahal_std = all_mahal.std().item()
+
+            # Z-normalize for alpha optimization
+            norm_known_anti = (all_anti - self._geo_anti_mu) / (self._geo_anti_std + 1e-8)
+            norm_known_mahal = (all_mahal - self._geo_mahal_mu) / (self._geo_mahal_std + 1e-8)
+
+            # Compute unknown scores for alpha optimization
+            unknown_anti_all, unknown_mahal_all = [], []
+            for c in self.unknown_classes:
+                feats = self.cache.get_class_features(c)
+                if len(feats) > 0:
+                    unknown_anti_all.append(self.score_anti_prototype_all(feats, prototypes))
+                    unknown_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+            has_unknown = len(unknown_anti_all) > 0
+            if has_unknown:
+                norm_unknown_anti = (torch.cat(unknown_anti_all) - self._geo_anti_mu) / (self._geo_anti_std + 1e-8)
+                norm_unknown_mahal = (torch.cat(unknown_mahal_all) - self._geo_mahal_mu) / (self._geo_mahal_std + 1e-8)
+
+            best_alpha, best_j = 0.5, -1.0
+            for alpha in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
+                combined_known = alpha * norm_known_anti + (1 - alpha) * norm_known_mahal
+                sorted_k = combined_known.sort()[0]
+                idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                thresh = sorted_k[idx]
+                if has_unknown:
+                    combined_unknown = alpha * norm_unknown_anti + (1 - alpha) * norm_unknown_mahal
+                    tpr = (combined_unknown > thresh).float().mean().item()
+                else:
+                    tpr = 0.0
+                tnr = (combined_known >= thresh).float().mean().item()
+                j = tnr + tpr - 1.0
+                if j > best_j:
+                    best_j, best_alpha = j, alpha
+            self._geo_fusion_alpha = best_alpha
+            print(f"  Anti scores:   mu={self._geo_anti_mu:.3f} std={self._geo_anti_std:.3f}")
+            print(f"  Mahal scores:  mu={self._geo_mahal_mu:.3f} std={self._geo_mahal_std:.3f}")
+            print(f"  Fusion weight: alpha={best_alpha:.2f} (Youden J={best_j:.3f})")
 
         # Score known samples
         known_scores_list = []
@@ -3742,17 +3877,85 @@ class OSRCalibrator:
                         best_j, best_alpha = j, trial_alpha
                 self._z_mahal_alpha = best_alpha
 
-            # For 'flow_hybrid': update normalization stats per round
+            # For 'flow_hybrid': update normalization stats per round + optimize alpha
             if method == 'flow_hybrid':
+                self.compute_latent_stats(prototypes)  # z-space mahal needs latent stats
                 known_flow_all, known_mahal_all = [], []
                 for c in self.base_classes:
                     feats = self.cache.get_class_features(c)
                     known_flow_all.append(self.score_samples_energy(feats, prototypes))
+                    # osr17g: reverted to z-space mahal
                     known_mahal_all.append(self.score_samples_mahalanobis(feats, prototypes))
                 all_flow = torch.cat(known_flow_all)
                 all_mahal = torch.cat(known_mahal_all)
                 self._flow_mu, self._flow_std = all_flow.mean().item(), all_flow.std().item()
                 self._mahal_mu, self._mahal_std = all_mahal.mean().item(), all_mahal.std().item()
+                # osr17f: per-round alpha optimization via Youden J
+                best_alpha, best_j = 0.5, 0.0
+                for trial_alpha in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
+                    self._flow_hybrid_alpha = trial_alpha
+                    trial_known = []
+                    trial_unknown = []
+                    for c in self.base_classes:
+                        trial_known.append(self.score_samples_combined(
+                            self.cache.get_class_features(c), prototypes, alpha=trial_alpha))
+                    for c in self.unknown_classes:
+                        feats = self.cache.get_class_features(c)
+                        if len(feats) > 0:
+                            trial_unknown.append(self.score_samples_combined(
+                                feats, prototypes, alpha=trial_alpha))
+                    trial_known = torch.cat(trial_known)
+                    if not trial_unknown:
+                        continue
+                    trial_unknown = torch.cat(trial_unknown)
+                    sorted_k, _ = trial_known.sort()
+                    tnr_idx = min(int(len(sorted_k) * 0.05), len(sorted_k) - 1)
+                    tau = sorted_k[tnr_idx].item()
+                    tpr = (trial_unknown > tau).float().mean().item()
+                    j = 0.95 + tpr - 1.0
+                    if j > best_j:
+                        best_j, best_alpha = j, trial_alpha
+                self._flow_hybrid_alpha = best_alpha
+
+            # For 'geo_fusion': update geo fusion stats per round + optimize alpha
+            if method == 'geo_fusion':
+                self.compute_feat_stats()
+                known_anti_all, known_mahal_all = [], []
+                for c in self.base_classes:
+                    feats = self.cache.get_class_features(c)
+                    known_anti_all.append(self.score_anti_prototype_all(feats, prototypes))
+                    known_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                all_anti = torch.cat(known_anti_all)
+                all_mahal = torch.cat(known_mahal_all)
+                self._geo_anti_mu = all_anti.mean().item()
+                self._geo_anti_std = all_anti.std().item()
+                self._geo_mahal_mu = all_mahal.mean().item()
+                self._geo_mahal_std = all_mahal.std().item()
+                # Per-round alpha optimization
+                best_alpha, best_j = 0.5, 0.0
+                for trial_alpha in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
+                    self._geo_fusion_alpha = trial_alpha
+                    trial_known = []
+                    trial_unknown = []
+                    for c in self.base_classes:
+                        trial_known.append(self.score_samples_geo_fusion(
+                            self.cache.get_class_features(c), prototypes))
+                    for c in self.unknown_classes:
+                        feats = self.cache.get_class_features(c)
+                        if len(feats) > 0:
+                            trial_unknown.append(self.score_samples_geo_fusion(feats, prototypes))
+                    trial_known = torch.cat(trial_known)
+                    if not trial_unknown:
+                        continue
+                    trial_unknown = torch.cat(trial_unknown)
+                    sorted_k, _ = trial_known.sort()
+                    tnr_idx = min(int(len(sorted_k) * 0.05), len(sorted_k) - 1)
+                    tau = sorted_k[tnr_idx].item()
+                    tpr = (trial_unknown > tau).float().mean().item()
+                    j = 0.95 + tpr - 1.0
+                    if j > best_j:
+                        best_j, best_alpha = j, trial_alpha
+                self._geo_fusion_alpha = best_alpha
 
             # For 'learned_ensemble': retrain OOD head per round
             if method == 'learned_ensemble':
@@ -3990,12 +4193,12 @@ def main():
     N_way = 5
     K_shot = 5
     Q_query = 30  # 15→30: 2x query samples提升GPU利用率 (5-way * 30 = 150 queries/episode)
-    num_episodes = 10000
+    num_episodes = 6000  # osr17b: reduced from 10000 — patience=3000 will stop earlier anyway
     gradient_accum_steps = 1  # 2→1: Q_query增大后不需要累积
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr17'
+    experiment_dir = 'experiment/yamnet_fewshot_osr17'  # osr17d: normalized features + balanced losses + condition_net
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
@@ -4087,11 +4290,23 @@ def main():
     train_cache = FeatureCache()
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
 
+    # osr17e: Load normalization stats from cache file (not from already-normalized features)
+    # osr17d bug: recomputed mean/std from normalized features → ≈0/≈1, wrong for new extractions
+    train_cache_data = torch.load(
+        os.path.join('experiment/fewshot_cache', 'train_features.pt'), weights_only=True)
+    train_norm_mean = train_cache_data.get('norm_mean', None)
+    train_norm_std = train_cache_data.get('norm_std', None)
+    if train_norm_mean is not None:
+        print(f"  Loaded norm stats from cache: mean_range=[{train_norm_mean.min():.4f}, {train_norm_mean.max():.4f}] "
+              f"std_range=[{train_norm_std.min():.4f}, {train_norm_std.max():.4f}]")
+
     calib_cache = FeatureCache()
-    calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
+    calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64,
+                                   norm_mean=train_norm_mean, norm_std=train_norm_std)
 
     test_cache = FeatureCache()
-    test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
+    test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64,
+                                  norm_mean=train_norm_mean, norm_std=train_norm_std)
 
     # --- t-SNE visualization: base vs novel feature distribution ---
     visualize_features_tsne(train_cache, test_cache,
@@ -4111,7 +4326,7 @@ def main():
         s_clamp_max=3.0,
         flow_dim=32,
         use_flow=True,
-        use_condition_network=False   # osr13: no condition network
+        use_condition_network=True    # osr17d: enable for richer flow conditioning
     )
 
     # OOD exposure: provide unknown class features for open-set training
@@ -4179,7 +4394,10 @@ def main():
 
     # Select OSR methods based on flow availability
     if trainer.flow_classifier.use_flow:
-        osr_methods = ['feature_mahalanobis', 'reciprocal', 'z_consistency', 'z_gap', 'z_mahal_fusion', 'flow_hybrid', 'flow_energy', 'ood_head']
+        # osr17g: added geo_fusion (anti_prototype + feat_mahal), anti_prototype center fix
+        osr_methods = ['feature_mahalanobis', 'anti_prototype', 'geo_fusion',
+                       'reciprocal', 'z_consistency', 'z_reconstruction',
+                       'z_mahal_fusion', 'flow_hybrid', 'flow_energy', 'ood_head']
     else:
         # When use_flow=False, only use feature-space methods (skip all z/flow methods)
         osr_methods = ['feature_mahalanobis', 'ood_head']

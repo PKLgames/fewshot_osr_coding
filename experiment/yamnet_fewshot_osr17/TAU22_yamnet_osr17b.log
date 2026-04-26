@@ -66,3 +66,351 @@ Initializing Curriculum OOD Sampler (3-level progressive training)...
   CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
   CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
   GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=108.90, 10th percentile=70.56
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 1,047,460
+
+Checkpoint not found at experiment/yamnet_fewshot_osr17/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with flow classifier
+
+======================================================================
+Episodic Meta-Training: 5-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         10000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       150 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        200 episodes
+Stage2 (cls):     400 episodes
+Stage3 (struct):  800 episodes
+Gaussian prior:   starts from ep 1 (co-trained with CE)
+Patience:         2000 episodes (13 evals)
+Training mode:    Single-stage joint (classification + OOD together)
+======================================================================
+
+Ep   150/10000 | CE: 2.4527 Total: 2.4625 Acc: 53.42% | Val Loss: 1.9072 Acc: 51.73% | LR: 3.75e-05 cls:0.0 gau:0.5 str:0.0 | z_norm²: 12.2(≈32) z_std: 0.354(≈1.0)
+  -> Best model saved (Val Acc: 51.73%)
+Ep   300/10000 | CE: 1.9551 Total: 2.2493 Acc: 48.59% | Val Loss: 1.8584 Acc: 48.20% | LR: 5.00e-05 cls:0.2 gau:0.6 str:0.0 | z_norm²: 26.2(≈32) z_std: 0.477(≈1.0)
+Ep   450/10000 | CE: 1.9049 Total: 2.3377 Acc: 47.89% | Val Loss: 1.9272 Acc: 46.22% | LR: 4.98e-05 cls:0.5 gau:0.8 str:0.0 | z_norm²: 18.6(≈32) z_std: 0.455(≈1.0)
+Ep   600/10000 | CE: 1.7809 Total: 2.2109 Acc: 48.19% | Val Loss: 1.9222 Acc: 46.09% | LR: 4.95e-05 cls:0.8 gau:1.0 str:0.0 | z_norm²: 16.9(≈32) z_std: 0.420(≈1.0)
+Ep   750/10000 | CE: 1.8512 Total: 22.1832 Acc: 47.91% | Val Loss: 1.7766 Acc: 49.16% | LR: 4.90e-05 cls:1.0 gau:1.0 str:0.2 | z_norm²: 20.5(≈32) z_std: 0.427(≈1.0)
+Ep   900/10000 | CE: 1.8226 Total: 61.2246 Acc: 48.91% | Val Loss: 1.9354 Acc: 48.13% | LR: 4.83e-05 cls:1.0 gau:1.0 str:0.4 | z_norm²: 30.0(≈32) z_std: 0.520(≈1.0)
+Ep  1050/10000 | CE: 1.7850 Total: 99.9761 Acc: 48.00% | Val Loss: 1.7995 Acc: 49.22% | LR: 4.76e-05 cls:1.0 gau:1.0 str:0.6 | z_norm²: 48.2(≈32) z_std: 0.587(≈1.0)
+Ep  1200/10000 | CE: 1.7301 Total: 134.5430 Acc: 49.05% | Val Loss: 1.7723 Acc: 52.16% | LR: 4.67e-05 cls:1.0 gau:1.0 str:0.8 | z_norm²: 52.4(≈32) z_std: 0.672(≈1.0)
+  -> Best model saved (Val Acc: 52.16%)
+Ep  1350/10000 | CE: 1.6825 Total: 184.1003 Acc: 48.62% | Val Loss: 1.7696 Acc: 51.56% | LR: 4.56e-05 cls:1.0 gau:1.0 str:0.9 | z_norm²: 66.3(≈32) z_std: 0.784(≈1.0)
+Ep  1500/10000 | CE: 1.6707 Total: 213.3319 Acc: 51.11% | Val Loss: 1.6904 Acc: 51.36% | LR: 4.44e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 63.2(≈32) z_std: 0.819(≈1.0)
+Ep  1650/10000 | CE: 1.7199 Total: 210.5960 Acc: 50.89% | Val Loss: 1.5992 Acc: 52.89% | LR: 4.31e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 68.7(≈32) z_std: 0.819(≈1.0)
+  -> Best model saved (Val Acc: 52.89%)
+Ep  1800/10000 | CE: 1.6720 Total: 212.0983 Acc: 52.36% | Val Loss: 1.7329 Acc: 52.60% | LR: 4.17e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 65.2(≈32) z_std: 0.829(≈1.0)
+Ep  1950/10000 | CE: 1.6145 Total: 215.1363 Acc: 52.53% | Val Loss: 1.6522 Acc: 52.96% | LR: 4.02e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 66.5(≈32) z_std: 0.808(≈1.0)
+  -> Best model saved (Val Acc: 52.96%)
+Ep  2100/10000 | CE: 1.6692 Total: 212.0044 Acc: 53.31% | Val Loss: 1.6499 Acc: 54.53% | LR: 3.86e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 62.7(≈32) z_std: 0.799(≈1.0)
+  -> Best model saved (Val Acc: 54.53%)
+Ep  2250/10000 | CE: 1.6710 Total: 207.9922 Acc: 52.52% | Val Loss: 1.5989 Acc: 52.58% | LR: 3.70e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 68.4(≈32) z_std: 0.824(≈1.0)
+Ep  2400/10000 | CE: 1.6903 Total: 207.5722 Acc: 51.90% | Val Loss: 1.6965 Acc: 51.82% | LR: 3.52e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 60.9(≈32) z_std: 0.836(≈1.0)
+Ep  2550/10000 | CE: 1.6817 Total: 212.0879 Acc: 54.09% | Val Loss: 1.6666 Acc: 53.87% | LR: 3.34e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 64.7(≈32) z_std: 0.774(≈1.0)
+Ep  2700/10000 | CE: 1.6072 Total: 213.0342 Acc: 54.16% | Val Loss: 1.5463 Acc: 54.69% | LR: 3.15e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 64.5(≈32) z_std: 0.796(≈1.0)
+  -> Best model saved (Val Acc: 54.69%)
+Ep  2850/10000 | CE: 1.6405 Total: 212.9276 Acc: 53.17% | Val Loss: 1.5698 Acc: 52.87% | LR: 2.96e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 61.5(≈32) z_std: 0.793(≈1.0)
+Ep  3000/10000 | CE: 1.6475 Total: 212.2309 Acc: 54.22% | Val Loss: 1.6365 Acc: 54.91% | LR: 2.77e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 60.4(≈32) z_std: 0.781(≈1.0)
+  -> Best model saved (Val Acc: 54.91%)
+Ep  3150/10000 | CE: 1.6389 Total: 211.0531 Acc: 54.13% | Val Loss: 1.5445 Acc: 55.93% | LR: 2.57e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 58.8(≈32) z_std: 0.774(≈1.0)
+  -> Best model saved (Val Acc: 55.93%)
+Ep  3300/10000 | CE: 1.5586 Total: 206.5631 Acc: 55.50% | Val Loss: 1.5592 Acc: 55.13% | LR: 2.37e-05 cls:1.0 gau:1.0 str:1.0 | z_norm²: 56.5(≈32) z_std: 0.786(≈1.0)
+
+!!! Early stopping at episode 3300 !!!
+
+Loaded best model (Val Acc: 55.93%, Ep 3150)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 55.93%
+======================================================================
+Episode history saved: experiment/yamnet_fewshot_osr17/episodic_history.json
+
+======================================================================
+Phase 3: Evaluation & OSR Calibration
+======================================================================
+
+--- Base class few-shot evaluation (train cache) ---
+5w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w1s eval:   3%|▎         | 3/100 [00:00<00:04, 20.57it/s]5w1s eval:   6%|▌         | 6/100 [00:00<00:04, 22.91it/s]5w1s eval:   9%|▉         | 9/100 [00:00<00:04, 21.77it/s]5w1s eval:  12%|█▏        | 12/100 [00:00<00:03, 22.81it/s]5w1s eval:  15%|█▌        | 15/100 [00:00<00:03, 22.00it/s]5w1s eval:  18%|█▊        | 18/100 [00:00<00:03, 21.52it/s]5w1s eval:  21%|██        | 21/100 [00:00<00:03, 22.42it/s]5w1s eval:  24%|██▍       | 24/100 [00:01<00:03, 21.61it/s]5w1s eval:  27%|██▋       | 27/100 [00:01<00:03, 22.34it/s]5w1s eval:  30%|███       | 30/100 [00:01<00:03, 22.92it/s]5w1s eval:  33%|███▎      | 33/100 [00:01<00:03, 21.98it/s]5w1s eval:  36%|███▌      | 36/100 [00:01<00:02, 22.19it/s]5w1s eval:  39%|███▉      | 39/100 [00:01<00:02, 21.11it/s]5w1s eval:  42%|████▏     | 42/100 [00:01<00:02, 22.99it/s]5w1s eval:  45%|████▌     | 45/100 [00:02<00:02, 21.65it/s]5w1s eval:  48%|████▊     | 48/100 [00:02<00:02, 20.84it/s]5w1s eval:  51%|█████     | 51/100 [00:02<00:02, 20.28it/s]5w1s eval:  54%|█████▍    | 54/100 [00:02<00:02, 19.91it/s]5w1s eval:  57%|█████▋    | 57/100 [00:02<00:02, 19.66it/s]5w1s eval:  59%|█████▉    | 59/100 [00:02<00:02, 19.53it/s]5w1s eval:  61%|██████    | 61/100 [00:02<00:02, 19.36it/s]5w1s eval:  63%|██████▎   | 63/100 [00:02<00:01, 19.28it/s]5w1s eval:  66%|██████▌   | 66/100 [00:03<00:01, 20.47it/s]5w1s eval:  69%|██████▉   | 69/100 [00:03<00:01, 21.21it/s]5w1s eval:  72%|███████▏  | 72/100 [00:03<00:01, 21.71it/s]5w1s eval:  75%|███████▌  | 75/100 [00:03<00:01, 20.78it/s]5w1s eval:  78%|███████▊  | 78/100 [00:03<00:01, 20.18it/s]5w1s eval:  81%|████████  | 81/100 [00:03<00:00, 19.79it/s]5w1s eval:  84%|████████▍ | 84/100 [00:03<00:00, 20.67it/s]5w1s eval:  87%|████████▋ | 87/100 [00:04<00:00, 20.09it/s]5w1s eval:  90%|█████████ | 90/100 [00:04<00:00, 20.84it/s]5w1s eval:  93%|█████████▎| 93/100 [00:04<00:00, 20.19it/s]5w1s eval:  96%|█████████▌| 96/100 [00:04<00:00, 20.98it/s]5w1s eval:  99%|█████████▉| 99/100 [00:04<00:00, 20.40it/s]5w1s eval: 100%|██████████| 100/100 [00:04<00:00, 21.01it/s]
+
+  5-way 1-shot: Acc = 50.75% +/- 2.26% (conf: 47.95%)
+5w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w5s eval:   3%|▎         | 3/100 [00:00<00:04, 23.30it/s]5w5s eval:   6%|▌         | 6/100 [00:00<00:04, 20.74it/s]5w5s eval:   9%|▉         | 9/100 [00:00<00:04, 20.02it/s]5w5s eval:  12%|█▏        | 12/100 [00:00<00:04, 19.64it/s]5w5s eval:  15%|█▌        | 15/100 [00:00<00:04, 19.81it/s]5w5s eval:  17%|█▋        | 17/100 [00:00<00:04, 18.79it/s]5w5s eval:  20%|██        | 20/100 [00:01<00:03, 20.04it/s]5w5s eval:  23%|██▎       | 23/100 [00:01<00:03, 19.73it/s]5w5s eval:  25%|██▌       | 25/100 [00:01<00:03, 19.57it/s]5w5s eval:  27%|██▋       | 27/100 [00:01<00:03, 19.45it/s]5w5s eval:  29%|██▉       | 29/100 [00:01<00:03, 19.28it/s]5w5s eval:  32%|███▏      | 32/100 [00:01<00:03, 20.45it/s]5w5s eval:  35%|███▌      | 35/100 [00:01<00:03, 21.20it/s]5w5s eval:  38%|███▊      | 38/100 [00:01<00:02, 23.23it/s]5w5s eval:  41%|████      | 41/100 [00:01<00:02, 21.75it/s]5w5s eval:  44%|████▍     | 44/100 [00:02<00:02, 22.17it/s]5w5s eval:  47%|████▋     | 47/100 [00:02<00:02, 23.94it/s]5w5s eval:  50%|█████     | 50/100 [00:02<00:02, 22.26it/s]5w5s eval:  53%|█████▎    | 53/100 [00:02<00:02, 21.27it/s]5w5s eval:  56%|█████▌    | 56/100 [00:02<00:02, 21.84it/s]5w5s eval:  59%|█████▉    | 59/100 [00:02<00:01, 22.30it/s]5w5s eval:  62%|██████▏   | 62/100 [00:02<00:01, 22.63it/s]5w5s eval:  65%|██████▌   | 65/100 [00:03<00:01, 22.84it/s]5w5s eval:  68%|██████▊   | 68/100 [00:03<00:01, 22.99it/s]5w5s eval:  71%|███████   | 71/100 [00:03<00:01, 21.78it/s]5w5s eval:  74%|███████▍  | 74/100 [00:03<00:01, 21.01it/s]5w5s eval:  77%|███████▋  | 77/100 [00:03<00:01, 20.50it/s]5w5s eval:  80%|████████  | 80/100 [00:03<00:00, 20.17it/s]5w5s eval:  83%|████████▎ | 83/100 [00:03<00:00, 19.85it/s]5w5s eval:  85%|████████▌ | 85/100 [00:04<00:00, 19.76it/s]5w5s eval:  88%|████████▊ | 88/100 [00:04<00:00, 20.87it/s]5w5s eval:  92%|█████████▏| 92/100 [00:04<00:00, 24.29it/s]5w5s eval:  95%|█████████▌| 95/100 [00:04<00:00, 23.06it/s]5w5s eval:  98%|█████████▊| 98/100 [00:04<00:00, 23.53it/s]5w5s eval: 100%|██████████| 100/100 [00:04<00:00, 21.48it/s]
+
+  5-way 5-shot: Acc = 58.08% +/- 1.30% (conf: 45.70%)
+5w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w10s eval:   3%|▎         | 3/100 [00:00<00:04, 20.49it/s]5w10s eval:   6%|▌         | 6/100 [00:00<00:04, 22.56it/s]5w10s eval:   9%|▉         | 9/100 [00:00<00:03, 23.41it/s]5w10s eval:  13%|█▎        | 13/100 [00:00<00:03, 25.18it/s]5w10s eval:  16%|█▌        | 16/100 [00:00<00:03, 23.46it/s]5w10s eval:  19%|█▉        | 19/100 [00:00<00:03, 22.43it/s]5w10s eval:  22%|██▏       | 22/100 [00:00<00:03, 23.10it/s]5w10s eval:  25%|██▌       | 25/100 [00:01<00:03, 24.33it/s]5w10s eval:  29%|██▉       | 29/100 [00:01<00:02, 25.44it/s]5w10s eval:  32%|███▏      | 32/100 [00:01<00:02, 25.27it/s]5w10s eval:  35%|███▌      | 35/100 [00:01<00:02, 23.74it/s]5w10s eval:  38%|███▊      | 38/100 [00:01<00:02, 22.75it/s]5w10s eval:  41%|████      | 41/100 [00:01<00:02, 22.05it/s]5w10s eval:  45%|████▌     | 45/100 [00:01<00:02, 23.77it/s]5w10s eval:  48%|████▊     | 48/100 [00:02<00:02, 22.79it/s]5w10s eval:  51%|█████     | 51/100 [00:02<00:02, 23.30it/s]5w10s eval:  54%|█████▍    | 54/100 [00:02<00:02, 22.44it/s]5w10s eval:  58%|█████▊    | 58/100 [00:02<00:01, 25.28it/s]5w10s eval:  62%|██████▏   | 62/100 [00:02<00:01, 25.89it/s]5w10s eval:  65%|██████▌   | 65/100 [00:02<00:01, 25.56it/s]5w10s eval:  68%|██████▊   | 68/100 [00:02<00:01, 25.29it/s]5w10s eval:  71%|███████   | 71/100 [00:02<00:01, 25.07it/s]5w10s eval:  74%|███████▍  | 74/100 [00:03<00:01, 23.58it/s]5w10s eval:  77%|███████▋  | 77/100 [00:03<00:01, 22.07it/s]5w10s eval:  80%|████████  | 80/100 [00:03<00:00, 22.22it/s]5w10s eval:  83%|████████▎ | 83/100 [00:03<00:00, 22.84it/s]5w10s eval:  88%|████████▊ | 88/100 [00:03<00:00, 26.49it/s]5w10s eval:  92%|█████████▏| 92/100 [00:03<00:00, 26.70it/s]5w10s eval:  95%|█████████▌| 95/100 [00:03<00:00, 26.10it/s]5w10s eval:  98%|█████████▊| 98/100 [00:04<00:00, 25.64it/s]5w10s eval: 100%|██████████| 100/100 [00:04<00:00, 24.10it/s]
+
+  5-way 10-shot: Acc = 59.33% +/- 1.21% (conf: 45.30%)
+
+--- Novel class few-shot evaluation (test cache) ---
+4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:   3%|▎         | 3/100 [00:00<00:04, 20.16it/s]4w1s eval:   6%|▌         | 6/100 [00:00<00:04, 20.14it/s]4w1s eval:   9%|▉         | 9/100 [00:00<00:04, 20.14it/s]4w1s eval:  12%|█▏        | 12/100 [00:00<00:04, 20.15it/s]4w1s eval:  15%|█▌        | 15/100 [00:00<00:04, 20.26it/s]4w1s eval:  18%|█▊        | 18/100 [00:00<00:04, 20.34it/s]4w1s eval:  21%|██        | 21/100 [00:01<00:03, 20.38it/s]4w1s eval:  24%|██▍       | 24/100 [00:01<00:03, 20.44it/s]4w1s eval:  27%|██▋       | 27/100 [00:01<00:03, 20.53it/s]4w1s eval:  30%|███       | 30/100 [00:01<00:03, 20.57it/s]4w1s eval:  33%|███▎      | 33/100 [00:01<00:03, 20.61it/s]4w1s eval:  36%|███▌      | 36/100 [00:01<00:03, 20.66it/s]4w1s eval:  39%|███▉      | 39/100 [00:01<00:02, 20.70it/s]4w1s eval:  42%|████▏     | 42/100 [00:02<00:02, 20.72it/s]4w1s eval:  45%|████▌     | 45/100 [00:02<00:02, 20.76it/s]4w1s eval:  48%|████▊     | 48/100 [00:02<00:02, 20.80it/s]4w1s eval:  51%|█████     | 51/100 [00:02<00:02, 20.79it/s]4w1s eval:  54%|█████▍    | 54/100 [00:02<00:02, 20.81it/s]4w1s eval:  57%|█████▋    | 57/100 [00:02<00:02, 20.79it/s]4w1s eval:  60%|██████    | 60/100 [00:02<00:01, 20.81it/s]4w1s eval:  63%|██████▎   | 63/100 [00:03<00:01, 20.83it/s]4w1s eval:  66%|██████▌   | 66/100 [00:03<00:01, 20.88it/s]4w1s eval:  69%|██████▉   | 69/100 [00:03<00:01, 20.87it/s]4w1s eval:  72%|███████▏  | 72/100 [00:03<00:01, 20.78it/s]4w1s eval:  75%|███████▌  | 75/100 [00:03<00:01, 20.73it/s]4w1s eval:  78%|███████▊  | 78/100 [00:03<00:01, 20.73it/s]4w1s eval:  81%|████████  | 81/100 [00:03<00:00, 20.73it/s]4w1s eval:  84%|████████▍ | 84/100 [00:04<00:00, 20.72it/s]4w1s eval:  87%|████████▋ | 87/100 [00:04<00:00, 20.73it/s]4w1s eval:  90%|█████████ | 90/100 [00:04<00:00, 20.76it/s]4w1s eval:  93%|█████████▎| 93/100 [00:04<00:00, 20.77it/s]4w1s eval:  96%|█████████▌| 96/100 [00:04<00:00, 20.75it/s]4w1s eval:  99%|█████████▉| 99/100 [00:04<00:00, 20.73it/s]4w1s eval: 100%|██████████| 100/100 [00:04<00:00, 20.65it/s]
+
+  4-way 1-shot: Acc = 38.90% +/- 2.58% (conf: 69.75%)
+4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:   3%|▎         | 3/100 [00:00<00:04, 20.79it/s]4w5s eval:   6%|▌         | 6/100 [00:00<00:04, 20.73it/s]4w5s eval:   9%|▉         | 9/100 [00:00<00:04, 20.78it/s]4w5s eval:  12%|█▏        | 12/100 [00:00<00:04, 20.69it/s]4w5s eval:  15%|█▌        | 15/100 [00:00<00:04, 20.48it/s]4w5s eval:  18%|█▊        | 18/100 [00:00<00:04, 20.44it/s]4w5s eval:  21%|██        | 21/100 [00:01<00:03, 20.48it/s]4w5s eval:  24%|██▍       | 24/100 [00:01<00:03, 20.50it/s]4w5s eval:  27%|██▋       | 27/100 [00:01<00:03, 20.44it/s]4w5s eval:  30%|███       | 30/100 [00:01<00:03, 20.53it/s]4w5s eval:  33%|███▎      | 33/100 [00:01<00:03, 20.61it/s]4w5s eval:  36%|███▌      | 36/100 [00:01<00:03, 20.63it/s]4w5s eval:  39%|███▉      | 39/100 [00:01<00:02, 20.66it/s]4w5s eval:  42%|████▏     | 42/100 [00:02<00:02, 20.64it/s]4w5s eval:  45%|████▌     | 45/100 [00:02<00:02, 20.57it/s]4w5s eval:  48%|████▊     | 48/100 [00:02<00:02, 20.60it/s]4w5s eval:  51%|█████     | 51/100 [00:02<00:02, 20.68it/s]4w5s eval:  54%|█████▍    | 54/100 [00:02<00:02, 20.53it/s]4w5s eval:  57%|█████▋    | 57/100 [00:02<00:02, 20.61it/s]4w5s eval:  60%|██████    | 60/100 [00:02<00:01, 20.64it/s]4w5s eval:  63%|██████▎   | 63/100 [00:03<00:01, 20.57it/s]4w5s eval:  66%|██████▌   | 66/100 [00:03<00:01, 20.49it/s]4w5s eval:  69%|██████▉   | 69/100 [00:03<00:01, 20.41it/s]4w5s eval:  72%|███████▏  | 72/100 [00:03<00:01, 20.40it/s]4w5s eval:  75%|███████▌  | 75/100 [00:03<00:01, 20.45it/s]4w5s eval:  78%|███████▊  | 78/100 [00:03<00:01, 20.49it/s]4w5s eval:  81%|████████  | 81/100 [00:03<00:00, 20.48it/s]4w5s eval:  84%|████████▍ | 84/100 [00:04<00:00, 19.99it/s]4w5s eval:  87%|████████▋ | 87/100 [00:04<00:00, 19.71it/s]4w5s eval:  89%|████████▉ | 89/100 [00:04<00:00, 19.39it/s]4w5s eval:  91%|█████████ | 91/100 [00:04<00:00, 19.33it/s]4w5s eval:  93%|█████████▎| 93/100 [00:04<00:00, 19.28it/s]4w5s eval:  95%|█████████▌| 95/100 [00:04<00:00, 19.24it/s]4w5s eval:  97%|█████████▋| 97/100 [00:04<00:00, 19.19it/s]4w5s eval:  99%|█████████▉| 99/100 [00:04<00:00, 19.09it/s]4w5s eval: 100%|██████████| 100/100 [00:04<00:00, 20.22it/s]
+
+  4-way 5-shot: Acc = 45.62% +/- 2.31% (conf: 80.10%)
+4w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w10s eval:   3%|▎         | 3/100 [00:00<00:04, 20.04it/s]4w10s eval:   6%|▌         | 6/100 [00:00<00:04, 20.37it/s]4w10s eval:   9%|▉         | 9/100 [00:00<00:04, 20.21it/s]4w10s eval:  12%|█▏        | 12/100 [00:00<00:04, 19.74it/s]4w10s eval:  14%|█▍        | 14/100 [00:00<00:04, 19.62it/s]4w10s eval:  16%|█▌        | 16/100 [00:00<00:04, 19.52it/s]4w10s eval:  18%|█▊        | 18/100 [00:00<00:04, 19.46it/s]4w10s eval:  20%|██        | 20/100 [00:01<00:04, 19.43it/s]4w10s eval:  22%|██▏       | 22/100 [00:01<00:04, 19.39it/s]4w10s eval:  24%|██▍       | 24/100 [00:01<00:04, 18.94it/s]4w10s eval:  27%|██▋       | 27/100 [00:01<00:03, 19.63it/s]4w10s eval:  29%|██▉       | 29/100 [00:01<00:03, 19.49it/s]4w10s eval:  31%|███       | 31/100 [00:01<00:03, 19.01it/s]4w10s eval:  33%|███▎      | 33/100 [00:01<00:03, 18.42it/s]4w10s eval:  36%|███▌      | 36/100 [00:01<00:03, 19.21it/s]4w10s eval:  39%|███▉      | 39/100 [00:01<00:03, 19.80it/s]4w10s eval:  42%|████▏     | 42/100 [00:02<00:02, 20.18it/s]4w10s eval:  45%|████▌     | 45/100 [00:02<00:02, 20.41it/s]4w10s eval:  48%|████▊     | 48/100 [00:02<00:02, 20.58it/s]4w10s eval:  51%|█████     | 51/100 [00:02<00:02, 20.71it/s]4w10s eval:  54%|█████▍    | 54/100 [00:02<00:02, 20.75it/s]4w10s eval:  57%|█████▋    | 57/100 [00:02<00:02, 20.84it/s]4w10s eval:  60%|██████    | 60/100 [00:02<00:01, 20.90it/s]4w10s eval:  63%|██████▎   | 63/100 [00:03<00:01, 20.93it/s]4w10s eval:  66%|██████▌   | 66/100 [00:03<00:01, 20.93it/s]4w10s eval:  69%|██████▉   | 69/100 [00:03<00:01, 20.64it/s]4w10s eval:  72%|███████▏  | 72/100 [00:03<00:01, 20.17it/s]4w10s eval:  75%|███████▌  | 75/100 [00:03<00:01, 20.33it/s]4w10s eval:  78%|███████▊  | 78/100 [00:03<00:01, 20.41it/s]4w10s eval:  81%|████████  | 81/100 [00:04<00:00, 20.43it/s]4w10s eval:  84%|████████▍ | 84/100 [00:04<00:00, 20.49it/s]4w10s eval:  87%|████████▋ | 87/100 [00:04<00:00, 20.54it/s]4w10s eval:  90%|█████████ | 90/100 [00:04<00:00, 20.56it/s]4w10s eval:  93%|█████████▎| 93/100 [00:04<00:00, 20.55it/s]4w10s eval:  96%|█████████▌| 96/100 [00:04<00:00, 20.57it/s]4w10s eval:  99%|█████████▉| 99/100 [00:04<00:00, 20.51it/s]4w10s eval: 100%|██████████| 100/100 [00:04<00:00, 20.19it/s]
+
+  4-way 10-shot: Acc = 47.75% +/- 2.18% (conf: 83.44%)
+
+--- OSR FEATURE_MAHALANOBIS calibration (calib data) ---
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-38.71, -2.42] mean=-5.25
+Unknown scores: [-41.43, -2.50] mean=-6.59
+Mean separation: 1.34 (positive = known higher = good)
+
+Threshold (tau): -8.5243
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.21%
+
+--- OSR FEATURE_MAHALANOBIS evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   11.46%
+  OSR Score (mean):         53.23%
+
+--- OSR RECIPROCAL calibration (calib data) ---
+
+======================================================================
+OSR Calibration (RECIPROCAL)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-2.69, 6.89] mean=3.60
+Unknown scores: [-2.91, 6.89] mean=2.51
+Mean separation: 1.09 (positive = known higher = good)
+
+Threshold (tau): -0.0890
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 13.89%
+
+--- OSR RECIPROCAL evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (RECIPROCAL)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   9.19%
+  OSR Score (mean):         52.10%
+
+--- OSR Z_CONSISTENCY calibration (calib data) ---
+
+======================================================================
+OSR Calibration (Z_CONSISTENCY)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-1.14, -0.77] mean=-0.84
+Unknown scores: [-1.16, -0.77] mean=-0.84
+Mean separation: -0.00 (positive = known higher = good)
+
+Threshold (tau): -0.8719
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 1.76%
+
+--- OSR Z_CONSISTENCY evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (Z_CONSISTENCY)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   2.14%
+  OSR Score (mean):         48.57%
+
+--- OSR Z_GAP calibration (calib data) ---
+
+======================================================================
+OSR Calibration (Z_GAP)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-1.00, -0.88] mean=-0.98
+Unknown scores: [-1.00, -0.88] mean=-0.98
+Mean separation: -0.00 (positive = known higher = good)
+
+Threshold (tau): -0.9990
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 4.39%
+
+--- OSR Z_GAP evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (Z_GAP)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   5.28%
+  OSR Score (mean):         50.14%
+
+--- OSR Z_MAHAL_FUSION calibration (calib data) ---
+
+======================================================================
+OSR Calibration (Z_MAHAL_FUSION)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+  Z-Mahal fusion alpha: 0.65 (Youden J=0.915)
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-10.80, 2.29] mean=0.00
+Unknown scores: [-7.98, 1.82] mean=0.00
+Mean separation: 0.00 (positive = known higher = good)
+
+Threshold (tau): -1.1541
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 3.51%
+
+--- OSR Z_MAHAL_FUSION evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (Z_MAHAL_FUSION)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   4.30%
+  OSR Score (mean):         49.65%
+
+--- OSR FLOW_HYBRID calibration (calib data) ---
+
+======================================================================
+OSR Calibration (FLOW_HYBRID)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing latent space statistics...
+Computing flow + mahalanobis normalization stats...
+  Flow scores:   mu=-42.034 std=3.201
+  Mahal scores:  mu=-3.301 std=1.345
+  Fusion weight: alpha=0.10 (Youden J=0.061)
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.46, 1.31] mean=0.00
+Unknown scores: [-4.25, 1.24] mean=-0.07
+Mean separation: 0.07 (positive = known higher = good)
+
+Threshold (tau): -1.2166
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 6.96%
+
+--- OSR FLOW_HYBRID evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (FLOW_HYBRID)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   4.59%
+  OSR Score (mean):         49.79%
+
+--- OSR FLOW_ENERGY calibration (calib data) ---
+
+======================================================================
+OSR Calibration (FLOW_ENERGY)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-56.35, -34.64] mean=-42.03
+Unknown scores: [-56.63, -35.20] mean=-41.13
+Mean separation: -0.90 (positive = known higher = good)
+
+Threshold (tau): -47.2566
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 1.67%
+
+--- OSR FLOW_ENERGY evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (FLOW_ENERGY)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   2.85%
+  OSR Score (mean):         48.93%
+
+--- OSR OOD_HEAD calibration (calib data) ---
+
+======================================================================
+OSR Calibration (OOD_HEAD)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [0.16, 0.83] mean=0.63
+Unknown scores: [0.15, 0.83] mean=0.54
+Mean separation: 0.09 (positive = known higher = good)
+
+Threshold (tau): 0.3027
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 14.15%
+
+--- OSR OOD_HEAD evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (OOD_HEAD)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   9.78%
+  OSR Score (mean):         52.39%
+
+======================================================================
+OSR Method Comparison (test data, per-round recalibration)
+======================================================================
+  Method                    TNR      TPR      OSR
+  feature_mahalanobis   95.00%  11.46%  53.23%
+  reciprocal            95.00%   9.19%  52.10%
+  z_consistency         95.00%   2.14%  48.57%
+  z_gap                 95.00%   5.28%  50.14%
+  z_mahal_fusion        95.00%   4.30%  49.65%
+  flow_hybrid           95.00%   4.59%  49.79%
+  flow_energy           95.00%   2.85%  48.93%
+  ood_head              95.00%   9.78%  52.39%
+
+Final model saved: experiment/yamnet_fewshot_osr17/fewshot_final.pth
+
+======================================================================
+Pipeline complete!
+======================================================================
+
+Generating analysis plots from: TAU22_yamnet_osr7.log
+Output directory: experiment/yamnet_fewshot_osr17
+
+
+All plots saved to: experiment/yamnet_fewshot_osr17/
