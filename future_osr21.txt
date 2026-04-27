@@ -1,0 +1,159 @@
+OSR21 实验计划: Flow辅助增强FOAC-AIFP的OSR能力
+============================================
+
+════════════════════════════════════════════════════════════════════
+〇、Baseline记录 (历史最优 + FOAC-AIFP基线)
+════════════════════════════════════════════════════════════════════
+
+  ── osr18a (历史最优模型, FewShotFlowACModel) ──
+    训练配置: FewShotFlowACModel (方案A+C, density模式)
+    Flow架构: ConditionalINN(input=32, condition=0, 3 coupling layers, hidden=[32,32])
+    闭集ACC: 68.89%
+    最优OSR: anti_prototype 17.62%
+    其他: feature_mahalanobis ~13%, geo_fusion ~14%, ood_head 10.48%
+    结论: Flow仅用于分类增强, 不用于OSR
+
+  ── osr18b/c (Flow OSR loss调参) ──
+    osr18b: 强反归一化力 3.2:1 → ACC 57.60%, anti_proto 17.20%
+    osr18c: 温和反归一化力 0.5:1 → ACC 64.44%, anti_proto 17.16%
+    统一结论: Flow OSR loss调整对flow OSR无效, 反而伤害分类
+
+  ── osr19a (Flow z空间教师/辅助, 全部失败) ──
+    闭集ACC: 65.82%
+    最优OSR: anti_prototype 17.69%
+    根因: Flow z空间与特征空间同构, Flow密度与特征统计量冗余
+    关键教训: Flow对OSR贡献为零, 改进应从特征空间方向寻找
+
+  ── osr20a (纯特征空间优化) ──
+    模型: EpisodicFlowClassifier (无Flow, 纯prototypical distance)
+    闭集Val ACC: 70.07%
+    anti_proto: 18.92%, per_class: 21.21%
+    ✅ Per-class自适应阈值: +2.29%
+    ✅ OOD head扩展(5→11维): +7.32%
+    ❌ 原型正则化/方差归一化/余弦距离/10-shot: 均无效
+
+  ── osr20b (Ensemble融合, ★历史最优) ──
+    使用osr20a同一模型 (Val ACC 70.07%)
+    ★ ensemble_anti_oodext: TPR=22.91%, TNR=95.00%, OSR=58.95%
+    融合: 60% anti_proto + 40% ood_head_extended
+    结论: anti_proto(几何信号) + ood_head_ext(统计信号) 互补有效
+    总提升: 17.62% → 22.91% (+5.29% TPR, +30%相对提升)
+
+  ── FOAC-AIFP tau22_v2 (当前FOAC基线, ResNet18+CIAM/PAM/NPM) ──
+    model_TAU22_max_acc.pth:    ACC=66.70%  TNR=96.67%  TPR=13.58%  OSR=55.13%
+    model_TAU22_max_auroc.pth:  ACC=66.10%  TNR=96.67%  TPR=13.12%  OSR=54.89%
+    model_TAU22_max_fscore.pth: ACC=66.27%  TNR=96.67%  TPR=14.03%  OSR=55.35%
+    OSR方法: 仅anti_prototype (无ensemble, 无ood_head_extended)
+    差距: vs osr20b = -9.33% TPR
+
+  ── FOAC-AIFP save_tau22 (原始Baseline, 改造前) ──
+    ACC=64.93%  TNR=96.67%  TPR=6.77%  OSR=51.72%  (所有checkpoint相同)
+
+
+════════════════════════════════════════════════════════════════════
+一、osr21实验设计思路
+════════════════════════════════════════════════════════════════════
+
+  核心策略: 将osr20b的评估方法移植到FOAC-AIFP, 再用Flow原理增强训练
+
+  过去Flow失败原因分析:
+    ❌ osr18/19: Flow密度估计用于OSR评分 → 完全无效
+       根因: Flow的平滑双射使z空间与特征空间同构, 无额外判别信息
+       根因: 无条件Flow(condition_dim=0)无法区分类别
+       根因: "完美的密度估计器 = 最差的异常检测器"
+
+  osr21 Flow新思路:
+    ✅ Flow不用于评分, 用于训练数据增强
+    ✅ 使用ConditionalINN的采样能力(condition→z→x)
+    ✅ 以PAM原型为条件(condition_dim=512), 使Flow首次类感知
+    ✅ 生成"接近原型但非真实样本"的合成特征作为训练时额外未知类
+    ✅ 测试时仍用ensemble评分(osr21a建立)
+
+
+════════════════════════════════════════════════════════════════════
+二、osr21a: 移植ensemble评分到FOAC-AIFP (无Flow, 建立基线)
+════════════════════════════════════════════════════════════════════
+
+  目标: TPR 22-24% (先消除评估差距)
+
+  修改:
+    1. util.py: 添加ood_head_extended (11维统计特征+LogisticRegression) ✅
+    2. util.py: 添加ensemble_anti_oodext融合 (alpha搜索) ✅
+    3. Network.py: _osr_features扩展, 缓存softmax分数 ✅
+    4. trainer.py: compute_feats改为ensemble流程+per-round recalibration ✅
+    5. C2_Net_train.py: 训练OSR指标更新为ensemble ✅
+
+  osr21a 状态: 代码修改完成, 待训练验证
+
+
+════════════════════════════════════════════════════════════════════
+三、osr21b: Flow合成未知类增强训练
+════════════════════════════════════════════════════════════════════
+
+  目标: TPR 25-28% (在osr21a基础上)
+
+  Flow原理: ConditionalINN(condition=PAM原型) 采样合成特征
+    - Warmup: 训练Flow MLE loss log_prob(support_feat | proto_c)
+    - 增强: 采样 z~N(0,σ²I) (σ>1), x_synth=flow.inverse(z, proto_c)
+    - 集成: 合成特征加入cross_entropy的(N+1)类
+
+  关键区别:
+    ✅ Flow仅用于训练数据生成, 不用于测试评分
+    ✅ condition_dim=512 (PAM原型), 首次类感知Flow
+    vs osr18/19: condition_dim=0, Flow密度用于评分 → 失败
+
+
+════════════════════════════════════════════════════════════════════
+四、osr21c: Flow增强NPM假中心生成
+════════════════════════════════════════════════════════════════════
+
+  目标: TPR 27-30% (在osr21b基础上)
+
+  Flow原理: NPM当前生成单一假中心(确定性)
+    → Flow采样K个多样化假中心
+    → 对比push loss: 推开support特征远离假中心
+    → 多中心评分增强开集边界
+
+
+════════════════════════════════════════════════════════════════════
+五、osr21d (备选): 梯度扰动合成未知类 (无Flow)
+════════════════════════════════════════════════════════════════════
+
+  如果ConditionalINN在512维上训练不稳定:
+    - 原型间方向扰动: proto_c + α*(proto_a-proto_b)/||...|| + β*N(0,I)
+    - 对抗扰动: 梯度上升最大化分类不确定性
+    - 课程学习: 简单→困难
+
+
+════════════════════════════════════════════════════════════════════
+六、不做的事
+════════════════════════════════════════════════════════════════════
+
+    Flow相关 (osr18/19已穷尽):
+    ✗ Flow密度/能量/z空间用于OSR评分
+    ✗ 无条件Flow (condition_dim=0已证明无效)
+    ✗ Flow作为教师/辅助评分器
+
+    评估改进已证伪 (osr20a/b):
+    ✗ 原型正则化 (K_shot≥50时完全无效)
+    ✗ 方差归一化/余弦距离 (均不如L2)
+    ✗ per-class阈值用于概率型方法/ensemble
+    ✗ 减少K_shot (10-shot比50-shot差)
+
+
+════════════════════════════════════════════════════════════════════
+七、执行顺序
+════════════════════════════════════════════════════════════════════
+
+  osr21a (必须先做, 无Flow, 建立ensemble基线)
+      ├── osr21b (Flow训练增强) ──→ osr21c (Flow+NPM)
+      └── osr21d (备选, 梯度扰动)
+
+
+════════════════════════════════════════════════════════════════════
+八、实验结果 (待填写)
+════════════════════════════════════════════════════════════════════
+
+  (osr21a 结果待填写)
+  (osr21b 结果待填写)
+  (osr21c 结果待填写)
