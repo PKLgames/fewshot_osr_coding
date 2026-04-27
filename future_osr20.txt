@@ -1,0 +1,173 @@
+OSR20 实验总结: 纯特征空间OSR深度优化
+============================================
+
+════════════════════════════════════════════════════════════════════
+〇、Baseline记录 (历史最优)
+════════════════════════════════════════════════════════════════════
+
+  ── osr18a (历史最优模型, FewShotFlowACModel) ──
+    训练配置: FewShotFlowACModel (方案A+C, density模式)
+    Flow架构: ConditionalINN(input=32, condition=0, 3 coupling layers, hidden=[32,32])
+    闭集ACC: 68.89%
+    最优OSR: anti_prototype 17.62%
+    其他: feature_mahalanobis ~13%, geo_fusion ~14%, ood_head 10.48%
+    结论: Flow仅用于分类增强, 不用于OSR
+
+  ── osr18b/c (Flow OSR loss调参) ──
+    osr18b: 强反归一化力 3.2:1 → ACC 57.60%, anti_proto 17.20%
+    osr18c: 温和反归一化力 0.5:1 → ACC 64.44%, anti_proto 17.16%
+    统一结论: Flow OSR loss调整对flow OSR无效, 反而伤害分类
+
+  ── osr19a (Flow z空间教师/辅助, 全部失败) ──
+    闭集ACC: 65.82%
+    最优OSR: anti_prototype 17.69%
+    根因: Flow z空间与特征空间同构, Flow密度与特征统计量冗余
+    关键教训: Flow对OSR贡献为零, 改进应从特征空间方向寻找
+
+
+════════════════════════════════════════════════════════════════════
+一、osr20a 实验结果 (已完成)
+════════════════════════════════════════════════════════════════════
+
+  ── 训练配置 ──
+    模型: EpisodicFlowClassifier (无Flow, 纯prototypical distance)
+    从osr19a checkpoint加载失败 (架构不同) → 从头训练
+    闭集Val ACC: 70.07% (osr19a: 65.82%, osr18a: 68.89%)
+
+    Few-shot分类:
+      Base:  5w1s=61.49%, 5w5s=72.75%, 5w10s=73.40%
+      Novel: 4w1s=41.70%, 4w5s=45.80%, 4w10s=46.80%
+
+  ── osr20a 关键发现 ──
+    ✅ Per-class自适应阈值: anti_proto 18.92%→21.21% (+2.29%)
+    ✅ OOD head扩展(5→11维): ood_head 9.01%→ood_head_ext 16.33% (+7.32%)
+    ❌ 原型正则化: 无效 (K_shot=50时原型已稳定)
+    ❌ 方差归一化/余弦距离: 均不如L2
+    ❌ 10-shot: 反而下降 (原型质量降低)
+
+    osr20a最优: anti_prototype_per_class_rectified TPR=21.24%
+
+
+════════════════════════════════════════════════════════════════════
+二、osr20b 实验结果 (已完成 — 达标)
+════════════════════════════════════════════════════════════════════
+
+  使用osr20a同一模型 (Val ACC 70.07%)
+
+  ── OSR方法完整对比 (TNR≈95%, 10 rounds) ──
+    ┌──────────────────────────────────────┬──────────┬──────────┬──────────┐
+    │ 方法                                 │ TNR(%)   │ TPR(%)   │ OSR(%)   │
+    ├──────────────────────────────────────┼──────────┼──────────┼──────────┤
+    │ feature_mahalanobis                  │ 95.00    │ 12.54    │ 53.77    │
+    │ anti_prototype                       │ 95.00    │ 18.92    │ 56.96    │
+    │ geo_fusion                           │ 95.00    │ 14.06    │ 54.53    │
+    │ ood_head                             │ 95.00    │  9.01    │ 52.00    │
+    │ ood_head_extended                    │ 95.00    │ 16.33    │ 55.67    │
+    │ anti_prototype_per_class             │ 94.76    │ 21.21    │ 57.99    │
+    │ ood_head_extended_per_class          │ 95.68    │ 12.27    │ 53.97    │
+    │ ★ ensemble_anti_oodext               │ 95.00    │ 22.91    │ 58.95    │
+    │   ensemble_anti_oodext_per_class     │ 95.07    │ 20.68    │ 57.88    │
+    └──────────────────────────────────────┴──────────┴──────────┴──────────┘
+    ★ = 最优方法 (历史最佳)
+
+  ── 各方向结果分析 ──
+
+    ✅ 方向1: Ensemble anti_proto + ood_head_extended — 成功, 突破22%!
+       anti_prototype: 18.92% → ensemble_anti_oodext: 22.91% (+3.99%)
+       anti_prototype_per_class: 21.21% → ensemble_anti_oodext: 22.91% (+1.70%)
+       融合权重: alpha=0.60 (60% anti_proto + 40% ood_head_extended)
+       TNR完美保持95.00% (无需per-class即可保持)
+       Youden J: 0.190 (calib 0.154 → test 0.190, 泛化良好)
+       结论: anti_prototype和ood_head_extended提供真正互补的OSR信号
+             anti_proto捕获几何结构, ood_head_ext捕获统计特征, 融合有效
+
+    ❌ 方向2: ood_head_extended per-class — 失败
+       ood_head_extended: 16.33% → per_class: 12.27% (-4.06%)
+       TNR反而升高到95.68% → per-class阈值过于保守
+       原因: ood_head_extended输出是概率值, 分布与anti_proto不同
+             per-class阈值按最近类分组, 但概率分布不适合这种分治策略
+       结论: per-class阈值只适用于距离型方法 (anti_proto), 不适用概率型方法
+
+    ❌ 方向3: ensemble + per-class — 反而下降
+       ensemble: 22.91% → ensemble_per_class: 20.68% (-2.23%)
+       原因: ensemble的归一化已隐式处理了类间差异, per-class额外分治引入噪声
+       结论: 集成与per-class阈值不兼容, 集成方法应使用全局阈值
+
+  ── osr20b 关键发现 ──
+    1. anti_prototype和ood_head_extended的信号确实互补
+       → anti_proto: 基于几何距离的判别 (原型反射)
+       → ood_head_ext: 基于统计特征的判别 (11维特征, logistic regression)
+       → 融合后互补, 而非冗余
+    2. 融合权重alpha=0.60, 非极端值, 说明两个信号都有贡献
+    3. 全局阈值在集成方法上优于per-class阈值
+
+
+════════════════════════════════════════════════════════════════════
+三、最终结论
+════════════════════════════════════════════════════════════════════
+
+  ══════════════════════════════════════════
+  ★ 最优方案: ensemble_anti_oodext
+    TPR: 22.91%  TNR: 95.00%  OSR: 58.95%
+  ══════════════════════════════════════════
+
+  进化历程 (anti_prototype TPR):
+    osr18a: 17.62% (baseline, 含Flow)
+    osr19a: 17.69% (Flow辅助全部失败)
+    osr20a: 18.92% (无Flow, 从头训练, 分类更好)
+           21.21% (per-class阈值)
+    osr20b: 22.91% (ensemble, ★最终方案)
+
+  总提升: 17.62% → 22.91% (+5.29% TPR, +30%相对提升)
+
+  目标达成:
+    ✅ 最低目标 20%+: 21.24% (osr20a已达成)
+    ✅ 理想目标 22%+: 22.91% (osr20b达成)
+
+  有效改进 (按贡献排序):
+    1. ensemble融合 (+3.99%, 从anti_proto到ensemble) — 最大贡献
+    2. per-class阈值 (+2.29%, 对anti_proto单独) — osr20a最大贡献
+    3. ood_head特征扩展 (+7.32%, ood_head维度扩展) — 集成的基础
+    4. 去除Flow训练 (+1.2%, 分类ACC提升带来更好的特征空间)
+
+
+════════════════════════════════════════════════════════════════════
+四、不做的事 (完整排除列表)
+════════════════════════════════════════════════════════════════════
+
+    Flow相关 (osr18/19已穷尽):
+    ✗ Flow z空间/密度/边界/几何作为OSR判别器
+    ✗ Flow作为教师/辅助评分器
+    ✗ 修改Flow架构/深度/宽度/loss
+
+    评估改进已证伪 (osr20a/b):
+    ✗ 原型正则化 (K_shot≥50时完全无效)
+    ✗ 方差归一化距离 (比L2差)
+    ✗ 余弦距离anti-prototype (比L2差很多)
+    ✗ 减少K_shot (10-shot比50-shot差)
+    ✗ per-class阈值应用于概率型方法 (ood_head_ext反而下降)
+    ✗ per-class + ensemble组合 (集成已隐式处理类间差异)
+    ✗ geo_fusion per-class (反而更差)
+
+    训练改进 (目标已达成, 不再需要):
+    ✗ Anti-prototype Margin Loss
+    ✗ 增强SupCon + 类间距离
+
+
+════════════════════════════════════════════════════════════════════
+五、后续可选方向 (如果需要进一步推进 22.91%→25%+)
+════════════════════════════════════════════════════════════════════
+
+  当前22.91%已达标, 以下为可选的进一步优化方向:
+
+  方向1: 集成中加入第三种信号 (如果存在有效独立信号)
+    当前ensemble = 60% anti_proto + 40% ood_head_ext
+    如果feature_mahalanobis或其他方法提供第三种独立信号, 可进一步融合
+
+  方向2: 训练阶段改进 (margin loss, SupCon增强)
+    可能提升特征空间判别力, 间接提升所有OSR方法
+    需要重新训练, 风险中
+
+  方向3: 更复杂的集成架构
+    当前是简单线性加权, 可尝试logistic regression或小型神经网络
+    风险: 过拟合
