@@ -1348,10 +1348,13 @@ class EpisodicFlowClassifier(nn.Module):
         )
         self.temperature = nn.Parameter(torch.tensor(10.0))
 
-        # Binary OOD detection head: operates on feature-space statistics
-        # Input: [min_dist, dist_ratio, softmax_max, entropy, feat_norm] = 5 features
+        # Binary OOD detection head: operates on feature-space + flow-auxiliary statistics
+        # osr19b: 10 features (5 original + 5 flow-auxiliary)
+        # Original: [min_dist, dist_ratio, softmax_max, entropy, feat_norm]
+        # Flow auxiliary: [flow_log_prob, flow_best_class_logp, z_norm,
+        #                  proto_score_variance, flow_density_gap]
         self.ood_head = nn.Sequential(
-            nn.Linear(5, 32), nn.ReLU(), nn.Dropout(0.3),
+            nn.Linear(10, 32), nn.ReLU(), nn.Dropout(0.3),
             nn.Linear(32, 16), nn.ReLU(),
             nn.Linear(16, 1),  # logit for known(1) / unknown(0)
         )
@@ -1728,6 +1731,80 @@ class EpisodicFlowClassifier(nn.Module):
         dist_proto = torch.cdist(features, prototypes, p=2).min(dim=1).values
         dist_anti = torch.cdist(features, anti_protos, p=2).min(dim=1).values
         return -dist_proto + dist_anti  # known high, unknown low
+
+    def score_anti_prototype_enhanced(self, features: torch.Tensor,
+                                       prototypes: torch.Tensor,
+                                       class_cov_inv: Dict[int, torch.Tensor] = None,
+                                       class_means: Dict[int, torch.Tensor] = None) -> torch.Tensor:
+        """osr19a: Flow-guided anti-prototype with z-space covariance weighting.
+
+        Improvements over base anti_prototype:
+          1. Uses per-class covariance from z-space (Flow teacher signal) for
+             Mahalanobis-weighted distance instead of plain L2.
+          2. Confidence-weighted center for more stable anti-prototype computation.
+          3. Adaptive margin normalization.
+
+        Args:
+            features: (B, D) query features
+            prototypes: (N, D) class prototypes
+            class_cov_inv: dict mapping class_idx -> (D, D) inverse covariance in z-space
+            class_means: dict mapping class_idx -> (D,) class mean in z-space
+        Returns:
+            scores: (B,) higher = more likely known
+        """
+        # Confidence-weighted center: use feature norms as proxy for confidence
+        feat_norms = (features ** 2).sum(dim=1, keepdim=True).sqrt()  # (B, 1)
+        total_norm = feat_norms.sum() + 1e-8
+        weights = feat_norms / total_norm  # (B, 1) normalized confidence
+        feat_center = (features * weights).sum(dim=0, keepdim=True)  # (1, D)
+
+        if class_cov_inv is not None and len(class_cov_inv) > 0:
+            # Flow teacher: use z-space covariance for Mahalanobis distance
+            N = prototypes.size(0)
+            D = features.size(1)
+
+            # Compute Mahalanobis distance to each prototype
+            mahal_dists = torch.zeros(features.size(0), N, device=features.device)
+            for c in range(N):
+                diff = features - prototypes[c].unsqueeze(0)  # (B, D)
+                if c in class_cov_inv:
+                    cov_inv = class_cov_inv[c]
+                    # If cov is smaller dim (z-space), project to feature space
+                    if cov_inv.size(0) < D:
+                        # Use diagonal approximation: scale each dim by inverse variance
+                        var = torch.diag(cov_inv)[:D] if cov_inv.size(0) >= D else torch.ones(D, device=features.device)
+                        mahal_dists[:, c] = (diff ** 2 * var.unsqueeze(0)).sum(dim=1).sqrt()
+                    else:
+                        mahal_dists[:, c] = torch.sum(
+                            (diff @ cov_inv) * diff, dim=1).sqrt()
+                else:
+                    mahal_dists[:, c] = (diff ** 2).sum(dim=1).sqrt()
+
+            # Anti-prototype in Mahalanobis space
+            anti_protos = 2 * feat_center - prototypes  # (N, D)
+            mahal_anti_dists = torch.zeros(features.size(0), N, device=features.device)
+            for c in range(N):
+                diff = features - anti_protos[c].unsqueeze(0)
+                if c in class_cov_inv:
+                    cov_inv = class_cov_inv[c]
+                    if cov_inv.size(0) < D:
+                        var = torch.diag(cov_inv)[:D] if cov_inv.size(0) >= D else torch.ones(D, device=features.device)
+                        mahal_anti_dists[:, c] = (diff ** 2 * var.unsqueeze(0)).sum(dim=1).sqrt()
+                    else:
+                        mahal_anti_dists[:, c] = torch.sum(
+                            (diff @ cov_inv) * diff, dim=1).sqrt()
+                else:
+                    mahal_anti_dists[:, c] = (diff ** 2).sum(dim=1).sqrt()
+
+            min_proto_dist = mahal_dists.min(dim=1).values
+            min_anti_dist = mahal_anti_dists.min(dim=1).values
+            return -min_proto_dist + min_anti_dist
+        else:
+            # Fallback: standard anti-prototype with confidence-weighted center
+            anti_protos = 2 * feat_center - prototypes
+            dist_proto = torch.cdist(features, prototypes, p=2).min(dim=1).values
+            dist_anti = torch.cdist(features, anti_protos, p=2).min(dim=1).values
+            return -dist_proto + dist_anti
 
 
 class LearnableOSRThreshold(nn.Module):
@@ -2529,23 +2606,58 @@ class EpisodicTrainer:
         # Uses feature-space distances and classification confidence, NOT z-space
         if scale_cls > 0:
             def _compute_ood_features_feat(feat_batch, proto_batch, log_probs_batch):
-                """Extract 5-dim OOD feature vector from feature-space stats.
+                """osr19b: Extract 10-dim OOD feature vector with flow-auxiliary stats.
+                Original 5:
                 1. proto_dist_min: min L2 distance to any prototype
                 2. proto_dist_ratio: min_dist / second_min_dist (relative clarity)
                 3. softmax_max: max classification confidence
                 4. logit_entropy: prediction entropy
                 5. feature_norm: L2 norm of the feature vector
+                Flow-auxiliary 5:
+                6. flow_log_prob: flow density (global)
+                7. flow_best_class_logp: best class conditional density
+                8. z_norm: z vector norm
+                9. proto_score_variance: variance of prototype distances
+                10. flow_density_gap: flow_log_prob - flow_best_class_logp
                 """
                 dists = torch.cdist(feat_batch, proto_batch, p=2)  # (B, N)
                 sorted_d, _ = dists.sort(dim=1)
                 min_d = sorted_d[:, 0:1]
                 second_d = sorted_d[:, 1:2]
                 dist_ratio = min_d / (second_d + 1e-6)
+                proto_score_variance = dists.var(dim=1, keepdim=True)
                 probs = F.softmax(log_probs_batch, dim=1)
                 softmax_max = probs.max(dim=1, keepdim=True)[0]
                 entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1, keepdim=True)
                 feat_norm = (feat_batch ** 2).sum(dim=1, keepdim=True).sqrt()
-                return torch.cat([min_d, dist_ratio, softmax_max, entropy, feat_norm], dim=1)
+
+                # Flow-auxiliary features
+                B = feat_batch.size(0)
+                flow_log_prob = torch.zeros(B, 1, device=feat_batch.device)
+                flow_best_logp = torch.zeros(B, 1, device=feat_batch.device)
+                z_norm_feat = torch.zeros(B, 1, device=feat_batch.device)
+
+                if self.flow_classifier.use_flow:
+                    try:
+                        flow_lp = self.flow_classifier.forward(feat_batch, proto_batch)  # (B, N)
+                        best_lp, _ = flow_lp.max(dim=1, keepdim=True)
+                        total_lp = torch.logsumexp(flow_lp, dim=1, keepdim=True)
+                        flow_log_prob = total_lp
+                        flow_best_logp = best_lp
+                        z_all = self.flow_classifier.forward_to_latent(feat_batch, proto_batch)
+                        best_c = flow_lp.argmax(dim=1)
+                        z_best = z_all[torch.arange(B, device=feat_batch.device), best_c]
+                        z_norm_feat = (z_best ** 2).sum(dim=1, keepdim=True).sqrt()
+                    except Exception:
+                        pass
+
+                flow_density_gap = flow_log_prob - flow_best_logp
+
+                return torch.cat([
+                    min_d, dist_ratio, softmax_max, entropy, feat_norm,
+                    flow_log_prob, flow_best_logp, z_norm_feat,
+                    proto_score_variance, flow_density_gap
+                ], dim=1)
 
             # Known samples: target = 1
             known_feats = _compute_ood_features_feat(query_feats, prototypes, log_probs)
@@ -3010,6 +3122,308 @@ class OSRCalibrator:
 
         return torch.cat(all_feats, dim=0)
 
+    # ---- osr19b: Enhanced 10-dim OOD feature extraction ----
+
+    def extract_ood_features_enhanced(self, features: torch.Tensor,
+                                       prototypes: torch.Tensor,
+                                       batch_size: int = 4096) -> torch.Tensor:
+        """
+        osr19b: Extract 10-dim OOD feature vector with Flow-auxiliary features.
+
+        Original 5 dims:
+          [0] proto_dist_min   - min L2 distance to any prototype
+          [1] proto_dist_ratio - min_dist / second_min_dist
+          [2] softmax_max      - max classification confidence
+          [3] logit_entropy    - prediction entropy
+          [4] feature_norm     - L2 norm of feature vector
+
+        Flow-auxiliary 5 dims:
+          [5] flow_log_prob         - flow density estimation (global density)
+          [6] flow_best_class_logp  - best matching class conditional density
+          [7] z_norm                - z vector L2 norm (OOD may deviate from N(0,I))
+          [8] proto_score_variance  - variance of distances to all prototypes
+          [9] flow_density_gap      - flow_log_prob - flow_best_class_logp
+        """
+        self.flow.eval()
+        all_feats = []
+
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                B = batch.size(0)
+
+                # --- Original 5-dim features ---
+                dists = torch.cdist(batch, prototypes, p=2)  # (B, N)
+                sorted_d, _ = dists.sort(dim=1)
+                min_d = sorted_d[:, 0:1]
+                second_d = sorted_d[:, 1:2]
+                dist_ratio = min_d / (second_d + 1e-6)
+                proto_score_variance = dists.var(dim=1, keepdim=True)  # (B, 1)
+
+                log_probs_cls = self.flow.classify(batch, prototypes)
+                probs = F.softmax(log_probs_cls, dim=1)
+                softmax_max = probs.max(dim=1, keepdim=True)[0]
+                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1, keepdim=True)
+                feat_norm = (batch ** 2).sum(dim=1, keepdim=True).sqrt()
+
+                # --- Flow-auxiliary 5 dims ---
+                flow_log_prob = torch.zeros(B, 1, device=self.device)
+                flow_best_logp = torch.zeros(B, 1, device=self.device)
+                z_norm_feat = torch.zeros(B, 1, device=self.device)
+
+                if self.flow.use_flow:
+                    try:
+                        flow_lp = self.flow(batch, prototypes)  # (B, N)
+                        best_lp, _ = flow_lp.max(dim=1, keepdim=True)  # (B, 1)
+                        total_lp = torch.logsumexp(flow_lp, dim=1, keepdim=True)  # (B, 1)
+                        flow_log_prob = total_lp
+                        flow_best_logp = best_lp
+
+                        # z-space norm
+                        z_all = self.flow.forward_to_latent(batch, prototypes)  # (B, N, D)
+                        best_c = flow_lp.argmax(dim=1)
+                        z_best = z_all[torch.arange(B, device=self.device), best_c]
+                        z_norm_feat = (z_best ** 2).sum(dim=1, keepdim=True).sqrt()
+                    except Exception:
+                        pass  # Flow not available, keep zeros
+
+                flow_density_gap = flow_log_prob - flow_best_logp  # (B, 1)
+
+                feats = torch.cat([
+                    min_d, dist_ratio, softmax_max, entropy, feat_norm,      # original 5
+                    flow_log_prob, flow_best_logp, z_norm_feat,              # flow 3
+                    proto_score_variance, flow_density_gap                     # extra 2
+                ], dim=1)  # (B, 10)
+                all_feats.append(feats.cpu())
+
+        return torch.cat(all_feats, dim=0)
+
+    # ---- osr19d: Flow z-space boundary guidance ----
+
+    def compute_z_space_boundary(self, prototypes: torch.Tensor,
+                                  batch_size: int = 4096):
+        """osr19d: Compute z-space decision boundaries and safe regions.
+
+        Uses Flow z-space geometry to define:
+          - Per-class safe region radius (max distance from class center in z-space)
+          - Inter-class boundary midpoints
+          These guide feature-space threshold setting.
+        """
+        if not self.flow.use_flow:
+            self._z_boundaries = None
+            return
+
+        self.flow.eval()
+        self.z_class_centers: Dict[int, torch.Tensor] = {}
+        self.z_class_radii: Dict[int, float] = {}
+
+        for c_idx, c_id in enumerate(self.base_classes):
+            feats = self.cache.get_class_features(c_id)
+            all_z = []
+
+            with torch.no_grad():
+                for i in range(0, len(feats), batch_size):
+                    batch = feats[i:i+batch_size].to(self.device)
+                    z_all = self.flow.forward_to_latent(
+                        batch, prototypes[c_idx].unsqueeze(0))
+                    all_z.append(z_all.squeeze(1).cpu())
+
+            if all_z:
+                z_all = torch.cat(all_z, dim=0)
+                center = z_all.mean(dim=0)
+                self.z_class_centers[c_idx] = center.to(self.device)
+                # Safe radius: 95th percentile distance from center
+                dists = (z_all - center.unsqueeze(0)).norm(dim=1)
+                self.z_class_radii[c_idx] = torch.quantile(dists, 0.95).item()
+
+        self._z_boundaries = True
+        print(f"  Z-space boundaries computed: {len(self.z_class_centers)} classes")
+        for c_idx in self.z_class_centers:
+            print(f"    Class {c_idx}: radius={self.z_class_radii[c_idx]:.3f}")
+
+    def score_samples_z_boundary(self, features: torch.Tensor,
+                                  prototypes: torch.Tensor,
+                                  batch_size: int = 4096) -> torch.Tensor:
+        """osr19d: Z-space boundary consistency verification.
+
+        Maps query features to z-space, checks if they fall within any
+        known class safe region. Provides a second-opinion OOD signal.
+
+        Score: -min_distance_to_safe_region_boundary (higher = safer = known)
+        """
+        if not self.flow.use_flow or not getattr(self, '_z_boundaries', False):
+            return torch.zeros(len(features))
+
+        self.flow.eval()
+        all_scores = []
+        N = prototypes.size(0)
+
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                B = batch.size(0)
+
+                # Map to z-space using best-matching prototype
+                log_probs = self.flow(batch, prototypes)
+                best_c = log_probs.argmax(dim=1)
+
+                min_boundary_dist = torch.full((B,), float('inf'), device=self.device)
+                for c_idx in range(N):
+                    if c_idx not in self.z_class_centers:
+                        continue
+                    z_all = self.flow.forward_to_latent(
+                        batch, prototypes[c_idx].unsqueeze(0))
+                    z_c = z_all.squeeze(1)
+                    center = self.z_class_centers[c_idx]
+                    radius = self.z_class_radii[c_idx]
+                    dist_to_center = (z_c - center.unsqueeze(0)).norm(dim=1)
+                    # Distance to safe region boundary (negative = inside safe region)
+                    boundary_dist = dist_to_center - radius
+                    min_boundary_dist = torch.minimum(min_boundary_dist, boundary_dist)
+
+                # Score: closer to safe region boundary (or inside) = more known
+                all_scores.append(-min_boundary_dist.cpu())
+
+        return torch.cat(all_scores)
+
+    # ---- osr19a: Enhanced anti-prototype with Flow z-space covariance ----
+
+    def compute_z_space_covariance(self, prototypes: torch.Tensor,
+                                    batch_size: int = 4096):
+        """osr19a: Compute per-class covariance in Flow z-space.
+        Used as Flow teacher signal for anti-prototype distance weighting."""
+        if not self.flow.use_flow:
+            self._z_cov_inv = {}
+            return
+
+        self.flow.eval()
+        self._z_cov_inv: Dict[int, torch.Tensor] = {}
+
+        for c_idx, c_id in enumerate(self.base_classes):
+            feats = self.cache.get_class_features(c_id)
+            all_z = []
+
+            with torch.no_grad():
+                for i in range(0, len(feats), batch_size):
+                    batch = feats[i:i+batch_size].to(self.device)
+                    z_all = self.flow.forward_to_latent(
+                        batch, prototypes[c_idx].unsqueeze(0))
+                    all_z.append(z_all.squeeze(1).cpu())
+
+            if all_z:
+                z_all = torch.cat(all_z, dim=0)
+                D = z_all.size(1)
+                cov = torch.cov(z_all.T).to(self.device)
+                cov += 1e-3 * torch.eye(D, device=self.device)
+                self._z_cov_inv[c_idx] = torch.linalg.inv(cov)
+
+    def score_anti_prototype_enhanced(self, features: torch.Tensor,
+                                       prototypes: torch.Tensor,
+                                       batch_size: int = 4096) -> torch.Tensor:
+        """osr19a: Flow-guided anti-prototype with z-space covariance weighting.
+        Uses Flow z-space covariance as teacher signal for distance weighting."""
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                z_cov_inv = getattr(self, '_z_cov_inv', {})
+                scores = self.flow.score_anti_prototype_enhanced(
+                    batch, prototypes, class_cov_inv=z_cov_inv)
+                all_scores.append(scores.cpu())
+        return torch.cat(all_scores)
+
+    # ---- osr19c: Flow-prior multi-method ensemble ----
+
+    def score_samples_flow_ensemble(self, features: torch.Tensor,
+                                     prototypes: torch.Tensor,
+                                     batch_size: int = 4096) -> torch.Tensor:
+        """osr19c: Multi-method weighted ensemble with Flow density prior.
+
+        Combines:
+          1. anti_prototype_enhanced (osr19a, Flow-guided)
+          2. feat_mahalanobis
+          3. ood_head_enhanced (osr19b, Flow-augmented)
+          With Flow density prior as soft confidence regulator.
+        """
+        # Get individual method scores
+        anti_scores = self.score_anti_prototype_enhanced(features, prototypes, batch_size)
+        mahal_scores = self.score_samples_feat_mahalanobis(features, prototypes, batch_size)
+
+        # Z-normalize using cached stats
+        anti_mu = getattr(self, '_ens_anti_mu', anti_scores.mean().item())
+        anti_std = getattr(self, '_ens_anti_std', anti_scores.std().item())
+        mahal_mu = getattr(self, '_ens_mahal_mu', mahal_scores.mean().item())
+        mahal_std = getattr(self, '_ens_mahal_std', mahal_scores.std().item())
+
+        anti_normed = (anti_scores - anti_mu) / (anti_std + 1e-8)
+        mahal_normed = (mahal_scores - mahal_mu) / (mahal_std + 1e-8)
+
+        # Weighted combination
+        w_anti = getattr(self, '_ens_w_anti', 0.4)
+        w_mahal = getattr(self, '_ens_w_mahal', 0.3)
+        w_z_boundary = getattr(self, '_ens_w_z_boundary', 0.3)
+
+        base_score = w_anti * anti_normed + w_mahal * mahal_normed
+
+        # Add z-boundary score if available
+        if getattr(self, '_z_boundaries', False) and self.flow.use_flow:
+            z_bound_scores = self.score_samples_z_boundary(features, prototypes, batch_size)
+            z_mu = getattr(self, '_ens_z_bound_mu', z_bound_scores.mean().item())
+            z_std = getattr(self, '_ens_z_bound_std', z_bound_scores.std().item())
+            z_normed = (z_bound_scores - z_mu) / (z_std + 1e-8)
+            base_score = base_score + w_z_boundary * z_normed
+
+        # Flow density prior: regulate ensemble confidence
+        # If flow density is extremely low, boost OOD tendency
+        if self.flow.use_flow and hasattr(self, '_flow_density_tau'):
+            try:
+                flow_lp = self.flow.compute_energy(features.to(self.device), prototypes)
+                flow_lp = flow_lp.cpu()
+                # Sigmoid modulation: low density → suppress known score
+                k_regulate = getattr(self, '_flow_regulate_k', 2.0)
+                modulation = torch.sigmoid(k_regulate * (flow_lp - self._flow_density_tau))
+                base_score = base_score * modulation
+            except Exception:
+                pass
+
+        return base_score
+
+    # ---- osr19e: Flow-guided hard negative mining ----
+
+    def mine_hard_negatives_z(self, prototypes: torch.Tensor,
+                               n_negatives: int = 1000,
+                               batch_size: int = 4096) -> torch.Tensor:
+        """osr19e: Mine hard negative samples using Flow z-space density.
+
+        Selects known-class samples that are furthest from their class center
+        in z-space — these are the hardest OOD proxies for calibration.
+        """
+        if not self.flow.use_flow:
+            return torch.zeros(0)
+
+        self.flow.eval()
+        all_samples = []
+        all_dists = []
+
+        for c_idx, c_id in enumerate(self.base_classes):
+            feats = self.cache.get_class_features(c_id)
+            with torch.no_grad():
+                batch = feats.to(self.device)
+                z_all = self.flow.forward_to_latent(
+                    batch, prototypes[c_idx].unsqueeze(0)).squeeze(1)
+                center = z_all.mean(dim=0)
+                dists = (z_all - center.unsqueeze(0)).norm(dim=1)
+                all_samples.append(feats)
+                all_dists.append(dists.cpu())
+
+        all_samples = torch.cat(all_samples, dim=0)
+        all_dists = torch.cat(all_dists, dim=0)
+
+        # Select samples furthest from their class center (hardest negatives)
+        _, top_indices = all_dists.topk(min(n_negatives, len(all_dists)))
+        return all_samples[top_indices]
+
     # ---- Mahalanobis scoring (primary) ----
 
     def compute_latent_stats(self, prototypes: torch.Tensor,
@@ -3245,6 +3659,15 @@ class OSRCalibrator:
             return self.score_samples_likelihood_ratio_v2(features, prototypes, batch_size)
         if method == 'adaptive_fusion':
             return self.score_samples_adaptive_fusion(features, prototypes, batch_size)
+        # osr19 new methods
+        if method == 'anti_prototype_enhanced':
+            return self.score_anti_prototype_enhanced(features, prototypes, batch_size)
+        if method == 'ood_head_enhanced':
+            return self.score_samples_ood_head_enhanced(features, prototypes, batch_size)
+        if method == 'flow_ensemble':
+            return self.score_samples_flow_ensemble(features, prototypes, batch_size)
+        if method == 'z_boundary':
+            return self.score_samples_z_boundary(features, prototypes, batch_size)
         return self.score_samples_mahalanobis(features, prototypes, batch_size)
 
     # ---- Neural OOD head (trained during episodic meta-training) ----
@@ -3252,28 +3675,26 @@ class OSRCalibrator:
     def score_samples_ood_head(self, features: torch.Tensor,
                                 prototypes: torch.Tensor,
                                 batch_size: int = 4096) -> torch.Tensor:
-        """Score using trained neural OOD head on feature-space statistics."""
+        """Score using trained neural OOD head on feature-space + flow-auxiliary statistics.
+        osr19b: now uses 10-dim features including flow density and z-space info."""
         self.flow.eval()
         all_scores = []
         with torch.no_grad():
             for i in range(0, len(features), batch_size):
                 batch = features[i:i+batch_size].to(self.device)
-                log_probs = self.flow.classify(batch, prototypes)
-                # Feature-space OOD features (same as training)
-                dists = torch.cdist(batch, prototypes, p=2)
-                sorted_d, _ = dists.sort(dim=1)
-                min_d = sorted_d[:, 0:1]
-                second_d = sorted_d[:, 1:2]
-                dist_ratio = min_d / (second_d + 1e-6)
-                probs = F.softmax(log_probs, dim=1)
-                softmax_max = probs.max(dim=1, keepdim=True)[0]
-                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1, keepdim=True)
-                feat_norm = (batch ** 2).sum(dim=1, keepdim=True).sqrt()
-                ood_feats = torch.cat([min_d, dist_ratio, softmax_max, entropy, feat_norm], dim=1)
+                # osr19b: use enhanced 10-dim features
+                ood_feats = self.extract_ood_features_enhanced(batch, prototypes, batch_size)
+                ood_feats = ood_feats.to(self.device)
                 logits = self.flow.ood_head(ood_feats)
                 scores = torch.sigmoid(logits).squeeze(1)  # P(known)
                 all_scores.append(scores.cpu())
         return torch.cat(all_scores)
+
+    def score_samples_ood_head_enhanced(self, features: torch.Tensor,
+                                          prototypes: torch.Tensor,
+                                          batch_size: int = 4096) -> torch.Tensor:
+        """osr19b: OOD head with 10-dim enhanced features (alias for score_samples_ood_head)."""
+        return self.score_samples_ood_head(features, prototypes, batch_size)
 
     def score_samples_reciprocal(self, features: torch.Tensor,
                                   prototypes: torch.Tensor,
@@ -3660,7 +4081,9 @@ class OSRCalibrator:
             self.compute_latent_stats(prototypes)
 
         if method in ('flow_hybrid', 'feature_mahalanobis', 'feat_mahalanobis_relative',
-                       'z_mahal_fusion', 'anti_prototype', 'geo_fusion', 'adaptive_fusion'):
+                       'z_mahal_fusion', 'anti_prototype', 'geo_fusion', 'adaptive_fusion',
+                       'anti_prototype_enhanced', 'ood_head_enhanced', 'flow_ensemble',
+                       'z_boundary'):
             print("Computing feature-space statistics...")
             self.compute_feat_stats()
 
@@ -3946,6 +4369,142 @@ class OSRCalibrator:
                         best_j, best_alpha = j, alpha
                 self._adapt_alpha = best_alpha
                 print(f"  Fusion alpha: {best_alpha:.2f} (J={best_j:.3f})")
+
+        # ---- osr19: New method calibrations ----
+
+        # osr19a: Flow-guided anti_prototype — compute z-space covariance
+        if method == 'anti_prototype_enhanced':
+            print("Computing z-space covariance for Flow-guided anti-prototype...")
+            if self.flow.use_flow:
+                self.compute_z_space_covariance(prototypes)
+            else:
+                self._z_cov_inv = {}
+
+        # osr19d: z-space boundary — compute boundaries
+        if method == 'z_boundary':
+            print("Computing z-space decision boundaries...")
+            self.compute_z_space_boundary(prototypes)
+
+        # osr19c: flow_ensemble — compute all required stats + optimize weights
+        if method == 'flow_ensemble':
+            print("Computing flow_ensemble calibration stats...")
+            self.compute_feat_stats()
+            if self.flow.use_flow:
+                self.compute_z_space_covariance(prototypes)
+                self.compute_z_space_boundary(prototypes)
+                # Flow density prior: compute threshold from known density distribution
+                known_energy = []
+                for c in self.base_classes:
+                    feats = self.cache.get_class_features(c)
+                    known_energy.append(self.flow.compute_energy(
+                        feats.to(self.device), prototypes).cpu())
+                all_energy = torch.cat(known_energy)
+                self._flow_density_tau = torch.quantile(all_energy, 0.05).item()
+                self._flow_regulate_k = 2.0
+                print(f"  Flow density tau: {self._flow_density_tau:.3f}")
+            else:
+                self._z_cov_inv = {}
+                self._z_boundaries = None
+
+            # Compute normalization stats for ensemble components
+            known_anti_all, known_mahal_all, known_z_bound_all = [], [], []
+            for c in self.base_classes:
+                feats = self.cache.get_class_features(c)
+                known_anti_all.append(self.score_anti_prototype_enhanced(feats, prototypes))
+                known_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                if getattr(self, '_z_boundaries', False):
+                    known_z_bound_all.append(self.score_samples_z_boundary(feats, prototypes))
+            all_anti = torch.cat(known_anti_all)
+            all_mahal = torch.cat(known_mahal_all)
+            self._ens_anti_mu = all_anti.mean().item()
+            self._ens_anti_std = all_anti.std().item()
+            self._ens_mahal_mu = all_mahal.mean().item()
+            self._ens_mahal_std = all_mahal.std().item()
+
+            if known_z_bound_all:
+                all_z_bound = torch.cat(known_z_bound_all)
+                self._ens_z_bound_mu = all_z_bound.mean().item()
+                self._ens_z_bound_std = all_z_bound.std().item()
+
+            # Compute unknown stats for weight optimization
+            unknown_anti_all, unknown_mahal_all, unknown_z_bound_all = [], [], []
+            for c in self.unknown_classes:
+                feats = self.cache.get_class_features(c)
+                if len(feats) > 0:
+                    unknown_anti_all.append(self.score_anti_prototype_enhanced(feats, prototypes))
+                    unknown_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                    if getattr(self, '_z_boundaries', False):
+                        unknown_z_bound_all.append(self.score_samples_z_boundary(feats, prototypes))
+            has_unknown = len(unknown_anti_all) > 0
+
+            # Grid search over weight combinations
+            best_j = -1.0
+            norm_known_anti = (all_anti - self._ens_anti_mu) / (self._ens_anti_std + 1e-8)
+            norm_known_mahal = (all_mahal - self._ens_mahal_mu) / (self._ens_mahal_std + 1e-8)
+
+            if has_unknown:
+                norm_unknown_anti = (torch.cat(unknown_anti_all) - self._ens_anti_mu) / (self._ens_anti_std + 1e-8)
+                norm_unknown_mahal = (torch.cat(unknown_mahal_all) - self._ens_mahal_mu) / (self._ens_mahal_std + 1e-8)
+
+            if known_z_bound_all:
+                norm_known_z = (all_z_bound - self._ens_z_bound_mu) / (self._ens_z_bound_std + 1e-8)
+                if has_unknown and unknown_z_bound_all:
+                    norm_unknown_z = (torch.cat(unknown_z_bound_all) - self._ens_z_bound_mu) / (self._ens_z_bound_std + 1e-8)
+
+                for w_anti in [0.3, 0.4, 0.5]:
+                    for w_mahal in [0.2, 0.3]:
+                        w_z = 1.0 - w_anti - w_mahal
+                        if w_z < 0.1:
+                            continue
+                        combined_known = w_anti * norm_known_anti + w_mahal * norm_known_mahal + w_z * norm_known_z
+                        sorted_k = combined_known.sort()[0]
+                        idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                        thresh = sorted_k[idx]
+                        if has_unknown and unknown_z_bound_all:
+                            combined_unknown = w_anti * norm_unknown_anti + w_mahal * norm_unknown_mahal + w_z * norm_unknown_z
+                            # Apply flow density prior modulation
+                            if self.flow.use_flow and hasattr(self, '_flow_density_tau'):
+                                try:
+                                    unk_feats_all = torch.cat([self.cache.get_class_features(c)
+                                                                for c in self.unknown_classes
+                                                                if len(self.cache.get_class_features(c)) > 0])
+                                    flow_e = self.flow.compute_energy(unk_feats_all.to(self.device), prototypes).cpu()
+                                    mod = torch.sigmoid(2.0 * (flow_e - self._flow_density_tau))
+                                    combined_unknown = combined_unknown * mod
+                                except Exception:
+                                    pass
+                            tpr = (combined_unknown > thresh).float().mean().item()
+                        else:
+                            tpr = 0.0
+                        tnr = (combined_known >= thresh).float().mean().item()
+                        j = tnr + tpr - 1.0
+                        if j > best_j:
+                            best_j = j
+                            self._ens_w_anti = w_anti
+                            self._ens_w_mahal = w_mahal
+                            self._ens_w_z_boundary = w_z
+                print(f"  Ensemble weights: anti={self._ens_w_anti:.1f} mahal={self._ens_w_mahal:.1f} "
+                      f"z_boundary={self._ens_w_z_boundary:.1f} (J={best_j:.3f})")
+            else:
+                # 2-method fallback
+                best_alpha, best_j = 0.5, -1.0
+                for alpha in [0.3, 0.4, 0.5, 0.6, 0.7]:
+                    combined_known = alpha * norm_known_anti + (1-alpha) * norm_known_mahal
+                    sorted_k = combined_known.sort()[0]
+                    idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                    thresh = sorted_k[idx]
+                    if has_unknown:
+                        combined_unknown = alpha * norm_unknown_anti + (1-alpha) * norm_unknown_mahal
+                        tpr = (combined_unknown > thresh).float().mean().item()
+                    else:
+                        tpr = 0.0
+                    j = (combined_known >= thresh).float().mean().item() + tpr - 1.0
+                    if j > best_j:
+                        best_j, best_alpha = j, alpha
+                self._ens_w_anti = best_alpha
+                self._ens_w_mahal = 1.0 - best_alpha
+                self._ens_w_z_boundary = 0.0
+                print(f"  Ensemble weights: anti={self._ens_w_anti:.1f} mahal={self._ens_w_mahal:.1f} (J={best_j:.3f})")
 
         # Score known samples
         known_scores_list = []
@@ -4293,6 +4852,67 @@ class OSRCalibrator:
                                 self._adapt_w_mahal = w_mahal
                                 self._adapt_w_z = w_z
 
+            # osr19a: anti_prototype_enhanced per-round — recompute z-space covariance
+            if method == 'anti_prototype_enhanced':
+                if self.flow.use_flow:
+                    self.compute_z_space_covariance(prototypes)
+
+            # osr19d: z_boundary per-round — recompute boundaries
+            if method == 'z_boundary':
+                self.compute_z_space_boundary(prototypes)
+
+            # osr19c: flow_ensemble per-round — update all stats + re-optimize weights
+            if method == 'flow_ensemble':
+                self.compute_feat_stats()
+                if self.flow.use_flow:
+                    self.compute_z_space_covariance(prototypes)
+                    self.compute_z_space_boundary(prototypes)
+                    known_energy = []
+                    for c in self.base_classes:
+                        feats = self.cache.get_class_features(c)
+                        known_energy.append(self.flow.compute_energy(
+                            feats.to(self.device), prototypes).cpu())
+                    all_energy = torch.cat(known_energy)
+                    self._flow_density_tau = torch.quantile(all_energy, 0.05).item()
+                # Update normalization stats
+                known_anti_all, known_mahal_all, known_z_bound_all = [], [], []
+                for c in self.base_classes:
+                    feats = self.cache.get_class_features(c)
+                    known_anti_all.append(self.score_anti_prototype_enhanced(feats, prototypes))
+                    known_mahal_all.append(self.score_samples_feat_mahalanobis(feats, prototypes))
+                    if getattr(self, '_z_boundaries', False):
+                        known_z_bound_all.append(self.score_samples_z_boundary(feats, prototypes))
+                all_anti = torch.cat(known_anti_all)
+                all_mahal = torch.cat(known_mahal_all)
+                self._ens_anti_mu = all_anti.mean().item()
+                self._ens_anti_std = all_anti.std().item()
+                self._ens_mahal_mu = all_mahal.mean().item()
+                self._ens_mahal_std = all_mahal.std().item()
+                if known_z_bound_all:
+                    all_z_bound = torch.cat(known_z_bound_all)
+                    self._ens_z_bound_mu = all_z_bound.mean().item()
+                    self._ens_z_bound_std = all_z_bound.std().item()
+                # Quick weight re-optimization
+                norm_known_anti = (all_anti - self._ens_anti_mu) / (self._ens_anti_std + 1e-8)
+                norm_known_mahal = (all_mahal - self._ens_mahal_mu) / (self._ens_mahal_std + 1e-8)
+                best_j = -1.0
+                if known_z_bound_all:
+                    norm_known_z = (all_z_bound - self._ens_z_bound_mu) / (self._ens_z_bound_std + 1e-8)
+                    for w_anti in [0.3, 0.4, 0.5]:
+                        for w_mahal in [0.2, 0.3]:
+                            w_z = 1.0 - w_anti - w_mahal
+                            if w_z < 0.1:
+                                continue
+                            combined = w_anti * norm_known_anti + w_mahal * norm_known_mahal + w_z * norm_known_z
+                            sorted_k = combined.sort()[0]
+                            idx = min(int(len(sorted_k) * 0.05), len(sorted_k) - 1)
+                            j = (combined >= sorted_k[idx]).float().mean().item()
+                            if j > best_j:
+                                best_j = j
+                                self._ens_w_anti = w_anti
+                                self._ens_w_mahal = w_mahal
+                                self._ens_w_z_boundary = w_z
+
             # Score known samples
             known_scores_list = []
             for c in self.base_classes:
@@ -4530,7 +5150,7 @@ def main():
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr18'  # osr18: calibrated conditioning + energy-aware training
+    experiment_dir = 'experiment/yamnet_fewshot_osr19'  # osr19: feature-space OSR enhancement + Flow auxiliary
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
@@ -4727,11 +5347,13 @@ def main():
 
     # Select OSR methods based on flow availability
     if trainer.flow_classifier.use_flow:
-        # osr18: added likelihood_ratio_v2, adaptive_fusion
-        osr_methods = ['feature_mahalanobis', 'anti_prototype', 'geo_fusion',
-                       'reciprocal', 'z_consistency', 'z_reconstruction',
-                       'z_mahal_fusion', 'flow_hybrid', 'flow_energy',
-                       'likelihood_ratio_v2', 'adaptive_fusion', 'ood_head']
+        # osr19: added Flow-auxiliary methods (anti_prototype_enhanced, ood_head_enhanced,
+        #         flow_ensemble, z_boundary)
+        osr_methods = ['feature_mahalanobis', 'anti_prototype', 'anti_prototype_enhanced',
+                       'geo_fusion', 'reciprocal', 'ood_head', 'ood_head_enhanced',
+                       'z_boundary', 'flow_ensemble',
+                       'z_consistency', 'flow_hybrid', 'flow_energy',
+                       'adaptive_fusion']
     else:
         # When use_flow=False, only use feature-space methods (skip all z/flow methods)
         osr_methods = ['feature_mahalanobis', 'ood_head']

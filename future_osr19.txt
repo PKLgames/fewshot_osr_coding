@@ -1,0 +1,209 @@
+OSR19 实验计划: 特征空间OSR增强 + Flow辅助/教师
+====================================================
+
+════════════════════════════════════════════════════════════════════
+〇、实验记录
+════════════════════════════════════════════════════════════════════
+
+  ── osr18a (前一轮最优) ──
+    训练配置: FewShotFlowACModel (方案A+C, density模式)
+    Flow架构: ConditionalINN(input=32, condition=0, 3 coupling layers, hidden=[32,32])
+    闭集ACC: 68.89%
+    最优OSR: anti_prototype 17.62%
+    其他: feature_mahalanobis ~13%, geo_fusion ~14%, ood_head 10.48%
+
+  ── osr19a (本轮, 已完成) ──
+    训练配置: 同osr18a, 独立训练
+    闭集ACC: 65.82% (略低于osr18a的68.89%)
+    5w1s: 61.69%, 5w5s: 69.11%, 5w10s: 69.09%
+    Novel: 4w1s: 40.67%, 4w5s: 46.73%, 4w10s: 49.23%
+    z_norm² ≈ 34-36, z_std ≈ 0.99 (Flow训练正常)
+    Early stop: episode 4200, best at episode 3900
+
+    OSR方法对比 (TNR=95%):
+    ┌────────────────────────┬──────────┬──────────┬────────────────┐
+    │ 方法                   │ TPR(%)   │ OSR(%)   │ vs osr18a对应  │
+    ├────────────────────────┼──────────┼──────────┼────────────────┤
+    │ anti_prototype         │ 17.69    │ 56.35    │ ≈持平          │
+    │ anti_prototype_enhanced│ 12.95    │ 53.97    │ ✗ 显著下降     │
+    │ feature_mahalanobis    │ 12.54    │ 53.77    │ ≈持平          │
+    │ geo_fusion             │ 13.97    │ 54.48    │ ≈持平          │
+    │ ood_head               │  8.50    │ 51.75    │ 略降           │
+    │ ood_head_enhanced      │  8.50    │ 51.75    │ ✗ 无改善       │
+    │ z_boundary (新)        │  7.51    │ 51.25    │ ✗ 差           │
+    │ flow_ensemble (新)     │ 11.67    │ 53.34    │ 不如anti_proto │
+    │ adaptive_fusion (新)   │  5.58    │ 50.29    │ ✗ 差           │
+    │ reciprocal             │  8.83    │ 51.91    │ ≈持平          │
+    │ flow_hybrid            │  6.31    │ 50.65    │ ≈持平          │
+    │ flow_energy            │  4.71    │ 49.86    │ 略升           │
+    │ z_consistency          │  1.83    │ 48.41    │ 略降           │
+    └────────────────────────┴──────────┴──────────┴────────────────┘
+
+  osr19a 失败分析:
+    ❌ anti_prototype_enhanced (17.69→12.95):
+       - Flow z空间协方差在few-shot下不稳定
+       - 5-shot样本不够估计32×32协方差矩阵, 正则化后接近单位阵
+       - 马氏距离退化为接近欧氏距离但引入噪声
+       → 结论: z空间协方差不可用作few-shot下的距离度量权重
+
+    ❌ ood_head_enhanced (8.50→8.50, 完全无改善):
+       - flow_log_prob, flow_best_class_logp与原有特征高度冗余
+       - z_norm, proto_score_variance无判别力
+       - flow_density_gap ≈ 0 (条件密度与无条件密度几乎相同)
+       → 结论: Flow密度信息已被特征空间的norm/entropy隐式捕获
+
+    ❌ z_boundary (7.51):
+       - z空间类半径在不同round间波动大 (e.g. Class 1: 3.7-4.1)
+       - Flow双射光滑性→z空间类分布边界模糊
+       - "安全区域"定义不可靠, 大量known样本落在"安全区"外
+       → 结论: z空间几何结构不适合作为OSR边界
+
+    ❌ flow_ensemble/adaptive_fusion (11.67/5.58):
+       - 集成多个弱方法无法产生强方法
+       - z_boundary等弱方法拉低整体, 即使anti权重≥0.3
+       → 结论: 简单加权集成在本场景无效
+
+  osr19a 根因结论:
+    1. Flow z空间的几何结构(协方差/边界/安全区)对OSR判别无效
+       → Flow双射的固有光滑性使z空间与特征空间同构, 无额外判别信息
+    2. Flow密度估计与特征空间统计量高度冗余
+       → Flow不提供特征空间方法未捕获的额外信息
+    3. "Flow教师"策略在本架构下全面失败
+       → 所有以Flow为教师/辅助的改进方案均不如原始anti_prototype
+    4. anti_prototype (17.69%) 仍是天花板, 改进空间应从其他方向寻找
+
+    关键教训:
+      Flow在本项目中的价值仅限于分类增强(proto+flow centered)
+      Flow对OSR的贡献为零 (无论是独立判别还是辅助角色)
+      继续在Flow上投入OSR改进是无效的
+
+
+════════════════════════════════════════════════════════════════════
+一、修订后的实验目标
+════════════════════════════════════════════════════════════════════
+
+  总目标: 将anti_prototype TPR从 ~17-18% 提升到 22-25%
+    (放弃Flow辅助路线, 转向纯特征空间改进)
+
+  方向分析:
+    ✗ Flow辅助/教师 — 已证明无效 (osr19a全面失败)
+    ✗ 多方法集成 — 弱方法集合不产生强方法
+    ✓ 特征空间本身改进 — anti_prototype的天花板在哪?
+    ✓ 校准/阈值策略 — 是否有更好的per-class/per-round适配?
+    ✓ 训练阶段改进 — 是否需要改训练代码来提升OSR能力?
+
+  核心假设:
+    anti_prototype ~17% 的上限可能来自:
+      a) 特征空间本身的类间/类内分布 (特征表达能力上限)
+      b) few-shot下原型估计的噪声 (5-shot原型不稳定)
+      c) 阈值策略的局限性 (全局阈值 vs per-class自适应)
+
+
+════════════════════════════════════════════════════════════════════
+二、osr19b: 纯特征空间改进 (放弃Flow辅助)
+════════════════════════════════════════════════════════════════════
+
+  方向1: anti_prototype per-class自适应阈值
+    当前: 全局阈值在calibration集上固定, 所有类用同一阈值
+    问题: 不同类的anti_proto score分布不同, 全局阈值次优
+    改进:
+      - 在calibration阶段, 为每个类计算独立的阈值τ_c
+      - 每个类保持95% TNR的独立阈值
+      - 查询时: score_c = anti_proto_score(x, class_c)
+        若 score_c < τ_c → OOD (相对该类)
+      - 最终判别: max_c(score_c - τ_c) < 0 → OOD
+    预期: 每个类有更精确的边界, TPR提升2-4%
+    风险: 低, 仅改评估逻辑
+
+  方向2: 原型正则化 (Proto Rectification)
+    当前: prototype = mean(support_features)
+    问题: 5-shot下均值估计有噪声, anti_proto = 2*center - proto 放大噪声
+    改进:
+      - Bayesian prototype: proto_c = (n*mean + m*prior) / (n+m)
+        prior = 全局均值 (所有类的平均原型)
+        m = 1-2 (正则化强度)
+      - 或: proto_c = weighted_mean(support, weights=confidence)
+        用每个support样本的预测置信度加权
+    预期: 更稳定的anti_proto, TPR提升1-3%
+    风险: 低
+
+  方向3: 多尺度距离 (Multi-scale Anti-prototype)
+    当前: 单一欧氏距离
+    改进:
+      - 在多个距离尺度上计算anti_proto score:
+        d_near = dist(x, proto)  (原始)
+        d_var  = dist(x, proto) / std(class_features)  (归一化)
+        d_rank = rank_of(x_among_class)  (排序)
+      - 融合: score = w1*d_near + w2*d_var + w3*d_rank
+      - 校准集搜索最优权重
+    预期: 多视角判别, TPR提升1-2%
+    风险: 低
+
+  方向4: 校准集增强
+    当前: calibration集1800样本/类 × 10类 = 18000
+    问题: 阈值估计可能受样本量限制
+    改进:
+      - 使用数据增强扩充calibration集 (mixup, noise, time-shift)
+      - 或: 交叉验证方式多次估计阈值, 取中位数
+    预期: 更稳定的阈值, TPR提升0-2%
+    风险: 低
+
+
+════════════════════════════════════════════════════════════════════
+三、osr19c: 训练阶段改进 (如果osr19b不够)
+════════════════════════════════════════════════════════════════════
+
+  如果纯评估改进后 TPR 仍 < 22%, 需要改训练:
+
+  方向A: 增大support set (5-shot → 10-shot 或 15-shot)
+    - 更稳定的原型估计
+    - 不改模型, 只改评估时的support采样
+    - 预期: 原型质量显著提升
+
+  方向B: Margin-based episodic training
+    - 在训练时加入: d(proto, query_known) + margin < d(anti_proto, query_known)
+    - 直接优化anti_prototype的判别边界
+    - 需要修改训练loss
+    - 预期: 特征空间中anti_proto更有效
+
+  方向C: OOD-aware feature learning
+    - 训练时增大类间距离, 缩小类内距离
+    - 使用对比学习loss加强特征判别性
+    - 已有SimCLR→SupCon, 可加强SupCon阶段
+
+
+════════════════════════════════════════════════════════════════════
+四、执行计划 (修订后)
+════════════════════════════════════════════════════════════════════
+
+  Step 1: osr19b — 纯特征空间评估改进
+    - 实现per-class自适应阈值 (方向1)
+    - 实现原型正则化 (方向2)
+    - 在osr19a模型上评估
+    - 预期: 17.69% → 19-22%
+    - 改动: episodic_trainer.py 评估函数
+    - 风险: 低, 仅改评估
+
+  Step 2: osr19c — 训练阶段改进 (如果Step 1不足)
+    - 增大support set到10-shot
+    - 加入margin-based loss
+    - 预期: 额外提升3-5%
+    - 改动: episodic_trainer.py 训练逻辑
+    - 风险: 中, 需要重新训练
+
+  回退方案:
+    - 如果所有改进都不如原始anti_prototype, 使用osr18a的模型+原始评估
+    - 保留anti_prototype作为最优基线 (17-18%)
+
+
+════════════════════════════════════════════════════════════════════
+五、不做的事 (明确排除)
+════════════════════════════════════════════════════════════════════
+
+    ✗ Flow作为OSR判别器 (osr18已证明无效)
+    ✗ Flow z空间教师/辅助 (osr19a已证明无效)
+    ✗ Flow密度特征注入ood_head (osr19a已证明无改善)
+    ✗ z空间协方差/边界/安全区 (osr19a已证明无效)
+    ✗ 多弱方法加权集成 (osr19a已证明无效)
+    ✗ 修改Flow架构 (投入产出比极低)
+    ✗ 调整Flow loss函数 (osr18已证明无法修复架构缺陷)

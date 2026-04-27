@@ -27,7 +27,343 @@
 
 
 
-------
+---======
+
+【2 基础知识】
+
+本章围绕少样本开放集声学场景识别所涉及的核心数学理论与方法展开。首先介绍音频信号的数学表示，随后依次讨论开放集识别、少样本学习和标准化流的理论基础。
+
+---
+
+【2.1 音频信号的数学表示】
+
+一段连续的声学信号经采样和量化后可视为离散时间序列 $x(t)\in\mathbb{R}$，$t=0,1,\dots,T-1$。采样率 $f_s$ 决定了信号可表示的最高频率，即奈奎斯特频率 $f_{\mathrm{Nyquist}}=f_s/2$。
+
+为获取信号的时频局部化信息，需借助短时傅里叶变换。将信号按帧移 $H$ 分帧并施加窗函数 $w(n)$，第 $m$ 帧的傅里叶系数定义为
+
+$$X(m,k)=\sum_{n=0}^{N-1}x(mH+n)\cdot w(n)\cdot e^{-j2\pi kn/N},\quad k=0,1,\dots,N-1$$
+
+其中 $N$ 为FFT点数。取幅度谱的对数即得到对数频谱图 $\log|X(m,k)|$，这是深度学习模型最常用的输入形式。
+
+进一步地，将线性频率轴按梅尔刻度 $f_{\mathrm{mel}}=2595\log_{10}(1+f/700)$ 做非线性映射，所得的梅尔频谱图在低频段具有更高的分辨率，更贴近人耳的感知特性。本文实验中，原始音频统一重采样至16 kHz并截取1秒片段，经上述流程转换为梅尔频谱图后输入预训练骨干网络。
+
+---
+
+【2.2 开放集识别】
+
+传统的多类分类问题假设训练集与测试集共享相同的标签空间 $\mathcal{Y}=\{1,\dots,K\}$。然而在实际场景下，测试阶段出现的样本可能属于训练时未覆盖的类别。设训练类别集为 $\mathcal{C}_{\mathrm{train}}=\{1,\dots,K\}$，测试时可能出现额外的未知类别 $\mathcal{C}_{\mathrm{unknown}}=\{K+1,\dots\}$，开放集识别（Open Set Recognition, OSR）的目标是学习映射
+
+$$g:\mathcal{X}\to\{1,\dots,K,\text{unknown}\}$$
+
+在保持已知类分类精度的同时，将不属于任何已知类的输入归为"未知"。与OSR密切相关的概念是分布外检测（Out-of-Distribution Detection, OOD），二者均要求模型具备对自身认知边界的感知能力。
+
+**基于阈值的方法。** 早期工作如OpenMax[27]在softmax输出层之上引入极值理论建模，利用Weibull分布对每个类的激活尾部进行拟合，将低激活样本重新分配到"未知"类。ODIN[28]则通过温度缩放和输入扰动放大已知类与未知类在softmax输出上的差异。但研究表明，深度网络的softmax概率在OOD样本上常表现出过度自信，使得阈值法的可靠性受限。
+
+**基于距离的方法。** 此类方法的核心假设是：在良好的特征空间中，已知类样本应聚集在其类中心附近，而未知类样本到所有已知类中心的距离都较大。马氏距离考虑了特征维度间的协方差结构：
+
+$$d_M(\mathbf{x},\boldsymbol{\mu}_c)=\sqrt{(\mathbf{x}-\boldsymbol{\mu}_c)^\top\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu}_c)}$$
+
+其中 $\boldsymbol{\mu}_c$ 为第 $c$ 类的均值向量，$\boldsymbol{\Sigma}$ 为共享协方差矩阵。从几何上看，马氏距离等价于先对特征做白化变换再计算欧氏距离，其等值面为椭球而非球面，因而对非各向同性的特征分布具有更好的适应性。
+
+**基于能量的方法。** Liu等人[34]将分类器输出视为能量函数，定义输入 $\mathbf{x}$ 的能量分数为
+
+$$E(\mathbf{x};f)=-T\cdot\log\sum_{c=1}^{K}\exp(f_c(\mathbf{x})/T)$$
+
+其中 $f_c(\mathbf{x})$ 为分类器对第 $c$ 类的logit，$T$ 为温度参数。已知类样本的能量应低于未知类样本。能量方法不受softmax归一化的约束，理论上具有更好的OOD检测性质。
+
+---
+
+【2.3 少样本学习与元学习】
+
+少样本学习旨在从极少量的标注样本中快速获取新类别的判别能力。标准设定为 $N$-way $K$-shot分类：从 $N$ 个类别中各取 $K$ 个标注样本构成支撑集 $\mathcal{S}=\{(\mathbf{x}_i,y_i)\}$，对查询集 $\mathcal{Q}=\{\mathbf{x}_j\}$ 中的样本进行分类。当 $K$ 很小时，模型极易过拟合，这要求学习算法具备跨任务的泛化能力。
+
+元学习是解决少样本问题的主要范式，其核心思想是在大量元训练任务上学习一种可快速适应新任务的策略。情节式训练（Episodic Training）是元学习的标准训练方式：每一轮迭代从元训练类中采样一个情节，模拟一次完整的少样本任务——包含支撑集和查询集——并在该情节上进行前向传播与参数更新。
+
+**原型网络**[30]是本文采用的元学习分类器。设嵌入函数为 $f_\phi:\mathcal{X}\to\mathbb{R}^d$，第 $c$ 类的原型定义为该类支撑样本嵌入的算术平均：
+
+$$\mathbf{p}_c=\frac{1}{|S_c|}\sum_{(\mathbf{x}_i,y_i)\in S_c}f_\phi(\mathbf{x}_i)$$
+
+查询样本 $\mathbf{x}$ 的分类概率通过嵌入与各原型的距离计算：
+
+$$p(y=c\mid\mathbf{x})=\frac{\exp(-d(f_\phi(\mathbf{x}),\mathbf{p}_c))}{\sum_{c'}\exp(-d(f_\phi(\mathbf{x}),\mathbf{p}_{c'}))}$$
+
+其中 $d(\cdot,\cdot)$ 通常取欧氏距离。原型网络的隐含假设是：同一类别的样本在嵌入空间中围绕原型呈聚类分布，不同类别的原型彼此远离。这一假设在特征空间质量良好时成立，且原型计算仅涉及均值运算，不引入额外的可学习参数，在少样本条件下不容易过拟合。
+
+---
+
+【2.4 标准化流】
+
+标准化流（Normalizing Flow）是本文OOD检测模块的数学基础。它是一类可逆生成模型，通过一系列可逆的双射变换将简单的基准分布（如标准正态分布 $\mathcal{N}(\mathbf{0},\mathbf{I})$）映射到复杂的目标分布，同时借助概率论中的变量替换公式实现对目标分布密度的精确计算。
+
+**基本原理。** 设 $\mathbf{z}\sim p_Z(\mathbf{z})$ 为基准分布的随机变量，$f_\phi$ 为可逆变换且逆变换 $\mathbf{z}=f_\phi^{-1}(\mathbf{x})$ 存在。由概率密度的变量替换公式，$\mathbf{x}=f_\phi(\mathbf{z})$ 的密度为
+
+$$\log p_X(\mathbf{x})=\log p_Z(f_\phi^{-1}(\mathbf{x}))+\log\left|\det\frac{\partial f_\phi^{-1}(\mathbf{x})}{\partial\mathbf{x}}\right|$$
+
+其中第二项是逆变换雅可比矩阵的对数行列式，度量了变换对体积的缩放效应。将 $L$ 个可逆变换链式复合 $f=f_1\circ f_2\circ\cdots\circ f_L$，对数似然可递推计算：
+
+$$\log p_X(\mathbf{x})=\log p_Z(\mathbf{z}_L)+\sum_{\ell=1}^{L}\log\left|\det\frac{\partial f_\ell^{-1}}{\partial\mathbf{z}_\ell}\right|$$
+
+与VAE仅能提供变分下界（ELBO）、GAN没有显式似然相比，标准化流的最大优势在于能提供精确可计算的对数似然值，这使其天然适用于基于密度的OOD检测。
+
+**仿射耦合层。** 标准化流的结构设计需同时满足可逆性和雅可比行列式的高效计算。RealNVP[33]提出的仿射耦合层将输入 $\mathbf{x}$ 拆分为 $\mathbf{x}_1,\mathbf{x}_2$ 两部分，仅对其中一部分做参数化变换：
+
+$$\mathbf{z}_1=\mathbf{x}_1,\quad\mathbf{z}_2=\mathbf{x}_2\odot\exp(s(\mathbf{x}_1))+t(\mathbf{x}_1)$$
+
+其中 $s(\cdot)$ 和 $t(\cdot)$ 为任意神经网络（不需要可逆），$\odot$ 为逐元素乘法。由于 $\mathbf{z}_1=\mathbf{x}_1$ 不变，逆变换直接可写：$\mathbf{x}_2=(\mathbf{z}_2-t(\mathbf{z}_1))\odot\exp(-s(\mathbf{z}_1))$。雅可比矩阵为下三角矩阵，其对数行列式简化为 $\sum s(\mathbf{x}_1)$，计算代价与网络规模无关。通过交替拆分维度并堆叠多层，可实现所有维度间的信息交换。
+
+**有理二次样条耦合层。** 仿射耦合在每个区间内仅做线性缩放，表达能力有限。Durkan等人[29]提出的Neural Spline Flow用有理二次样条函数替代仿射变换。样条变换将输入域划分为 $K$ 个区间，给定节点 $\{(x_k,y_k)\}_{k=0}^K$ 和节点处导数 $\{d_k\}_{k=0}^K$（要求 $d_k>0$ 以保证单调可逆），在第 $k$ 个区间内的映射为
+
+$$y=y_k+h_k\cdot\frac{s_k\xi^2+d_k\xi(1-\xi)}{s_k+(d_{k+1}+d_k-2s_k)\xi(1-\xi)}$$
+
+其中 $\xi=(x-x_k)/w_k\in[0,1]$ 为归一化坐标，$w_k=x_{k+1}-x_k$，$h_k=y_{k+1}-y_k$，$s_k=h_k/w_k$。该映射在每个区间内是非线性的，且解析地可求导，因此雅可比行列式可精确计算。相比仿射耦合的逐区间线性映射，样条变换以更少的层数即可达到同等甚至更优的密度估计精度。
+
+**条件标准化流。** 在分类场景中，需要建模条件密度 $p(\mathbf{x}\mid c)$ 而非边缘密度 $p(\mathbf{x})$。条件流的实现方式是将条件向量 $c$（如类原型）与耦合层中变换网络的输入拼接，使样条参数依赖于条件信息：
+
+$$\log p(\mathbf{x}\mid c)=\log p_Z(f_\phi^{-1}(\mathbf{x};c))+\log\left|\det\frac{\partial f_\phi^{-1}(\mathbf{x};c)}{\partial\mathbf{x}}\right|$$
+
+在本文中，$c$ 取类别原型向量 $\mathbf{p}_c$，条件流学习在给定原型下特征向量的类条件分布。
+
+**似然比检测。** 直接使用 $\log p(\mathbf{x}\mid c)$ 进行OOD检测存在"典型性"问题——复杂输入可能在所有模型下都获得高似然值，导致检测失效[35]。对此，引入一个无条件背景流 $p_{\mathrm{bg}}(\mathbf{x})$ 建模边缘分布，通过似然比校正消除输入复杂度的影响：
+
+$$\mathrm{LR}(\mathbf{x})=\log p(\mathbf{x}\mid\mathbf{p}_{c^*})-\log p_{\mathrm{bg}}(\mathbf{x})$$
+
+其中 $c^*=\arg\max_c\log p(\mathbf{x}\mid\mathbf{p}_c)$。已知类样本的类条件似然应显著高于边缘似然，而未知类样本二者接近，因此似然比能有效区分两类样本。
+
+> **[表] 标准化流与VAE、GAN的关键性质对比**：可逆性、似然计算（精确对数似然 vs. 变分下界 vs. 无显式似然）、训练稳定性、密度估计能力、OOD检测适用性。
+
+---
+
+【2.5 少样本开放集识别】
+
+少样本开放集识别（FS-OSR）结合了上述两个方向的双重挑战：模型既要从极少量支撑样本中建立对新类别的判别能力，又要在推理时可靠地检测出不属于任何已知类的输入。
+
+FS-OSR相比单独的少样本学习或开放集识别面临独特困难。一方面，少量支撑样本导致原型估计不准确，基于距离的OOD检测阈值更难设定；另一方面，少样本条件下分类器本身尚不够稳健，使得依赖分类输出的检测方法（如softmax阈值、能量分数）的可靠性进一步降低。此外，样本稀缺也使生成模型的训练更加困难——在仅有几个样本时，标准化流容易过拟合支撑集而丧失对密度比的区分能力。
+
+现有FS-OSR方法大多遵循"元学习分类器+OOD检测模块"的联合训练范式[24][25]，关键设计在于如何在元训练中模拟未知类样本——常用策略包括伪OOD生成（随机噪声、类间插值、GMM边界采样）以及自监督对比学习。本文的方法属于这一范式，但引入了更丰富的检测信号（隐空间一致性、似然比、OOD检测头等），并通过分阶段训练策略逐步引入各损失项，以缓解少样本条件下训练不稳定的问题。
+
+======
+
+【3 算法设计】
+
+本章详细阐述所提FS-OSR框架的算法设计。首先给出问题的形式化定义，然后依次描述特征提取器、基于Neural Spline Flow的条件密度建模、原型网络与流密度的融合分类机制、多组件损失函数及其分阶段调度策略，最后给出GMM边界采样与多信号OOD检测方法。
+
+---
+
+【3.1 问题的形式化定义】
+
+设声学场景的全类别集为 $\mathcal{C}=\{c_1,\dots,c_M\}$，将其划分为基类 $\mathcal{C}_{\mathrm{base}}=\{c_1,\dots,c_K\}$ 与新类 $\mathcal{C}_{\mathrm{novel}}=\{c_{K+1},\dots,c_M\}$。基类拥有充足的标注样本，新类仅有极少量标注。训练阶段不使用新类数据。推理阶段，给定一个由若干已知类（从 $\mathcal{C}_{\mathrm{base}}\cup\mathcal{C}_{\mathrm{novel}}$ 中选取）构成的情节任务，系统同时获得该任务的支撑集 $\mathcal{S}=\{(\mathbf{x}_i,y_i)\}_{i=1}^{N\times K}$ 和查询集 $\mathcal{Q}=\{\mathbf{x}_j\}$。模型需对每个查询样本做出判断：若它属于任务中的某个已知类，则给出正确的类别标签；否则将其标记为"未知"。
+
+形式化地，目标是学习决策函数
+
+$$g:\mathcal{X}\times\mathcal{P}(\mathcal{S})\to\{1,\dots,N\}\cup\{\text{unknown}\}$$
+
+其中 $\mathcal{P}(\mathcal{S})$ 表示由支撑集导出的类别原型集合。注意到与传统分类不同，此处的决策不仅依赖于输入 $\mathbf{x}$，还依赖于支撑集提供的上下文信息。
+
+> **[图] 系统整体流程图**：展示Phase 0（特征提取器预训练，仅基类）→ Phase 1（离线特征提取与缓存）→ Phase 2（情节式元训练：标准化流+原型网络）→ Phase 3（OSR校准与评估）的完整数据流向，标注各阶段输入输出。
+
+---
+
+【3.2 特征提取器】
+
+特征提取器的角色是将原始梅尔频谱图映射为固定维度的判别性嵌入向量。本文选用PANNs Cnn14_16k[3]作为骨干网络，该网络在AudioSet（约200万条音频，527类）上预训练，其卷积部分由6个卷积块（通道数64→128→256→512→1024→2048）构成，经全局平均池化和最大池化后输出2048维向量。
+
+> **[表] 三种候选骨干网络对比**：PANNs Cnn14_16k（CNN, 80M参数, 2048维输出）、Distil-AST（Transformer蒸馏, 6层, 768维输出）、YAMNet（MobileNet, 3.7M参数, 521维输出），从参数量、表达能力和迁移性能三个维度比较。
+
+骨干网络的2048维输出经过三层全连接投影逐步降维至64维，每层集成Squeeze-and-Excitation（SE）通道注意力[10]。具体地，单层的运算为
+
+$$\mathbf{h}=\mathrm{Dropout}\bigl(\mathrm{SE}\bigl(\mathrm{BN}\bigl(\mathrm{GELU}(\mathbf{W}\cdot\mathbf{x})\bigr)\bigr)\bigr)$$
+
+其中SE块通过学习通道权重实现特征重标定。设 $\mathbf{f}\in\mathbb{R}^{C}$ 为一个批归一化后的特征向量，SE块的计算为
+
+$$\mathbf{s}=\sigma\bigl(\mathbf{W}_{\mathrm{down}}\cdot\mathrm{ReLU}(\mathbf{W}_{\mathrm{up}}\cdot\overline{\mathbf{f}})\bigr)\in\mathbb{R}^C,\quad\tilde{\mathbf{f}}=\mathbf{f}\odot\mathbf{s}$$
+
+$\overline{\mathbf{f}}=\frac{1}{C}\sum_{j=1}^C f_j$ 为全局平均池化，$\mathbf{W}_{\mathrm{up}}\in\mathbb{R}^{C/r\times C}$ 与 $\mathbf{W}_{\mathrm{down}}\in\mathbb{R}^{C\times C/r}$ 构成压缩比 $r$ 的瓶颈结构。三层投影依次将维度从2048降至256、再降至128、最终降至64。最终输出 $\mathbf{z}\in\mathbb{R}^{64}$ 作为后续所有模块的输入特征。
+
+为防止新类信息泄露，特征提取器仅在基类数据上预训练，使用交叉熵损失配合标签平滑（$\epsilon=0.1$）。
+
+---
+
+【3.3 基于Neural Spline Flow的条件密度建模】
+
+本节是方法的核心。我们构建一个以类原型为条件的标准化流，用于估计查询样本在各类条件下的概率密度，并利用密度信息辅助分类和OOD检测。
+
+### 3.3.1 维度适配与条件网络
+
+64维特征直接作为流的输入维度偏高，容易导致训练不稳定。因此设计了维度适配管线，将64维特征经两层线性投影+层归一化映射到48维流空间：
+
+$$\mathbf{f}_{\mathrm{adapted}}=\mathrm{LayerNorm}(\mathbf{W}_1\mathbf{z})\in\mathbb{R}^{64}$$
+
+$$\mathbf{f}_{\mathrm{flow}}=\mathrm{LayerNorm}(\mathbf{W}_2\mathbf{f}_{\mathrm{adapted}})\in\mathbb{R}^{48}$$
+
+$$\mathbf{f}_{\mathrm{proj}}=\mathbf{W}_4\cdot\mathrm{Dropout}(\mathrm{ReLU}(\mathbf{W}_3\mathbf{f}_{\mathrm{flow}}))\in\mathbb{R}^{48}$$
+
+$\mathbf{f}_{\mathrm{proj}}$ 作为流模型的实际输入。类似地，条件网络将64维原型映射到48维条件空间：
+
+$$\mathbf{c}_{\mathrm{proto}}=\mathrm{LayerNorm}(\mathbf{W}_6\cdot\mathrm{ReLU}(\mathbf{W}_5\mathbf{p}_c))\in\mathbb{R}^{48}$$
+
+### 3.3.2 条件样条耦合层的构造
+
+流的主体由 $L=12$ 层条件样条耦合层堆叠而成。每层将输入 $\mathbf{x}\in\mathbb{R}^{48}$ 沿特征维度对半拆分为 $\mathbf{x}_1,\mathbf{x}_2\in\mathbb{R}^{24}$，对 $\mathbf{x}_1$ 施加以 $\mathbf{x}_2$ 和条件 $\mathbf{c}$ 为输入的样条变换，$\mathbf{x}_2$ 保持不变。下一层翻转拆分方式，交替执行。
+
+样条变换的核心是有理二次样条函数。给定 $B$ 个区间的节点位置 $\{(x_k,y_k)\}_{k=0}^B$ 和节点导数 $\{d_k\}_{k=0}^B$（要求 $d_k>0$ 以保证单调性），输入值 $x$ 落在第 $k$ 个区间 $[x_k,x_{k+1})$ 时，正向变换为
+
+$$y=y_k+h_k\cdot\frac{s_k\xi^2+d_k\xi(1-\xi)}{s_k+(d_{k+1}+d_k-2s_k)\xi(1-\xi)}$$
+
+其中 $\xi=(x-x_k)/w_k\in[0,1]$，$w_k=x_{k+1}-x_k$，$h_k=y_{k+1}-y_k$，$s_k=h_k/w_k$。这是一个严格单调递增的分段有理函数，其逆映射可通过二分法或直接求解二次方程得到。
+
+对数雅可比行列式可以解析地计算。记分子为 $\mathrm{num}=s_k\xi^2+d_k\xi(1-\xi)$，分母为 $\mathrm{den}=s_k+(d_{k+1}+d_k-2s_k)\xi(1-\xi)$，则
+
+$$\frac{\partial y}{\partial x}=h_k\cdot\frac{\alpha\cdot\mathrm{den}-2\mathrm{num}\cdot\beta}{w_k\cdot\mathrm{den}^2}$$
+
+其中 $\alpha=d_k(1-\xi)^2+2s_k\xi(1-\xi)+d_{k+1}\xi^2$，$\beta=(d_{k+1}+d_k-2s_k)(1-2\xi)/2$。取对数后累加，即得到整个链式变换的对数行列式。这里 $B=8$ 个区间的划分使得每个区间内的非线性映射能力显著高于仿射耦合层的线性缩放。
+
+节点参数（位置、高度、导数）并非手动设定，而是由条件网络动态预测。具体地，变换网络 $\theta(\mathbf{x}_2,\mathbf{c})$ 以 $\mathbf{x}_2$ 和条件向量 $\mathbf{c}$ 的拼接为输入，输出 $3B+1$ 个参数（$B+1$ 个宽度、$B+1$ 个高度、$B-1$ 个内部导数），经过softmax归一化和正值约束后作为样条参数。
+
+> **[图] Neural Spline Flow结构示意图**：展示12层样条耦合层的交替变换过程、条件信息注入方式（原型→条件网络→样条参数）、可逆变换的双向数据流。
+
+### 3.3.3 类条件对数似然
+
+对于 $N$-way分类情节中的查询样本 $\mathbf{x}$，将其与 $N$ 个类原型 $\{\mathbf{p}_c\}_{c=1}^N$ 分别配对，经条件流映射后计算对数似然。在第 $c$ 类条件下的对数似然为
+
+$$\log p(\mathbf{x}\mid\mathbf{p}_c)=\log p_{\mathrm{prior}}(\mathbf{z}_c)+\sum_{\ell=1}^{L}\log\left|\det\frac{\partial f_\ell^{-1}}{\partial\mathbf{z}_\ell}\right|$$
+
+其中 $\mathbf{z}_c=f_\phi(\mathbf{x};\mathbf{p}_c)\in\mathbb{R}^{48}$ 为条件流的前向映射输出，$p_{\mathrm{prior}}=\mathcal{N}(\mathbf{0},\mathbf{I}_{48})$。先验项展开为 $-\frac{1}{2}\|\mathbf{z}_c\|^2-\frac{D}{2}\log(2\pi)$。这一似然值同时编码了两部分信息：先验项衡量隐变量偏离标准正态的程度（越大越好），雅可比项衡量变换引入的体积变化。
+
+---
+
+【3.4 原型网络与流密度融合分类】
+
+分类决策综合原型距离和流密度两种信号。
+
+**原型距离分数。** 在64维特征空间中，计算查询样本到各类原型的加权负欧氏距离：
+
+$$s_{\mathrm{proto}}(\mathbf{x},\mathbf{p}_c)=-\tau\cdot\|h(\mathbf{x})-h(\mathbf{p}_c)\|_2^2$$
+
+其中 $h:\mathbb{R}^{64}\to\mathbb{R}^{64}$ 为可训练的距离投影头（两层MLP），$\tau>0$ 为可学习的温度参数。引入可学习投影而非直接使用欧氏距离，是因为原始特征空间未必是各向同性的——经 $h$ 变换后，欧氏距离能更合理地度量类别间的相似性。
+
+**流密度分数。** 取第 $c$ 类条件下的对数似然作为密度分数：
+
+$$s_{\mathrm{flow}}(\mathbf{x},\mathbf{p}_c)=\log p(\mathbf{x}\mid\mathbf{p}_c)$$
+
+**分数融合。** 两种分数的量纲和尺度不同，直接相加可能导致一方主导。因此先对两种分数在类别维度上分别做中心化（减去均值），再相加：
+
+$$s_{\mathrm{combined}}(\mathbf{x},c)=(s_{\mathrm{proto}}(\mathbf{x},\mathbf{p}_c)-\bar{s}_{\mathrm{proto}})+(s_{\mathrm{flow}}(\mathbf{x},\mathbf{p}_c)-\bar{s}_{\mathrm{flow}})$$
+
+最终通过平滑截断函数 $\mathrm{clip}(v)=\tanh(v/10)\times 10$ 防止极端分数值对softmax的干扰。查询样本的分类概率为
+
+$$p(y=c\mid\mathbf{x})=\frac{\exp(s_{\mathrm{combined}}(\mathbf{x},c))}{\sum_{c'=1}^{N}\exp(s_{\mathrm{combined}}(\mathbf{x},c'))}$$
+
+---
+
+【3.5 多组件损失函数与分阶段调度】
+
+本框架的训练涉及多个损失项，各损失项之间存在相互制约的关系——如果同时施加，梯度方向可能冲突。为此，我们设计了分阶段的损失调度策略。
+
+### 3.5.1 各损失项的数学定义
+
+**分类损失 $\mathcal{L}_{\mathrm{CE}}$。** 以融合分数的负对数似然为基础，但引入 $\tanh$ 截断以防止梯度爆炸：
+
+$$\mathcal{L}_{\mathrm{CE}}=\mathrm{CE\_cap}\cdot\tanh\!\left(\frac{-\frac{1}{B}\sum_{i=1}^{B}\log\frac{e^{s(\mathbf{x}_i,y_i)}}{\sum_ce^{s(\mathbf{x}_i,c)}}}{\mathrm{CE\_cap}}\right)$$
+
+当交叉熵值超过CE\_cap（取10）时，梯度被自然地钳制在 $[-1,1]$ 范围内，避免了异常情节导致参数的大幅跳变。
+
+**高斯先验匹配损失 $\mathcal{L}_{\mathrm{Gauss}}$。** 推动正确类条件下的隐变量 $\mathbf{z}_{\mathrm{correct}}\in\mathbb{R}^D$（$D=48$）服从标准正态分布。注意到若 $\mathbf{z}\sim\mathcal{N}(\mathbf{0},\mathbf{I}_D)$，则 $\|\mathbf{z}\|^2$ 服从自由度为 $D$ 的 $\chi^2$ 分布，其期望为 $D$。据此设计：
+
+$$\mathcal{L}_{\mathrm{Gauss}}=\frac{|\mathrm{mean}(\|\mathbf{z}_{\mathrm{correct}}\|^2)-D|}{D}+\frac{1}{D}\sum_{j=1}^{D}(\mathrm{std}(z_{\mathrm{correct}}^{(j)})-1)^2$$
+
+第一项约束模长的期望，第二项约束各维度的方差。
+
+**隐空间对比排斥损失 $\mathcal{L}_{\mathrm{LCR}}$。** 本文提出的原创损失项。在隐空间中，将错误类条件下的隐变量 $\mathbf{z}_c$（$c\neq y$）推离正确类的隐变量 $\mathbf{z}_{\mathrm{correct}}$：
+
+$$\mathcal{L}_{\mathrm{LCR}}=\frac{1}{|\mathcal{N}|}\sum_{c\neq y}\max(0,\,m-\|\mathbf{z}_c-\mathbf{z}_{\mathrm{correct}}\|_2^2)$$
+
+其中 $m$ 为间隔参数（取32）。直观上，此损失确保"同一样本在正确类条件下映射到的隐变量"与"在错误类条件下映射到的隐变量"之间保持足够的距离。这对于OOD检测至关重要——未知类样本在任何已知类条件下都不会被正确映射，其隐变量应远离正确类隐变量的聚集区域。合页函数 $\max(0,\cdot)$ 确保只有在距离不足时才产生梯度。
+
+**非高斯排斥损失 $\mathcal{L}_{\mathrm{NonGauss}}$。** 进一步将错误类隐变量推离标准正态分布区域：
+
+$$\mathcal{L}_{\mathrm{NonGauss}}=\frac{1}{|\mathcal{N}|\cdot D}\sum_{c\neq y}\max(0,\,1.5D-\|\mathbf{z}_c\|_2^2)$$
+
+注意 $\|\mathbf{z}\|^2$ 在 $\mathbf{z}\sim\mathcal{N}(\mathbf{0},\mathbf{I}_D)$ 下的期望为 $D$。将阈值设为 $1.5D$，要求错误类隐变量的模长显著大于标准正态的典型值，使其不太可能被误认为来自正确类条件。
+
+**伪OOD排斥损失 $\mathcal{L}_{\mathrm{pseudo}}$。** 利用伪OOD样本（见3.6节的GMM边界采样）降低其对所有已知类的似然：
+
+$$\mathcal{L}_{\mathrm{pseudo}}=\frac{1}{|\mathcal{O}|}\sum_{\mathbf{x}_{\mathrm{ood}}\in\mathcal{O}}\log\sum_{c=1}^{N}\exp(\log p(\mathbf{x}_{\mathrm{ood}}\mid\mathbf{p}_c))$$
+
+此处使用 $\mathrm{logsumexp}$ 而非 $\max$，使梯度更平滑。最小化此损失意味着压低伪OOD样本在所有已知类条件下的似然，从而在密度空间中建立已知类与未知类的边界。
+
+**辅助损失。** 此外还包括密度最大化损失 $\mathcal{L}_{\mathrm{density}}=\mathrm{clamp}(-\frac{1}{B}\sum_i\log p(\mathbf{x}_i\mid\mathbf{p}_{y_i}),-5,5)$，提升已知类样本的对数似然下界；熵最小化损失 $\mathcal{L}_{\mathrm{entropy}}=-\frac{1}{B}\sum_i\sum_c p_{ic}\log p_{ic}$，增强分类决策的确定性；原型分离损失 $\mathcal{L}_{\mathrm{sep}}=\mathrm{clamp}(-\mathrm{mean}(\mathrm{pdist}(\{\mathbf{p}_c\})),-2,0)$，拉开不同类原型的距离。
+
+### 3.5.2 分阶段损失调度
+
+将上述损失分为三组：高斯先验组 $\mathcal{L}_{\mathrm{gauss}}=\mathcal{L}_{\mathrm{Gauss}}+\mathcal{L}_{\mathrm{density}}$，分类辅助组 $\mathcal{L}_{\mathrm{aux}}=\mathcal{L}_{\mathrm{entropy}}+\mathcal{L}_{\mathrm{sep}}$，结构化OSR组 $\mathcal{L}_{\mathrm{struct}}=\mathcal{L}_{\mathrm{LCR}}+\mathcal{L}_{\mathrm{NonGauss}}+\mathcal{L}_{\mathrm{pseudo}}$。总损失为
+
+$$\mathcal{L}_{\mathrm{total}}=\mathcal{L}_{\mathrm{CE}}+\alpha_{\mathrm{cls}}\mathcal{L}_{\mathrm{aux}}+\alpha_{\mathrm{gauss}}\mathcal{L}_{\mathrm{gauss}}+\alpha_{\mathrm{struct}}\mathcal{L}_{\mathrm{struct}}$$
+
+权重按训练进度（以episode为单位）分四阶段调度：
+
+> **[表] 分阶段损失权重调度表**
+>
+> | 阶段 | Episode | $\alpha_{\mathrm{cls}}$ | $\alpha_{\mathrm{gauss}}$ | $\alpha_{\mathrm{struct}}$ |
+> |------|---------|------------------------|--------------------------|---------------------------|
+> | Phase 0: 高斯预热 | 0~150 | 0 | 1.0 | 0 |
+> | Phase 1: CE+高斯 | 150~250 | 0 | 0.8 | 0 |
+> | Phase 2: 分类辅助 | 250~450 | 0→1 | 0.5→1 | 0 |
+> | Phase 3: 全部损失 | 450+ | 1.0 | 1.0 | 0→1 |
+
+设计的考量如下。Phase 0仅训练流模型使其学会将特征映射到标准正态空间，不涉及分类，保证流的密度估计能力首先建立。Phase 1引入分类损失，让流在保持密度建模的同时开始支持分类。Phase 2逐步增大分类辅助损失的权重，增强原型的判别性。Phase 3最后引入结构化OSR损失，在分类和密度建模均已稳定的基础上，拉开已知类与未知类在隐空间中的距离。这种渐进式的策略避免了训练初期各目标相互冲突导致的震荡。
+
+---
+
+【3.6 GMM边界采样与多信号OOD检测】
+
+### 3.6.1 GMM边界采样
+
+训练OSR检测能力需要模拟未知类样本。直接使用各向同性高斯噪声作为伪OOD是不理想的——它与真实数据分布差距过大，模型可以通过简单规则（如特征范数）轻松区分，但这种区分能力在面对真实未知类时失效。
+
+> **[图] GMM边界采样示意图**：在t-SNE降维后的特征空间中展示训练数据密度分布、GMM拟合轮廓、伪OOD样本（低密度区域采样点）的位置关系。
+
+本文提出的策略是：利用高斯混合模型（GMM）对基类特征分布进行参数估计，然后从GMM的低密度区域采样伪OOD样本。具体步骤如下。
+
+设基类特征集为 $\{\mathbf{f}_i\}_{i=1}^{n}$，$\mathbf{f}_i\in\mathbb{R}^{64}$。用 $J$ 个分量的GMM拟合其分布：
+
+$$p_{\mathrm{GMM}}(\mathbf{f})=\sum_{j=1}^{J}\pi_j\,\mathcal{N}(\mathbf{f};\boldsymbol{\mu}_j,\boldsymbol{\Sigma}_j)$$
+
+其中 $\pi_j$ 为混合权重，$\boldsymbol{\mu}_j$ 和 $\boldsymbol{\Sigma}_j$ 为第 $j$ 个分量的均值和协方差。取 $J=6$（与基类数一致），通过EM算法估计参数。
+
+随后从该GMM中大量采样（如10000个点），计算每个采样点的GMM对数似然。取训练数据对数似然的第10百分位数作为阈值 $\tau_{\mathrm{low}}$，保留似然值低于该阈值的采样点作为伪OOD池。这些点恰好位于特征流形的边界——它们在GMM的支撑集内（不是纯噪声），但处于低密度区域（不属于任何已知类的核心）。训练时以60%真实OOD样本与40% GMM边界样本混合使用。
+
+### 3.6.2 多信号OOD检测
+
+推理阶段，本文设计了多种互补的OOD检测信号。对每个查询样本 $\mathbf{x}$，从不同角度评估其"已知度"。
+
+**特征马氏距离。** 在64维特征空间中，利用支撑集估计各类的均值 $\boldsymbol{\mu}_c$ 和共享协方差 $\boldsymbol{\Sigma}$，计算 $\mathbf{x}$ 到最近类中心的马氏距离 $d_M(\mathbf{x})=\min_c d_M(\mathbf{x},\boldsymbol{\mu}_c)$。
+
+**隐空间一致性。** 将 $\mathbf{x}$ 在 $N$ 个类条件下分别通过流映射，得到 $N$ 个隐变量 $\{\mathbf{z}_c\}_{c=1}^N$。若 $\mathbf{x}$ 属于某个已知类，则正确条件下的 $\mathbf{z}_c$ 应接近标准正态，而错误条件下的 $\mathbf{z}_{c'}$（$c'\neq y$）应偏离。定义一致性度量为
+
+$$C(\mathbf{x})=\frac{1}{N}\sum_{c=1}^{N}\left|\frac{\|\mathbf{z}_c\|^2}{D}-1\right|$$
+
+已知类样本的一致性值应较高（某个 $\mathbf{z}_c$ 接近标准正态而其他偏离），未知类样本的一致性值较低（所有 $\mathbf{z}_c$ 都偏离）。
+
+**流似然比。** 如第二章所述，引入无条件背景流 $p_{\mathrm{bg}}(\mathbf{x})$ 建模边缘分布，计算 $\mathrm{LR}(\mathbf{x})=\max_c\log p(\mathbf{x}\mid\mathbf{p}_c)-\log p_{\mathrm{bg}}(\mathbf{x})$。已知类样本的似然比显著为正。
+
+**能量分数。** 基于流密度的能量定义为
+
+$$E(\mathbf{x})=-T\cdot\log\sum_{c=1}^{N}\exp\!\left(\frac{\log p(\mathbf{x}\mid\mathbf{p}_c)}{T}\right)$$
+
+已知类样本的能量值较低（似然高→能量低）。温度 $T$ 控制分布的尖锐程度。
+
+**OOD检测头。** 训练一个二分类MLP，其输入为5维手工特征：
+
+$$\mathbf{v}_{\mathrm{ood}}=\Bigl[\min_cd(\mathbf{x},\mathbf{p}_c),\;\frac{d_{\min}}{d_{2\mathrm{nd}\_\min}},\;\max_c\mathrm{softmax}_c,\;H(\mathrm{softmax}),\;\|\mathbf{x}\|_2\Bigr]$$
+
+这五个维度分别编码：到最近原型的距离、最近与次近原型的距离比、最大softmax概率、softmax分布的熵、以及特征范数。
+
+以上各信号可单独使用，也可融合为综合分数。在实验中（第六章），我们将逐一比较各信号的检测效果。
+
+> **[表] OOD检测方法汇总**：列出各方法名称、核心公式、所需组件（流/原型/背景流）、计算复杂度。
+
+---
+
 引用说明（标注对应 achievement.txt 原文位置）：
 
 [1]    刘悦. 声学场景分类的方法研究 — ASC定义与综述
@@ -54,54 +390,3 @@
 [36]   Vinyals O, et al. Matching networks for one shot learning[C]. NeurIPS, 2016.
 
 ---
-【2 基础知识】
-
-本章对与本文研究密切相关的背景知识进行梳理，涵盖声学场景分类、开放集识别、少样本学习、标准化流以及少样本开放集识别五个方面，为后续章节的方法论述提供理论依据。
-
-【2.1 声学场景分类】
-
-声学场景分类（Acoustic Scene Classification, ASC）的任务是将一段录音自动归入预定义的声学环境类别，如机场、公园、地铁站等[1]。DCASE挑战赛自2013年起每年举办该任务的比赛，所采用的TAU Urban Acoustic Scenes数据集收录了10类城市声景在欧洲多个城市的现场录音，已成为该领域的事实标准[13]。
-
-音频分类系统的输入通常不是原始波形，而是经过时频分析得到的频谱表示。短时傅里叶变换（STFT）对信号分帧加窗后逐帧计算频谱，将一维时域信号转化为时间-频率二维矩阵。在此基础上，将频率轴映射至梅尔刻度并对幅度取对数，即得到梅尔频谱图（Mel Spectrogram）。梅尔刻度 $f_{\text{mel}} = 2595 \cdot \log_{10}(1 + f/700)$ 模拟了人耳对频率的非线性感知特性，使得低频区域的分辨率高于高频区域。这一表示方式在声学场景分类中被广泛采用，本文的模型也以梅尔频谱图作为输入。
-
-早期ASC方法主要依赖梅尔频率倒谱系数（MFCC）等手工特征，配合GMM或SVM等浅层分类器[18]。2016年以来，CNN[2][9]、Transformer[10]等深度模型直接从频谱图端到端学习特征，精度显著提升。为了降低对标注数据的依赖，迁移学习成为主流做法：先在AudioSet等大规模音频数据集上预训练，再在目标任务上微调。其中，Kong等人提出的PANNs系列[3]在AudioSet的527类音频事件上预训练CNN，迁移到下游任务后表现出色，本文选用其Cnn14架构作为特征提取的骨干网络。
-
-【2.2 开放集识别】
-
-传统的分类方法建立在闭集假设之上，即测试阶段出现的所有类别都已在训练中见过。然而在实际部署中，系统几乎不可避免地遇到训练时未曾覆盖的新类别。开放集识别（Open Set Recognition, OSR）的设定放松了闭集假设：设训练类别为 $\mathcal{C}_{\text{train}} = \{1, \dots, K\}$，测试时可能出现额外的未知类别，分类器需要在正确分类已知类的同时将不属于任何已知类的输入判定为"未知"[27]。与OSR紧密相关的另一概念是分布外检测（Out-of-Distribution Detection, OOD），后者侧重于判断输入是否来自训练分布。二者在技术路线上高度重合，可以互相借鉴。
-
-目前OSR的研究大致沿四条路线展开。第一条路线在分类器输出端设阈值：OpenMax[27]利用极值理论对各类softmax激活值拟合Weibull分布，据此将低置信度样本判为未知；ODIN[28]在此基础上引入温度缩放和输入扰动以放大已知类与未知类在softmax输出上的差异。不过，深度网络的softmax概率在分布外样本上容易过度自信，仅靠输出阈值难以保证检测的可靠性。第二条路线基于特征空间距离，核心假设是已知类样本在特征空间中聚集于各自的类中心附近，而未知类样本到所有已知类中心的距离都偏大。马氏距离 $d_M(x, \mu_c) = \sqrt{(x-\mu_c)^\top \Sigma^{-1}(x-\mu_c)}$ 考虑了特征维度间的协方差结构，是这一路线的常用度量。第三条路线将分类器的logit输出解释为能量函数[34]，定义 $E(x) = -T \cdot \log \sum_c \exp(f_c(x)/T)$，已知类样本的能量应低于未知类样本。第四条路线利用生成模型估计已知类的概率密度，通过似然值判断是否属于已知分布。但Nalisnick等人指出，单纯依赖似然值存在"典型性"问题——复杂度高的输入即使在错误的类条件下也可能获得偏高的似然。Ren等人[35]据此提出用似然比校正：引入一个建模数据边缘分布的背景模型，以 $\text{score}(x) = \log p_{\text{class}}(x) - \log p_{\text{bg}}(x)$ 消除输入复杂度的干扰。本文沿用了这一思路，利用背景流做似然比校正。
-
-【2.3 少样本学习】
-
-少样本学习（Few-Shot Learning, FSL）关注的是如何从极少量的标注样本中快速学会新类别的分类。标准设定为N-way K-shot：从N个新类中各抽取K个标注样本构成支撑集 $\mathcal{S}$，对查询集 $\mathcal{Q}$ 中的样本进行分类。当K仅为1或5时，直接在支撑集上训练常规分类器极易过拟合，因此需要特殊的学习策略来保证泛化能力。
-
-元学习是解决少样本问题的主要范式。其核心思路与传统"在单个数据集上训练"不同，元学习在大量"任务"上训练，使模型获得快速适应新任务的能力。情节式训练（Episodic Training）是元学习的标准训练方式：每次迭代称为一个情节（Episode），从训练类中采样若干个类，每类抽取支撑样本和查询样本，模拟一次完整的少样本任务。经过数千个情节的训练，模型逐步学会从少量样本中提取有效的类别表示。
-
-在具体算法层面，Snell等人提出的原型网络[30]思路简洁且效果稳定：对每个类取其支撑样本在嵌入空间中的均值作为原型向量 $p_c$，查询样本的分类依据是其嵌入 $f_\phi(x)$ 到各原型的距离：
-
-【公式2-1】 $p(y{=}c \mid x) = \frac{\exp(-d(f_\phi(x),\, p_c))}{\sum_{c'}\exp(-d(f_\phi(x),\, p_{c'}))}$
-
-原型网络的假设是同类样本在嵌入空间中聚集、异类原型彼此远离，在声学场景这类中等粒度的分类任务上表现良好。本文的分类模块即以原型网络为基础，并进一步将流密度分数与原型距离融合以提高判别力。
-
-【2.4 标准化流】
-
-标准化流（Normalizing Flow）是一类可逆生成模型，它通过一连串可逆变换将简单的基础分布（通常是标准正态分布 $\mathcal{N}(0, I)$）映射到复杂的数据分布[29]。其理论基础来自概率论中的变量替换公式：设 $z \sim p_Z(z)$ 为基础分布下的随机变量，$x = f_\phi(z)$ 为可逆变换（逆变换记为 $z = f_\phi^{-1}(x)$），则 $x$ 的概率密度为
-
-【公式2-2】 $\log p_X(x) = \log p_Z(f_\phi^{-1}(x)) + \log\left|\det \frac{\partial f_\phi^{-1}(x)}{\partial x}\right|$
-
-等式右边第二项是雅可比矩阵的对数行列式，刻画了可逆变换对概率体积的缩放效应。将多个可逆变换 $f = f_1 \circ f_2 \circ \cdots \circ f_L$ 链式组合，对数似然仍可精确计算。这一点是标准化流区别于VAE（需用变分下界近似后验）和GAN（无法给出显式似然）的核心优势。
-
-实现上，标准化流依赖耦合层结构。耦合层将输入 $x$ 拆分为 $x_1$、$x_2$ 两部分，保持 $x_1$ 不变，用一个神经网络以 $x_1$ 为输入预测 $x_2$ 的变换参数。NICE[32]使用加性变换 $z_2 = x_2 + m(x_1)$，雅可比行列式恒为1，表达能力有限。RealNVP[33]引入仿射变换 $z_2 = x_2 \odot \exp(s(x_1)) + t(x_1)$，对数行列式简化为 $\sum s(x_1)$，表达力有所增强。Durkan等人提出的Neural Spline Flow（NSF）[29]则进一步用有理二次样条函数替代仿射变换：将输入域划分为若干区间，每个区间内用两个二次多项式的比值定义映射，只要节点导数保持正值就能保证单调可逆。样条变换在每个区间内都是非线性的，因此用更少的层数即可达到仿射耦合需要更多层才能获得的密度估计精度。
-
-在少样本分类场景中，需要在给定类别原型 $c$ 的条件下估计特征分布 $p(x \mid c)$。条件标准化流通过将条件信息注入耦合层的变换网络来实现这一点：变换网络同时以 $x_1$ 和 $c$ 为输入，输出依赖于条件的样条参数。本文采用这一结构，以类原型向量作为条件，建模类条件下的特征密度。
-
-【2.5 少样本开放集识别】
-
-少样本开放集识别（Few-Shot Open Set Recognition, FS-OSR）同时面对少样本学习和开放集识别两个问题。模型一方面要从少量支撑样本中学会对新类别的分类（FSL），另一方面还要在推理时将不属于任何已知类的样本检测出来（OSR）。
-
-与单独的FSL或OSR相比，FS-OSR存在更为棘手的困难。第一，少样本条件下分类器本身精度有限，基于分类输出的OOD检测方法（如softmax阈值、能量分数）的可靠性随之下降。第二，少量支撑样本给出的原型估计存在较大方差，基于距离的方法更难找到合适的检测阈值。第三，样本极度匮乏时，生成模型难以训练到足够好的密度估计质量。
-
-目前已有的FS-OSR方法大多沿"元学习+OOD检测"的路线，通过情节式训练学习少样本分类器，并在元训练阶段引入伪OOD样本来训练异常检测模块。关键的技术难点在于：如何生成高质量的伪OOD样本使其贴近真实未知类的分布，以及如何将分类精度与未知类检测两个目标有效融合。这两个问题也是本文方法设计的核心出发点。
-
-**本章小结：** 本章围绕研究主题梳理了五方面背景知识。声学场景分类方面介绍了任务定义、梅尔频谱表示以及从手工特征到预训练模型的技术演进。开放集识别方面阐述了阈值、距离、能量和似然比四条技术路线及其局限。少样本学习方面说明了元学习和情节式训练的思想，重点介绍了本文所采用的原型网络。标准化流方面解释了基于可逆变换精确估计密度的原理及Neural Spline Flow的优势。最后分析了少样本开放集识别的双重困难，指出伪OOD样本质量和分类-检测目标融合是两个关键问题，为后续方法设计提供了依据。

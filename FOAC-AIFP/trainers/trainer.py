@@ -461,3 +461,172 @@ def calc_fscore(known, unknown):
     y_pred = np.append(np.zeros(len(known)),np.ones(len(unknown)) )
     f_score = f1_score(y_true, y_pred, average="binary")
     return f_score
+
+
+# ======================================================================
+# OSR Evaluation: same protocol as episodic_trainer.py
+# - anti_prototype, feature_mahalanobis
+# - TPR@TNR=95%, per-round recalibration (10 rounds)
+# ======================================================================
+
+def extract_all_features(net, dataset, batch_size=256):
+    """Extract features for all samples in a dataset, grouped by class.
+    Returns dict: {class_id: Tensor[N, D]}
+    """
+    net.eval()
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=batch_size, shuffle=False,
+        num_workers=4, pin_memory=True
+    )
+    all_features = []
+    all_labels = []
+
+    with torch.no_grad():
+        for data, labels in tqdm(loader, desc='Extracting features'):
+            data = data.cuda()
+            feat, _ = net.encode(data)  # [B, 512]
+            all_features.append(feat.cpu())
+            all_labels.extend(labels.tolist() if isinstance(labels, torch.Tensor) else list(labels))
+
+    all_features = torch.cat(all_features, dim=0)
+
+    features_by_class = {}
+    for c in sorted(set(all_labels)):
+        mask = torch.tensor([l == c for l in all_labels])
+        features_by_class[c] = all_features[mask]
+
+    return features_by_class
+
+
+def mahalanobis_min_score(features, class_means, covs_inv):
+    """Minimum Mahalanobis distance across classes (negated as score).
+    Higher score = more likely known.
+    """
+    min_dist = None
+    for mean, cov_inv in zip(class_means, covs_inv):
+        diff = features - mean.unsqueeze(0)
+        mahal = ((diff @ cov_inv) * diff).sum(dim=1)
+        if min_dist is None:
+            min_dist = mahal
+        else:
+            min_dist = torch.min(min_dist, mahal)
+    return -min_dist
+
+
+def compute_tpr_at_tnr(known_scores, unknown_scores, target_tnr=0.95):
+    """Compute TPR at fixed TNR.
+    Returns (tnr, tpr, osr_score)
+    """
+    sorted_known, _ = known_scores.sort()
+    idx = min(int(len(sorted_known) * (1 - target_tnr)), len(sorted_known) - 1)
+    threshold = sorted_known[idx].item()
+
+    tnr = (known_scores >= threshold).float().mean().item()
+    tpr = (unknown_scores < threshold).float().mean().item()
+    osr_score = (tnr + tpr) / 2
+    return tnr, tpr, osr_score
+
+
+def run_osr_eval(net, args, logger=None):
+    """
+    Evaluate OSR with same protocol as episodic_trainer.py:
+    - Methods: anti_prototype, feature_mahalanobis
+    - Metrics: TPR@TNR=95%, OSR Score = (TNR+TPR)/2
+    - Per-round recalibration (10 rounds, K_shot=50)
+    - Uses test data for both prototype computation and evaluation
+    """
+    from datasets.TAU22 import TAU22Pretrain
+    if logger is None:
+        logger = get_logger(os.path.join(args.save_folder, 'TAU22osr.log'))
+
+    net.eval()
+    logger.info("=" * 70)
+    logger.info("OSR Evaluation (matching episodic_trainer.py protocol)")
+    logger.info("=" * 70)
+
+    # Step 1: Extract features from test data (all 10 classes)
+    logger.info("Extracting test features (all 10 classes)...")
+    test_dataset = TAU22Pretrain(
+        root=args.dataroot, phase='test', index=10
+    )
+    test_feats = extract_all_features(net, test_dataset)
+
+    known_classes = list(range(args.train_classes))  # 0-5
+    unknown_classes = list(range(args.train_classes, 10))  # 6-9
+
+    known_all = torch.cat([test_feats[c] for c in known_classes])
+    unknown_all = torch.cat([test_feats[c] for c in unknown_classes])
+
+    feat_dim = known_all.shape[1]
+    logger.info(f"Known samples:   {len(known_all)} ({len(known_classes)} classes)")
+    logger.info(f"Unknown samples: {len(unknown_all)} ({len(unknown_classes)} classes)")
+    logger.info(f"Feature dim:     {feat_dim}")
+
+    # Step 2: Per-round evaluation
+    num_rounds = 10
+    K_shot = 50
+    methods = ['anti_prototype', 'feature_mahalanobis']
+    results = {m: {'tnr': [], 'tpr': [], 'osr': []} for m in methods}
+
+    for round_idx in range(num_rounds):
+        np.random.seed(42 + round_idx)
+
+        # Sample prototypes from known test data
+        prototypes = []
+        for c in known_classes:
+            cf = test_feats[c]
+            idx = np.random.choice(len(cf), min(K_shot, len(cf)), False)
+            prototypes.append(cf[idx].mean(dim=0))
+        prototypes = torch.stack(prototypes)  # [6, D]
+        proto_center = prototypes.mean(dim=0)  # [D]
+
+        # --- anti_prototype scores ---
+        anti_protos = 2 * proto_center.unsqueeze(0) - prototypes  # [6, D]
+        dist_proto_k = torch.cdist(known_all, prototypes).min(dim=1).values
+        dist_anti_k = torch.cdist(known_all, anti_protos).min(dim=1).values
+        known_scores_anti = -dist_proto_k + dist_anti_k
+
+        dist_proto_u = torch.cdist(unknown_all, prototypes).min(dim=1).values
+        dist_anti_u = torch.cdist(unknown_all, anti_protos).min(dim=1).values
+        unknown_scores_anti = -dist_proto_u + dist_anti_u
+
+        # --- feature_mahalanobis scores ---
+        class_means = []
+        covs_inv = []
+        eye = torch.eye(feat_dim)
+        for c in known_classes:
+            cf = test_feats[c]
+            mean_c = cf.mean(dim=0)
+            class_means.append(mean_c)
+            diff = cf - mean_c
+            cov_c = (diff.T @ diff) / max(len(diff) - 1, 1)
+            cov_c += 0.01 * eye  # regularization
+            covs_inv.append(torch.linalg.inv(cov_c))
+
+        known_scores_mahal = mahalanobis_min_score(known_all, class_means, covs_inv)
+        unknown_scores_mahal = mahalanobis_min_score(unknown_all, class_means, covs_inv)
+
+        # Per-round recalibration
+        for method, ks, us in [
+            ('anti_prototype', known_scores_anti, unknown_scores_anti),
+            ('feature_mahalanobis', known_scores_mahal, unknown_scores_mahal),
+        ]:
+            tnr, tpr, osr = compute_tpr_at_tnr(ks, us, target_tnr=0.95)
+            results[method]['tnr'].append(tnr)
+            results[method]['tpr'].append(tpr)
+            results[method]['osr'].append(osr)
+
+    # Step 3: Print comparison table
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info("OSR Method Comparison (test data, per-round recalibration)")
+    logger.info("=" * 70)
+    logger.info(f"  {'Method':<22s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s}")
+    for method in methods:
+        r = results[method]
+        avg_tnr = np.mean(r['tnr'])
+        avg_tpr = np.mean(r['tpr'])
+        avg_osr = np.mean(r['osr'])
+        logger.info(f"  {method:<22s} {avg_tnr:>7.2%} {avg_tpr:>7.2%} {avg_osr:>7.2%}")
+
+    return results

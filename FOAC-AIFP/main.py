@@ -58,6 +58,25 @@ if not args.pretrain:
                 f.write(f"Fscore: {fscore[0]:.3f} ± {fscore[1]:.3f}\n")
                 f.write(f"Loss:   {loss:.5f}\n\n")
                 print(f"{ckpt_name}: ACC={acc[0]:.3f}±{acc[1]:.3f}  AUROC={auroc[0]:.3f}±{auroc[1]:.3f}  Fscore={fscore[0]:.3f}±{fscore[1]:.3f}")
+
+        # OSR evaluation with same protocol as episodic_trainer.py
+        print("\n" + "=" * 70)
+        print("Running OSR evaluation (matching episodic_trainer.py protocol)...")
+        print("=" * 70)
+        # Use best model by AUROC for OSR eval
+        best_ckpt = os.path.join(args.save_folder, 'model_TAU22_max_auroc.pth')
+        if not os.path.exists(best_ckpt):
+            best_ckpt = os.path.join(args.save_folder, 'model_TAU22_max_acc.pth')
+        if os.path.exists(best_ckpt):
+            state_dict = torch.load(best_ckpt)
+            model.weight_base = state_dict['weight_base'].to('cuda')
+            model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+            model.load_state_dict(state_dict, strict=False)
+            osr_results = trainer.run_osr_eval(model, args)
+            print(f"\nOSR results saved to {os.path.join(args.save_folder, 'TAU22osr.log')}")
+        else:
+            print("No checkpoint found for OSR evaluation")
+
         print(f"\nResults saved to {test_log_path}")
         exit()
     state_dict = torch.load(args.pretrained_model_path)['feature_params']
