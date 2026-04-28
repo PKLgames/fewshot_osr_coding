@@ -1,0 +1,79 @@
+第二章 相关数学与理论基础
+
+本章介绍与本文方法密切相关的数学理论。首先给出小样本学习与原型网络的形式化定义及其统计解释，然后建立开放集识别问题的数学框架与评价指标体系，接着推导反原型方法的几何原理及本文查询依赖设计的理论依据，再阐述高斯混合模型的参数估计方法与聚类特征提取机制，最后回顾逻辑回归与分类器融合中涉及的基础知识。这些内容共同构成第三章算法设计的理论基础。
+
+2.1 小样本学习与原型网络
+
+小样本学习考虑如下问题设定：给定支持集$\mathcal{S} = \{(x_i, y_i)\}_{i=1}^{N \times K}$，其中包含$N$个类别、每类$K$个标注样本，以及查询集$\mathcal{Q} = \{x_j\}$，目标是学习映射$f_\theta: \mathcal{X} \to \mathcal{Y} \cup \{\text{unknown}\}$。这一设定通常被称为$N$-way $K$-shot问题。当$K$很小（如$K=5$）而特征维度$D$远大于$K$时，直接利用$\mathcal{S}$中的样本来估计每一类的条件分布$P(x|y=c)$在统计上是不可行的——完全协方差矩阵$\boldsymbol{\Sigma}_c \in \mathbb{R}^{D \times D}$的自由度为$D(D+1)/2$，而$K$个样本仅提供$KD$个观测量，参数的不可辨识性导致估计方差极大。
+
+原型网络[引2]通过引入度量学习的思想规避了上述困难。设嵌入函数$f_\phi: \mathcal{X} \to \mathbb{R}^D$将每个输入样本映射到$D$维特征空间，对于类别$c$，定义类原型为该类所有支持样本嵌入的算术平均：
+
+【公2.1】$\mathbf{p}_c = \frac{1}{|S_c|} \sum_{(x_i, y_i) \in S_c} f_\phi(x_i)$
+
+查询样本的分类概率由距离的softmax归一化给出：
+
+【公2.2】$P(y=c|x) = \frac{\exp(-d(f_\phi(x), \mathbf{p}_c))}{\sum_{c'=1}^{N} \exp(-d(f_\phi(x), \mathbf{p}_{c'}))}$
+
+其中距离函数取欧氏距离的平方$d(\mathbf{a}, \mathbf{b}) = \|\mathbf{a} - \mathbf{b}\|_2^2$。
+
+这一分类准则可以从概率论的角度给出清晰的解释。假设各类嵌入特征服从各向同性高斯分布$P(f_\phi(x)|y=c) = \mathcal{N}(\mathbf{p}_c, \sigma^2 I)$，其中均值向量为类原型$\mathbf{p}_c$，协方差矩阵为$\sigma^2 I$。在此假设下，对数似然函数为
+
+$$\log P(f_\phi(x)|y=c) = -\frac{D}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2}\|f_\phi(x) - \mathbf{p}_c\|_2^2$$
+
+略去与类别$c$无关的常数项后，最大似然估计$\arg\max_c \log P(f_\phi(x)|y=c)$等价于最小化$\|f_\phi(x) - \mathbf{p}_c\|_2^2$，即寻找距查询样本最近的原型。换言之，原型网络的分类本质上是在高斯混合模型框架下做最大后验判决，各类共享相同的各向同性方差。这一统计解释不仅阐明了原型网络的理论基础，也为后续引入完全协方差高斯混合模型提供了自然的推广方向——各向同性假设忽略了特征分量间的相关性，本文在第三章中通过全局GMM的完全协方差矩阵来弥补这一不足。
+
+2.2 开放集识别的数学框架
+
+开放集识别[引7][引16]是闭集分类问题的推广。设已知类别集合$\mathcal{C}_{\text{known}} = \{1, 2, \ldots, N\}$，未知类别集合$\mathcal{C}_{\text{unknown}} = \{N+1, N+2, \ldots\}$在训练阶段不可获取。OSR要求构造决策函数$g: \mathcal{X} \to \{1, 2, \ldots, N\} \cup \{\text{unknown}\}$，使得当输入$x$的真实标签$y \in \mathcal{C}_{\text{known}}$时$g(x)$给出正确类别编号，当$y \in \mathcal{C}_{\text{unknown}}$时$g(x)$输出unknown。实际实现中将OSR分解为两个阶段：构造置信度评分函数$s: \mathcal{X} \to \mathbb{R}$和阈值$\tau$，然后通过决策规则统一分类与开放集检测：
+
+【公2.3】$g(x) = \begin{cases} \arg\max_{c} P(y=c|x) & \text{若 } s(x) \geq \tau \\ \text{unknown} & \text{若 } s(x) < \tau \end{cases}$
+
+理想情况下，已知类样本的$s(x)$集中在较高区域，未知类样本集中在较低区域，二者分离程度直接决定检测效果。阈值$\tau$控制已知类识别与未知类检测之间的折中。
+
+OSR的评价基于混淆矩阵。设样本真实标签和预测标签各有"已知"与"未知"两种情况，由此定义真阳性$TP$（未知类正确检测）、假阳性$FP$（已知类错判为未知）、真阴性$TN$（已知类正确识别）和假阴性$FN$（未知类错判为已知类）。核心指标包括真阳性率$\text{TPR} = TP/(TP + FN)$（未知类检测率）和真阴性率$\text{TNR} = TN/(TN + FP)$（已知类保留率），综合评价指标取两者算术平均：
+
+【公2.4】$\text{OSR} = \frac{\text{TNR} + \text{TPR}}{2}$
+
+本文固定$\text{TNR} = 95\%$，在此约束下最大化$\text{TPR}$，模拟实际部署中低误报率的需求。最优阈值和融合权重的确定采用Youden J统计量[引35]$J = \text{TNR} + \text{TPR} - 1$作为优化准则。$J$的取值范围为$[-1, 1]$，其中$J=1$对应完美分类，$J=0$对应随机猜测。选择$J$而非单纯TPR作为优化目标，是因为$J$同时考虑了两个方向的正确率，能避免得到极端阈值。
+
+2.3 反原型方法
+
+反原型方法的核心思想源自凸集几何中的对偶概念。对于嵌入空间中的每个已知类原型$\mathbf{p}_c$，定义其关于某个参考中心$\mathbf{c}$的对称点作为反原型$\mathbf{a}_c = 2\mathbf{c} - \mathbf{p}_c$。直观上，反原型$\mathbf{a}_c$是原型$\mathbf{p}_c$关于中心$\mathbf{c}$的镜像。已知类的样本集中在原型附近因而远离其反原型，未知类的样本则可能落入反原型附近。评分函数定义为：
+
+【公2.9】$s(x) = -\min_{c} \|f_\phi(x) - \mathbf{p}_c\|_2 + \min_{c} \|f_\phi(x) - \mathbf{a}_c\|_2$
+
+第一项度量样本到最近原型的距离（越小越好），第二项度量到最近反原型的距离（越大越好）。已知类样本$s(x)$取较高的正值，未知类样本趋向于零甚至取负值。
+
+参考中心$\mathbf{c}$的选取是该方法的关键设计决策。RPL[引13]中反原型作为可学习参数在训练中优化，其坐标系隐含地由训练阶段全部已知类确定。一种简化方案是取所有原型的均值$\bar{\mathbf{p}} = \frac{1}{N}\sum_c \mathbf{p}_c$作为固定中心。然而在小样本元学习框架下，每个测试episode仅包含全部已知类的一个子集——假设训练时有6个已知类而某测试episode仅出现2个，则固定中心$\bar{\mathbf{p}}$与实际可见的原型分布之间存在系统性偏移，导致已知/未知边界畸变。
+
+本文提出查询依赖反原型，将参考中心替换为当前查询批次的样本均值$\hat{\mathbf{c}}_Q = \frac{1}{|Q|}\sum_{x \in Q} f_\phi(x)$，反原型通过$\mathbf{a}_c = 2\hat{\mathbf{c}}_Q - \mathbf{p}_c$动态计算。该设计不引入任何额外参数，查询批次在推理环节中始终可用。消融实验证实，查询依赖中心使TPR从8.32%提升至18.92%，性能提升超过一倍。
+
+2.4 高斯混合模型与聚类分析
+
+高斯混合模型[引10]假设数据由$K$个高斯分量的线性叠加生成：
+
+【公2.10】$P(\mathbf{x}) = \sum_{k=1}^{K} \pi_k \mathcal{N}(\mathbf{x} | \boldsymbol{\mu}_k, \boldsymbol{\Sigma}_k)$
+
+其中$\pi_k \geq 0$且$\sum_k \pi_k = 1$为混合权重，$\boldsymbol{\mu}_k \in \mathbb{R}^D$和$\boldsymbol{\Sigma}_k \in \mathbb{R}^{D \times D}$分别为第$k$个分量的均值向量和协方差矩阵。参数通过EM算法[引30]极大似然估计：E步计算每个数据点属于各分量的后验概率$\gamma_k(\mathbf{x}_i) = \frac{\pi_k \mathcal{N}(\mathbf{x}_i | \boldsymbol{\mu}_k, \boldsymbol{\Sigma}_k)}{\sum_j \pi_j \mathcal{N}(\mathbf{x}_i | \boldsymbol{\mu}_j, \boldsymbol{\Sigma}_j)}$，M步以$\gamma_k$为权重更新参数，算法保证每次迭代后似然函数单调递增。
+
+在GMM框架下，样本到第$k$个分量中心的Mahalanobis距离[引12]定义为
+
+【公2.11】$d_M(\mathbf{x}, \boldsymbol{\mu}_k) = \sqrt{(\mathbf{x} - \boldsymbol{\mu}_k)^\top \boldsymbol{\Sigma}_k^{-1} (\mathbf{x} - \boldsymbol{\mu}_k)}$
+
+与欧氏距离不同，Mahalanobis距离通过精度矩阵$\boldsymbol{\Sigma}_k^{-1}$对特征空间进行了非均匀的伸缩和旋转，沿高方差方向的位移被压缩、沿低方差方向的位移被放大。在正态假设$\mathbf{x} \sim \mathcal{N}(\boldsymbol{\mu}_k, \boldsymbol{\Sigma}_k)$下，$d_M^2$服从自由度为$D$的$\chi^2$分布，为距离阈值设定提供了统计依据。当$\boldsymbol{\Sigma}_k = \sigma^2 I$时$d_M$退化为尺度归一化的欧氏距离。
+
+后验概率$\gamma_k(\mathbf{x})$构成$K$维概率分布，表征了样本在各分量间的软分配。从中提取两个统计量：最大后验概率$p_{\max}(\mathbf{x}) = \max_k \gamma_k(\mathbf{x})$和后验分布的信息熵$H(\mathbf{x}) = -\sum_{k=1}^{K} \gamma_k(\mathbf{x}) \log \gamma_k(\mathbf{x})$。已知类样本的后验通常集中于单一分量（$p_{\max}$接近1，$H$接近0），未知类样本的后验在多个分量上分散（$p_{\max}$较低，$H$较大）。三个聚类特征从几何远近、归属置信度和归属不确定性三个互补角度描述了样本与全局结构的关系，构成第三章OOD特征向量的第11至13维，是本文统计信号通路的核心创新。
+
+2.5 逻辑回归与分类器融合
+
+逻辑回归[引10]用于二分类问题。给定特征向量$\mathbf{h} \in \mathbb{R}^d$，预测正类概率为
+
+【公2.14】$P(y=1|\mathbf{h}) = \sigma(\mathbf{w}^\top \mathbf{h} + b) = \frac{1}{1 + e^{-(\mathbf{w}^\top \mathbf{h} + b)}}$
+
+其中$\sigma(\cdot)$为Sigmoid函数。参数通过最小化交叉熵损失$\mathcal{L} = -\frac{1}{n}\sum_{i=1}^{n} [y_i \log \hat{p}_i + (1-y_i)\log(1-\hat{p}_i)]$并附加$L_2$正则化项$\frac{\lambda}{2}\|\mathbf{w}\|_2^2$来估计。从贝叶斯推断的角度看，$L_2$正则化等价于对权重施加零均值高斯先验$\mathbf{w} \sim \mathcal{N}(\mathbf{0}, \lambda^{-1}I)$，正则化后的极大后验估计与带惩罚的极大似然估计等价。
+
+融合两个不同量纲的评分信号时，先进行Z-score标准化$\hat{s} = (s - \mu)/\sigma$（其中$\mu$、$\sigma$在校准集已知类样本上计算），使两个信号处于可比量级，然后加权线性组合：
+
+【公2.17】$s_{\text{ens}}(x) = \alpha \cdot \hat{s}_{\text{anti}}(x) + (1-\alpha) \cdot \hat{s}_{\text{ood}}(x)$
+
+权重$\alpha$通过在校准集上最大化Youden J统计量进行网格搜索确定。该融合策略的理论依据来自集成学习的多样性原则[引21][引22]：几何信号（反原型评分）关注样本在原型-反原型结构中的局部距离关系，统计信号（OOD逻辑回归评分）关注样本与全局分布的多维统计偏离，二者从不同角度评估已知/未知属性，具有良好的互补性。实验确定的最优权重$\alpha^* = 0.6$非极端值，验证了两种信号确实提供了不同维度的信息。
