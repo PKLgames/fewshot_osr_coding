@@ -38,7 +38,8 @@ torch.backends.cudnn.allow_tf32 = True
 from utils.TAU22 import TAUDataset
 import yamnet_PT_inference as yamnet_infer
 from torch_audioset.yamnet.model import yamnet as torch_yamnet
-# Flow module removed — OSR now uses feature-space methods only
+# osr21: Flow reintroduced as feature generator and transformer (NOT for density scoring)
+from Reversable_Function.cINN import ConditionalINN
 
 
 # ============================================================
@@ -1014,7 +1015,7 @@ class FeatureCache:
     旧缓存自动失效, 重新提取特征.
     """
 
-    CACHE_VERSION = 'v20_yamnet_normalized'  # osr17d: per-dim standardized features
+    CACHE_VERSION = 'v20_yamnet_normalized'  # Same features as osr20 (same backbone)
 
     def __init__(self, cache_dir: str = 'experiment/fewshot_cache'):
         self.cache_dir = cache_dir
@@ -1229,6 +1230,234 @@ class EpisodeSampler:
 
 
 # ============================================================
+# 3b. Flow OOD Generator (osr21a) — 条件Flow生成伪OOD样本
+# ============================================================
+
+class FlowOODGenerator:
+    """
+    osr21a: 用条件Flow生成高质量伪OOD特征样本, 替代GMM低密度采样.
+
+    核心思路: 训练条件Flow学习已知类特征分布 p(x|class),
+    然后通过在z空间操作(插值/外推/条件不匹配)生成边界样本.
+
+    与osr18/19的区别: Flow不参与OSR评分, 只用于数据生成.
+    """
+
+    def __init__(self, base_features: torch.Tensor, class_labels: torch.Tensor,
+                 device: str = 'cuda', n_coupling_layers: int = 3,
+                 hidden_dim: int = 64, epochs: int = 200, lr: float = 1e-3):
+        self.device = device
+        self.feature_dim = base_features.shape[1]
+        self.unique_classes = sorted(class_labels.unique().tolist())
+        self.n_classes = len(self.unique_classes)
+
+        # Per-class Flow models (轻量化: 每个类一个条件Flow)
+        self.flows = {}
+        self.class_means = {}
+        self.class_stds = {}
+
+        for c in self.unique_classes:
+            mask = class_labels == c
+            feats_c = base_features[mask]
+            self.class_means[c] = feats_c.mean(dim=0)
+            self.class_stds[c] = feats_c.std(dim=0).clamp(min=0.1)
+
+            # 轻量ConditionalINN: input=feature_dim, condition=0 (无条件, 每类独立)
+            flow = ConditionalINN(
+                input_dim=self.feature_dim,
+                condition_dim=0,  # 无条件: 每类独立建模
+                num_coupling_layers=n_coupling_layers,
+                hidden_dims=[hidden_dim, hidden_dim],
+                use_permutation=True,
+                permutation_type='fixed',
+                dropout=0.1,
+                s_clamp_max=2.0
+            ).to(device)
+
+            # 训练: MLE on known features
+            feats_dev = feats_c.to(device)
+            optimizer = torch.optim.Adam(flow.parameters(), lr=lr, weight_decay=1e-4)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+
+            flow.train()
+            prior = torch.distributions.Normal(
+                torch.zeros(self.feature_dim, device=device),
+                torch.ones(self.feature_dim, device=device))
+
+            best_loss = float('inf')
+            best_state = None
+            for epoch in range(epochs):
+                # Mini-batch training
+                perm = torch.randperm(len(feats_dev))
+                batch_size = min(64, len(feats_dev))
+                epoch_loss = 0.0
+                n_batches = 0
+                for start in range(0, len(feats_dev), batch_size):
+                    idx = perm[start:start + batch_size]
+                    batch = feats_dev[idx]
+                    c_empty = torch.zeros(batch.size(0), 0, device=device)
+
+                    z, log_det = flow(batch, c_empty, compute_jacobian=True)
+                    log_prob = prior.log_prob(z).sum(dim=1) + log_det
+                    loss = -log_prob.mean()
+
+                    optimizer.zero_grad()
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(flow.parameters(), 1.0)
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                    n_batches += 1
+
+                scheduler.step()
+                avg_loss = epoch_loss / max(n_batches, 1)
+
+                if avg_loss < best_loss:
+                    best_loss = avg_loss
+                    best_state = {k: v.clone() for k, v in flow.state_dict().items()}
+
+            if best_state is not None:
+                flow.load_state_dict(best_state)
+            flow.eval()
+            self.flows[c] = flow
+
+            n_params = sum(p.numel() for p in flow.parameters())
+            print(f"  Flow class {c}: {len(feats_c)} samples, "
+                  f"best NLL={best_loss:.2f}, params={n_params:,}")
+
+    def _inverse_batch(self, flow: ConditionalINN, z: torch.Tensor) -> torch.Tensor:
+        """Inverse in batches to avoid OOM."""
+        results = []
+        batch_size = 1024
+        c_empty = torch.zeros(z.size(0), 0, device=z.device)
+        for start in range(0, len(z), batch_size):
+            z_batch = z[start:start + batch_size]
+            c_batch = torch.zeros(z_batch.size(0), 0, device=z.device)
+            x_batch = flow.inverse(z_batch, c_batch)
+            results.append(x_batch)
+        return torch.cat(results, dim=0)
+
+    def generate_interpolation(self, n_samples: int,
+                                alpha: float = 0.5) -> torch.Tensor:
+        """策略A: z空间插值 → 类间边界样本.
+        从两个不同类的Flow生成, 在z空间插值后逆变换."""
+        samples = []
+        for _ in range(n_samples):
+            c1, c2 = random.sample(self.unique_classes, 2)
+            z1 = torch.randn(1, self.feature_dim, device=self.device)
+            z2 = torch.randn(1, self.feature_dim, device=self.device)
+            z_interp = alpha * z1 + (1 - alpha) * z2
+            # 逆变换到c1的特征空间
+            c_empty = torch.zeros(1, 0, device=self.device)
+            x = self.flows[c1].inverse(z_interp, c_empty)
+            samples.append(x.squeeze(0))
+        return torch.stack(samples)
+
+    def generate_low_density(self, n_samples: int,
+                              z_scale: float = 2.0) -> torch.Tensor:
+        """策略B: 远离原点的z → 特征空间低密度样本.
+        z ~ N(0, z_scale²·I), z_scale > 1 意味着采样点远离训练分布."""
+        samples = []
+        for _ in range(n_samples):
+            c = random.choice(self.unique_classes)
+            z = torch.randn(1, self.feature_dim, device=self.device) * z_scale
+            c_empty = torch.zeros(1, 0, device=self.device)
+            x = self.flows[c].inverse(z, c_empty)
+            samples.append(x.squeeze(0))
+        return torch.stack(samples)
+
+    def generate_cross_class(self, n_samples: int) -> torch.Tensor:
+        """策略C: 条件不匹配 → 精确边界样本.
+        从c1的z采样, 但用c2的Flow逆变换 → 不属于任何类的边界样本."""
+        samples = []
+        for _ in range(n_samples):
+            c1, c2 = random.sample(self.unique_classes, 2)
+            z = torch.randn(1, self.feature_dim, device=self.device)
+            # 用c2的Flow逆变换c1的z → 生成不匹配样本
+            c_empty = torch.zeros(1, 0, device=self.device)
+            x = self.flows[c2].inverse(z, c_empty)
+            samples.append(x.squeeze(0))
+        return torch.stack(samples)
+
+    def sample(self, n: int, strategy: str = 'mix') -> torch.Tensor:
+        """混合采样: 默认三种策略各1/3."""
+        if strategy == 'mix':
+            n1 = n // 3
+            n2 = n // 3
+            n3 = n - n1 - n2
+            parts = []
+            if n1 > 0:
+                parts.append(self.generate_interpolation(n1, alpha=random.uniform(0.3, 0.7)))
+            if n2 > 0:
+                parts.append(self.generate_low_density(n2, z_scale=random.uniform(1.5, 3.0)))
+            if n3 > 0:
+                parts.append(self.generate_cross_class(n3))
+            return torch.cat(parts, dim=0)
+        elif strategy == 'interpolation':
+            return self.generate_interpolation(n)
+        elif strategy == 'low_density':
+            return self.generate_low_density(n)
+        elif strategy == 'cross_class':
+            return self.generate_cross_class(n)
+        else:
+            return self.generate_low_density(n)
+
+
+# ============================================================
+# 3c. Lightweight Flow Transform (osr21b) — 可学习特征变换
+# ============================================================
+
+class LightweightFlowTransform(nn.Module):
+    """
+    osr21b: 轻量可学习Flow特征变换.
+
+    与osr18 ConditionalINN的区别:
+      - 无condition (不依赖class_id)
+      - 使用固定条件c=0 (无条件Flow)
+      - 2层coupling, 更轻量
+      - 训练目标: 分类loss驱动, 非MLE
+
+    用途: 将特征变换到线性可分性更好的空间,
+    使anti_prototype的反射操作更准确.
+    """
+    def __init__(self, input_dim: int, n_coupling_layers: int = 2,
+                 hidden_dim: int = 32):
+        super().__init__()
+        self.input_dim = input_dim
+        self.flow = ConditionalINN(
+            input_dim=input_dim,
+            condition_dim=0,  # 无条件
+            num_coupling_layers=n_coupling_layers,
+            hidden_dims=[hidden_dim, hidden_dim],
+            use_permutation=True,
+            permutation_type='fixed',
+            dropout=0.1,
+            s_clamp_max=2.0
+        )
+        self._c_empty = None  # cached empty condition
+
+    def _get_c_empty(self, batch_size: int, device: torch.device):
+        if self._c_empty is None or self._c_empty.size(0) != batch_size:
+            self._c_empty = torch.zeros(batch_size, 0, device=device)
+        return self._c_empty
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward transform: features → transformed features."""
+        c = self._get_c_empty(x.size(0), x.device)
+        z, _ = self.flow(x, c, compute_jacobian=False)
+        return z
+
+    def forward_with_logdet(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward with log determinant (for osr21c Jacobian scoring)."""
+        c = self._get_c_empty(x.size(0), x.device)
+        return self.flow(x, c, compute_jacobian=True)
+
+    def inverse(self, z: torch.Tensor) -> torch.Tensor:
+        """Inverse transform."""
+        c = self._get_c_empty(z.size(0), z.device)
+        return self.flow.inverse(z, c)
+
+
+# ============================================================
 # 4. Episodic Flow Classifier
 # ============================================================
 
@@ -1238,11 +1467,13 @@ class EpisodicFlowClassifier(nn.Module):
     OOD detection via feature-space methods (Mahalanobis, anti-prototype, etc.)
     """
 
-    def __init__(self, input_dim: int = 64, condition_dim: int = 64):
+    def __init__(self, input_dim: int = 64, condition_dim: int = 64,
+                 use_flow_transform: bool = True):
         super().__init__()
 
         self.input_dim = input_dim
         self.condition_dim = condition_dim
+        self.use_flow_transform = use_flow_transform
 
         # Feature adapter: trainable transform to refine frozen cached features
         # Learns a class-agnostic rotation/scaling of the feature space
@@ -1251,6 +1482,14 @@ class EpisodicFlowClassifier(nn.Module):
             nn.Linear(input_dim, input_dim),
             nn.LayerNorm(input_dim),
         )
+
+        # osr21b: Lightweight Flow transform for non-linear feature space mapping
+        if use_flow_transform:
+            self.feature_transform = LightweightFlowTransform(
+                input_dim=input_dim,
+                n_coupling_layers=2,
+                hidden_dim=input_dim // 2
+            )
 
         # Prototypical distance head (strong few-shot classification signal)
         # Operates in full 64-dim space for classification quality
@@ -1299,6 +1538,11 @@ class EpisodicFlowClassifier(nn.Module):
         """
         # --- Feature adaptation (refine cached features) ---
         features, prototypes = self.adapt_features(features, prototypes)
+
+        # osr21b: Optional Flow transform for non-linear boundary
+        if self.use_flow_transform:
+            features = self.feature_transform(features)
+            prototypes = self.feature_transform(prototypes)
 
         # --- Prototypical distance path (64-dim) ---
         dist_feats = self.distance_head(features)     # (B, D)
@@ -1613,13 +1857,15 @@ class CurriculumOODSampler:
     """
 
     def __init__(self, base_features: torch.Tensor, base_classes: List[int],
-                 device: str = 'cuda', n_components: int = 6):
+                 device: str = 'cuda', n_components: int = 6,
+                 use_flow_generator: bool = True):
         """
         Args:
             base_features: (N, D) base类特征
             base_classes: base类ID列表
             device: 'cuda' or 'cpu'
             n_components: GMM分量数
+            use_flow_generator: osr21a — 使用Flow生成器替代GMM
         """
         self.device = device
         self.base_classes = base_classes
@@ -1628,10 +1874,25 @@ class CurriculumOODSampler:
         # Level 1: 简单扰动不需要预计算
         print("  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)")
 
-        # Level 2: GMM边界采样器
-        print("  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...")
-        self._gmm_sampler = GMMBoundarySampler(
-            base_features, device, n_components=n_components, pool_size=5000)
+        # Level 2: osr21a Flow生成器 or GMM边界采样器
+        self._flow_generator = None
+        self._gmm_sampler = None
+        self.use_flow_generator = use_flow_generator
+
+        if use_flow_generator:
+            print("  CurriculumOODSampler Level 2: osr21a Flow OOD Generator...")
+            # 构建类标签
+            samples_per_class = len(base_features) // len(base_classes)
+            class_labels = torch.cat([
+                torch.full((samples_per_class,), c) for c in base_classes
+            ])
+            self._flow_generator = FlowOODGenerator(
+                base_features, class_labels, device,
+                n_coupling_layers=3, hidden_dim=64, epochs=200, lr=1e-3)
+        else:
+            print("  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...")
+            self._gmm_sampler = GMMBoundarySampler(
+                base_features, device, n_components=n_components, pool_size=5000)
 
         # Level 3: 对抗采样器（延迟初始化，需要分类器）
         self._adversarial_sampler = None
@@ -1719,7 +1980,9 @@ class CurriculumOODSampler:
         return torch.stack(pseudo).to(self.device)
 
     def _sample_level2(self, n: int) -> torch.Tensor:
-        """Level 2: 中等难度 - GMM边界样本"""
+        """Level 2: osr21a Flow生成 or GMM边界样本"""
+        if self._flow_generator is not None:
+            return self._flow_generator.sample(n, strategy='mix')
         return self._gmm_sampler.sample(n)
 
     def _sample_level3(self, n: int) -> torch.Tensor:
@@ -1727,7 +1990,7 @@ class CurriculumOODSampler:
         Level 3: 困难模式 - 靠近决策边界的对抗样本
 
         策略：在特征空间中找到"让分类器不确定"的点
-        - 随机采样候选点
+        - 随机采样候选点 (优先使用Flow生成器)
         - 计算分类熵（熵越高 = 越不确定）
         - 选择熵最高的点作为伪OOD
         """
@@ -1735,8 +1998,11 @@ class CurriculumOODSampler:
             # 如果分类器未设置，回退到 Level 2
             return self._sample_level2(n)
 
-        # 生成候选样本 (GMM边界附近)
-        candidates = self._gmm_sampler.sample(n * 5)  # 多生成一些
+        # 生成候选样本 (Flow生成 or GMM边界附近)
+        if self._flow_generator is not None:
+            candidates = self._flow_generator.sample(n * 5, strategy='low_density')
+        else:
+            candidates = self._gmm_sampler.sample(n * 5)  # 多生成一些
 
         # 计算每个候选的分类熵
         with torch.no_grad():
@@ -1826,7 +2092,8 @@ class EpisodicTrainer:
         # osr17b: Curriculum OOD sampler with 3 difficulty levels
         print("Initializing Curriculum OOD Sampler (3-level progressive training)...")
         self._ood_sampler = CurriculumOODSampler(
-            self._base_all, base_classes, device, n_components=len(base_classes))
+            self._base_all, base_classes, device, n_components=len(base_classes),
+            use_flow_generator=True)  # osr21a: Flow OOD Generator
 
         # Freeze feature extractor
         self.feature_extractor = feature_extractor.freeze()
@@ -2675,6 +2942,15 @@ class OSRCalibrator:
         # osr20b: ensemble
         if method == 'ensemble_anti_oodext':
             return self.score_ensemble_anti_oodext(features, prototypes, batch_size)
+        # osr21b: anti_prototype in Flow-transformed space
+        if method == 'anti_prototype_flow':
+            return self.score_anti_prototype_flow(features, prototypes, batch_size)
+        # osr21c: Flow Jacobian scoring
+        if method == 'flow_jacobian':
+            return self.score_flow_jacobian(features, prototypes, batch_size)
+        # osr21c: triple ensemble
+        if method == 'ensemble_triple':
+            return self.score_ensemble_triple(features, prototypes, batch_size)
         return self.score_samples_feat_mahalanobis(features, prototypes, batch_size)
 
     # ---- osr20b: Ensemble anti_prototype + ood_head_extended ----
@@ -2770,6 +3046,176 @@ class OSRCalibrator:
         alpha = getattr(self, '_ens_fusion_alpha', 0.7)
         return alpha * norm_anti + (1 - alpha) * norm_ood
 
+    # ---- osr21b: Anti-prototype in Flow-transformed space ----
+
+    def score_anti_prototype_flow(self, features: torch.Tensor,
+                                   prototypes: torch.Tensor,
+                                   batch_size: int = 4096) -> torch.Tensor:
+        """osr21b: Anti-prototype scoring in Flow-transformed feature space."""
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            # Transform prototypes once
+            adapted_protos = self.flow.feature_adapter(prototypes)
+            if self.flow.use_flow_transform:
+                adapted_protos = self.flow.feature_transform(adapted_protos)
+
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                # Same transform path as classify()
+                adapted_batch = self.flow.feature_adapter(batch)
+                if self.flow.use_flow_transform:
+                    adapted_batch = self.flow.feature_transform(adapted_batch)
+
+                feat_center = adapted_batch.mean(dim=0, keepdim=True)
+                anti_protos = 2 * feat_center - adapted_protos
+                dist_proto = torch.cdist(adapted_batch, adapted_protos, p=2).min(dim=1).values
+                dist_anti = torch.cdist(adapted_batch, anti_protos, p=2).min(dim=1).values
+                scores = -dist_proto + dist_anti
+                all_scores.append(scores.cpu())
+        return torch.cat(all_scores)
+
+    # ---- osr21c: Flow Jacobian (log_det) scoring ----
+
+    def score_flow_jacobian(self, features: torch.Tensor,
+                             prototypes: torch.Tensor,
+                             batch_size: int = 4096) -> torch.Tensor:
+        """osr21c: Use Flow Jacobian log_det as OSR signal.
+        Known features → well-modeled → stable log_det.
+        Unknown features → extrapolation → abnormal log_det."""
+        self.flow.eval()
+        if not self.flow.use_flow_transform:
+            # No Flow transform available, return zeros
+            return torch.zeros(len(features))
+
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                adapted = self.flow.feature_adapter(batch)
+                _, log_det = self.flow.feature_transform.forward_with_logdet(adapted)
+                # Use absolute log_det as OOD signal
+                # Higher |log_det| → more "stretched" → potentially OOD
+                all_scores.append(-log_det.abs().cpu())
+        return torch.cat(all_scores)
+
+    # ---- osr21c: Triple ensemble (anti_proto + ood_ext + flow_jacobian) ----
+
+    def train_ensemble_triple(self, prototypes: torch.Tensor,
+                               target_fpr: float = 0.05,
+                               batch_size: int = 4096):
+        """osr21c: Three-way ensemble = anti_proto + ood_head_ext + flow_jacobian."""
+        print("Training triple ensemble (anti_proto + ood_head_extended + flow_jacobian)...")
+
+        # Ensure base ensemble is trained
+        self.train_ensemble_anti_oodext(prototypes, target_fpr)
+
+        # Get flow jacobian scores
+        known_jac_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_jac_list.append(self.score_flow_jacobian(feats, prototypes, batch_size))
+        known_jac = torch.cat(known_jac_list)
+
+        unknown_jac_list = []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_jac_list.append(self.score_flow_jacobian(feats, prototypes, batch_size))
+        unknown_jac = torch.cat(unknown_jac_list) if unknown_jac_list else torch.tensor([])
+
+        # Store Jacobian normalization stats
+        self._jac_mu = known_jac.mean().item()
+        self._jac_std = known_jac.std().item() + 1e-8
+
+        # Search optimal three-way fusion weights
+        # Fix the anti+oodext alpha, search for jacobian weight gamma
+        # Score = (1-gamma) * [alpha*anti + (1-alpha)*ood] + gamma * jac
+        alpha = getattr(self, '_ens_fusion_alpha', 0.7)
+        has_unknown = len(unknown_jac) > 0
+
+        # Pre-compute anti+oodext combined
+        known_anti_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_anti_list.append(self.score_anti_prototype_all(feats, prototypes, batch_size))
+        known_anti = torch.cat(known_anti_list)
+        known_ood = torch.cat([
+            self.score_ood_head_extended(self.cache.get_class_features(c), prototypes, batch_size)
+            for c in self.base_classes
+        ])
+
+        ens_anti_mu = getattr(self, '_ens_anti_mu', known_anti.mean().item())
+        ens_anti_std = getattr(self, '_ens_anti_std', known_anti.std().item() + 1e-8)
+        ens_ood_mu = getattr(self, '_ens_ood_mu', known_ood.mean().item())
+        ens_ood_std = getattr(self, '_ens_ood_std', known_ood.std().item() + 1e-8)
+
+        known_base = alpha * (known_anti - ens_anti_mu) / ens_anti_std + \
+                     (1 - alpha) * (known_ood - ens_ood_mu) / ens_ood_std
+        norm_known_jac = (known_jac - self._jac_mu) / self._jac_std
+
+        if has_unknown:
+            unknown_anti = torch.cat([
+                self.score_anti_prototype_all(self.cache.get_class_features(c), prototypes, batch_size)
+                for c in self.unknown_classes if len(self.cache.get_class_features(c)) > 0
+            ])
+            unknown_ood = torch.cat([
+                self.score_ood_head_extended(self.cache.get_class_features(c), prototypes, batch_size)
+                for c in self.unknown_classes if len(self.cache.get_class_features(c)) > 0
+            ])
+            unknown_base = alpha * (unknown_anti - ens_anti_mu) / ens_anti_std + \
+                          (1 - alpha) * (unknown_ood - ens_ood_mu) / ens_ood_std
+            norm_unknown_jac = (unknown_jac - self._jac_mu) / self._jac_std
+
+        best_gamma, best_j = 0.0, -1.0
+        for gamma in [0.0, 0.05, 0.1, 0.15, 0.2, 0.3]:
+            combined_known = (1 - gamma) * known_base + gamma * norm_known_jac
+            sorted_k = combined_known.sort()[0]
+            idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+            tau = sorted_k[idx].item()
+            tnr = (combined_known >= tau).float().mean().item()
+
+            if has_unknown:
+                combined_unknown = (1 - gamma) * unknown_base + gamma * norm_unknown_jac
+                tpr = (combined_unknown < tau).float().mean().item()
+            else:
+                tpr = 0.0
+
+            j = tnr + tpr - 1.0
+            if j > best_j:
+                best_j, best_gamma = j, gamma
+
+        self._triple_gamma = best_gamma
+        self._triple_alpha = alpha
+        print(f"  Triple ensemble: alpha(anti)={alpha:.2f}, "
+              f"beta(ood)={1-alpha:.2f}, gamma(jac)={best_gamma:.2f}, "
+              f"Youden J={best_j:.3f}")
+
+    def score_ensemble_triple(self, features: torch.Tensor,
+                               prototypes: torch.Tensor,
+                               batch_size: int = 4096) -> torch.Tensor:
+        """osr21c: Three-way ensemble scoring."""
+        anti_scores = self.score_anti_prototype_all(features, prototypes, batch_size)
+        ood_scores = self.score_ood_head_extended(features, prototypes, batch_size)
+        jac_scores = self.score_flow_jacobian(features, prototypes, batch_size)
+
+        alpha = getattr(self, '_triple_alpha', 0.7)
+        gamma = getattr(self, '_triple_gamma', 0.0)
+
+        ens_anti_mu = getattr(self, '_ens_anti_mu', 0.0)
+        ens_anti_std = getattr(self, '_ens_anti_std', 1.0)
+        ens_ood_mu = getattr(self, '_ens_ood_mu', 0.0)
+        ens_ood_std = getattr(self, '_ens_ood_std', 1.0)
+        jac_mu = getattr(self, '_jac_mu', 0.0)
+        jac_std = getattr(self, '_jac_std', 1.0)
+
+        norm_anti = (anti_scores - ens_anti_mu) / ens_anti_std
+        norm_ood = (ood_scores - ens_ood_mu) / ens_ood_std
+        norm_jac = (jac_scores - jac_mu) / jac_std
+
+        base = alpha * norm_anti + (1 - alpha) * norm_ood
+        return (1 - gamma) * base + gamma * norm_jac
+
     # ---- Learned OOD head (logistic regression) ----
 
     def train_ood_head(self, prototypes: torch.Tensor,
@@ -2850,7 +3296,8 @@ class OSRCalibrator:
         if method in ('feature_mahalanobis', 'feat_mahalanobis_relative', 'geo_fusion',
                        'anti_prototype', 'anti_prototype_enhanced', 'ood_head',
                        'learned_ensemble', 'anti_proto_var_norm', 'anti_proto_cosine',
-                       'ood_head_extended'):
+                       'ood_head_extended', 'anti_prototype_flow', 'flow_jacobian',
+                       'ensemble_triple'):
             print("Computing feature-space statistics...")
             self.compute_feat_stats()
 
@@ -2859,7 +3306,7 @@ class OSRCalibrator:
             self.compute_class_variances(prototypes)
 
         # Transductive refinement
-        if method not in ('learned_ensemble', 'ood_head_extended'):
+        if method not in ('learned_ensemble', 'ood_head_extended', 'flow_jacobian', 'ensemble_triple'):
             support_feats_list = []
             support_labels_list = []
             query_feats_list = []
@@ -3004,6 +3451,61 @@ class OSRCalibrator:
             print(f"\nThreshold (tau): {self.threshold:.4f}")
             return self.threshold
 
+        # osr21b: anti_prototype_flow calibration
+        if method == 'anti_prototype_flow':
+            known_scores = self.score_anti_prototype_flow(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_anti_prototype_flow(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
+        # osr21c: Flow Jacobian calibration
+        if method == 'flow_jacobian':
+            known_scores = self.score_flow_jacobian(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_flow_jacobian(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
+        # osr21c: Triple ensemble calibration
+        if method == 'ensemble_triple':
+            self.train_ensemble_triple(prototypes, target_fpr)
+            known_scores = self.score_ensemble_triple(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_ensemble_triple(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
         # Score known and unknown samples
         known_scores_list = []
         for c in self.base_classes:
@@ -3089,7 +3591,8 @@ class OSRCalibrator:
 
             # Transductive refinement
             if method not in ('feature_mahalanobis', 'feat_mahalanobis_relative',
-                              'learned_ensemble', 'ood_head_extended'):
+                              'learned_ensemble', 'ood_head_extended',
+                              'flow_jacobian', 'ensemble_triple'):
                 support_feats_list = []
                 support_labels_list = []
                 query_feats_list = []
@@ -3192,6 +3695,17 @@ class OSRCalibrator:
             if method == 'ensemble_anti_oodext':
                 if round_i == 0:
                     self.train_ensemble_anti_oodext(prototypes, target_fpr)
+                else:
+                    self.train_ood_head_extended(prototypes, target_fpr, verbose=False)
+
+            # osr21b: anti_prototype_flow (no per-round training needed)
+
+            # osr21c: Flow Jacobian (no per-round training needed)
+
+            # osr21c: triple ensemble setup
+            if method == 'ensemble_triple':
+                if round_i == 0:
+                    self.train_ensemble_triple(prototypes, target_fpr)
                 else:
                     self.train_ood_head_extended(prototypes, target_fpr, verbose=False)
 
@@ -3468,7 +3982,7 @@ def main():
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr20'  # osr20: feature-space OSR only (flow removed)
+    experiment_dir = 'experiment/yamnet_fewshot_osr21'  # osr21: Flow-augmented feature-space OSR
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
@@ -3590,6 +4104,7 @@ def main():
     flow_classifier = EpisodicFlowClassifier(
         input_dim=feature_dim,
         condition_dim=feature_dim,
+        use_flow_transform=False,  # osr21a: 仅Flow OOD Generator, 不启用LightweightFlowTransform
     )
 
     # OOD exposure: provide unknown class features for open-set training
@@ -3716,6 +4231,63 @@ def main():
         method='ensemble_anti_oodext', recalibrate_per_round=True,
         use_per_class_threshold=True)
 
+    # ============ osr21 new methods ============
+
+    # osr21b: Anti-prototype in Flow-transformed space
+    print(f"\n--- OSR ANTI_PROTOTYPE_FLOW calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='anti_prototype_flow')
+
+    print(f"\n--- OSR ANTI_PROTOTYPE_FLOW evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['anti_prototype_flow'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='anti_prototype_flow', recalibrate_per_round=True)
+
+    # osr21c: Flow Jacobian scoring
+    print(f"\n--- OSR FLOW_JACOBIAN calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='flow_jacobian')
+
+    print(f"\n--- OSR FLOW_JACOBIAN evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['flow_jacobian'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='flow_jacobian', recalibrate_per_round=True)
+
+    # osr21c: Triple ensemble (anti_proto + ood_head_ext + flow_jacobian)
+    print(f"\n--- OSR ENSEMBLE_TRIPLE calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_triple')
+
+    print(f"\n--- OSR ENSEMBLE_TRIPLE evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['ensemble_triple'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='ensemble_triple', recalibrate_per_round=True)
+
+    # osr21 bonus: Flow anti_proto + Flow Jacobian ensemble
+    print(f"\n--- OSR ANTI_PROTOTYPE_FLOW per-class evaluation ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['anti_prototype_flow_per_class'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='anti_prototype_flow', recalibrate_per_round=True,
+        use_per_class_threshold=True)
+
     # Summary comparison
     print(f"\n{'='*70}")
     print("OSR Method Comparison (test data, per-round recalibration)")
@@ -3737,6 +4309,7 @@ def main():
             'base_classes': base_classes,
             'unknown_classes': unknown_classes,
             'scoring_method': best_method,
+            'use_flow_transform': True,  # osr21b
         },
         'base_results': base_results,
         'novel_results': novel_results,

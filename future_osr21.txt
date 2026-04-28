@@ -1,159 +1,409 @@
-OSR21 实验计划: Flow辅助增强FOAC-AIFP的OSR能力
+OSR21 实验计划: Flow原理辅助的特征空间OSR改进
 ============================================
 
 ════════════════════════════════════════════════════════════════════
-〇、Baseline记录 (历史最优 + FOAC-AIFP基线)
+〇、Baseline记录 (含历史最优 + tau22_v2参考)
 ════════════════════════════════════════════════════════════════════
 
-  ── osr18a (历史最优模型, FewShotFlowACModel) ──
+  ── osr20b (episodic_trainer历史最优, 无Flow) ──
+    训练配置: EpisodicFlowClassifier (无Flow, 纯prototypical distance)
+    闭集Val ACC: 70.07%
+    最优OSR: ensemble_anti_oodext TPR=22.91% TNR=95.00% OSR=58.95%
+    融合: 60% anti_prototype + 40% ood_head_extended
+    其他: anti_prototype 18.92%, anti_prototype_per_class 21.21%
+          ood_head_extended 16.33%, feature_mahalanobis 12.54%
+    结论: anti_proto(几何) + ood_head_ext(统计) 信号互补, 融合有效
+
+  ── tau22_v2 (FOAC-AIFP参考模型, My_Net + Attention) ──
+    训练配置: My_Net (ResNet18 + PAM + CIAM + NPM, 无Flow)
+    训练参数: SGD, LR=0.001/0.05, epochs=80, temperature=10.0
+    Episode: 2-way 2-open-way 5-shot 15-query, 400 train / 200 test
+    模型: model_TAU22_max_acc.pth
+      ACC:       66.700 ± 1.672
+      TNR:       96.667 ± 0.000
+      TPR:       13.583 ± 1.931
+      OSR Score: 55.125 ± 0.965
+      Loss:      1.05370
+    模型: model_TAU22_max_auroc.pth
+      ACC:       66.100 ± 1.616
+      TNR:       96.667 ± 0.000
+      TPR:       13.117 ± 1.988
+      OSR Score: 54.892 ± 0.994
+      Loss:      1.04753
+    模型: model_TAU22_max_fscore.pth
+      ACC:       66.267 ± 1.768
+      TNR:       96.667 ± 0.000
+      TPR:       14.033 ± 2.015
+      OSR Score: 55.350 ± 1.008
+      Loss:      1.06150
+    tau22_v2与osr20对比:
+      - ACC: 66.7% vs 70.07% (osr20高3.4%)
+      - TPR: 13.58% vs 22.91% (osr20高9.3%)
+      - tau22使用attention机制生成伪类中心, 无episodic meta-training
+      - tau22的TNR固定96.67%(硬阈值), osr20可调至95%
+
+  ── 历史baseline (osr18a, 含Flow) ──
     训练配置: FewShotFlowACModel (方案A+C, density模式)
     Flow架构: ConditionalINN(input=32, condition=0, 3 coupling layers, hidden=[32,32])
     闭集ACC: 68.89%
     最优OSR: anti_prototype 17.62%
-    其他: feature_mahalanobis ~13%, geo_fusion ~14%, ood_head 10.48%
-    结论: Flow仅用于分类增强, 不用于OSR
+    结论: Flow对OSR贡献为零, osr20去除Flow后反而提升
 
-  ── osr18b/c (Flow OSR loss调参) ──
-    osr18b: 强反归一化力 3.2:1 → ACC 57.60%, anti_proto 17.20%
-    osr18c: 温和反归一化力 0.5:1 → ACC 64.44%, anti_proto 17.16%
-    统一结论: Flow OSR loss调整对flow OSR无效, 反而伤害分类
-
-  ── osr19a (Flow z空间教师/辅助, 全部失败) ──
-    闭集ACC: 65.82%
-    最优OSR: anti_prototype 17.69%
-    根因: Flow z空间与特征空间同构, Flow密度与特征统计量冗余
-    关键教训: Flow对OSR贡献为零, 改进应从特征空间方向寻找
-
-  ── osr20a (纯特征空间优化) ──
-    模型: EpisodicFlowClassifier (无Flow, 纯prototypical distance)
-    闭集Val ACC: 70.07%
-    anti_proto: 18.92%, per_class: 21.21%
-    ✅ Per-class自适应阈值: +2.29%
-    ✅ OOD head扩展(5→11维): +7.32%
-    ❌ 原型正则化/方差归一化/余弦距离/10-shot: 均无效
-
-  ── osr20b (Ensemble融合, ★历史最优) ──
-    使用osr20a同一模型 (Val ACC 70.07%)
-    ★ ensemble_anti_oodext: TPR=22.91%, TNR=95.00%, OSR=58.95%
-    融合: 60% anti_proto + 40% ood_head_extended
-    结论: anti_proto(几何信号) + ood_head_ext(统计信号) 互补有效
-    总提升: 17.62% → 22.91% (+5.29% TPR, +30%相对提升)
-
-  ── FOAC-AIFP tau22_v2 (当前FOAC基线, ResNet18+CIAM/PAM/NPM) ──
-    model_TAU22_max_acc.pth:    ACC=66.70%  TNR=96.67%  TPR=13.58%  OSR=55.13%
-    model_TAU22_max_auroc.pth:  ACC=66.10%  TNR=96.67%  TPR=13.12%  OSR=54.89%
-    model_TAU22_max_fscore.pth: ACC=66.27%  TNR=96.67%  TPR=14.03%  OSR=55.35%
-    OSR方法: 仅anti_prototype (无ensemble, 无ood_head_extended)
-    差距: vs osr20b = -9.33% TPR
-
-  ── FOAC-AIFP save_tau22 (原始Baseline, 改造前) ──
-    ACC=64.93%  TNR=96.67%  TPR=6.77%  OSR=51.72%  (所有checkpoint相同)
+  ── osr19关键教训 (Flow在特征空间的失败) ──
+    Flow z空间与特征空间同构 → Flow密度与特征统计量冗余
+    根因: 64维特征空间经adapter后已well-structured, Flow学到的变换近似identity
+    ★ 关键约束: Flow不能用于密度估计/评分(已证伪), 需找新角色
 
 
 ════════════════════════════════════════════════════════════════════
-一、osr21实验设计思路
+一、osr21核心思路: Flow原理的新角色
 ════════════════════════════════════════════════════════════════════
 
-  核心策略: 将osr20b的评估方法移植到FOAC-AIFP, 再用Flow原理增强训练
+  osr18/19失败原因回顾:
+    Flow密度估计 ≈ 特征空间密度 → 与Mahalanobis/anti_proto冗余
+    Flow z空间 ≈ 特征空间 → 没有学到新信息
+    → Flow不应被用作"另一个密度估计器"
 
-  过去Flow失败原因分析:
-    ❌ osr18/19: Flow密度估计用于OSR评分 → 完全无效
-       根因: Flow的平滑双射使z空间与特征空间同构, 无额外判别信息
-       根因: 无条件Flow(condition_dim=0)无法区分类别
-       根因: "完美的密度估计器 = 最差的异常检测器"
+  osr21新思路: Flow作为"特征生成器"而非"密度估计器"
+    ┌─────────────────────────────────────────────────────────┐
+    │ osr18/19: features → Flow → density → score (失败,冗余) │
+    │                                                      │
+    │ osr21:    z ~ prior → Flow⁻¹ → pseudo-OOD features    │
+    │           用于增强OOD head训练 (新角色,无冲突)         │
+    │                                                      │
+    │ osr21:    features → Flow(可学习变换) → transformed    │
+    │           在变换后空间做anti_prototype (非线性边界)     │
+    └─────────────────────────────────────────────────────────┘
 
-  osr21 Flow新思路:
-    ✅ Flow不用于评分, 用于训练数据增强
-    ✅ 使用ConditionalINN的采样能力(condition→z→x)
-    ✅ 以PAM原型为条件(condition_dim=512), 使Flow首次类感知
-    ✅ 生成"接近原型但非真实样本"的合成特征作为训练时额外未知类
-    ✅ 测试时仍用ensemble评分(osr21a建立)
-
-
-════════════════════════════════════════════════════════════════════
-二、osr21a: 移植ensemble评分到FOAC-AIFP (无Flow, 建立基线)
-════════════════════════════════════════════════════════════════════
-
-  目标: TPR 22-24% (先消除评估差距)
-
-  修改:
-    1. util.py: 添加ood_head_extended (11维统计特征+LogisticRegression) ✅
-    2. util.py: 添加ensemble_anti_oodext融合 (alpha搜索) ✅
-    3. Network.py: _osr_features扩展, 缓存softmax分数 ✅
-    4. trainer.py: compute_feats改为ensemble流程+per-round recalibration ✅
-    5. C2_Net_train.py: 训练OSR指标更新为ensemble ✅
-
-  osr21a 状态: 代码修改完成, 待训练验证
+  为什么这次不同:
+    1. Flow不参与评分 → 不与anti_proto/ood_head_ext冗余
+    2. Flow生成训练数据 → 间接提升OOD head质量
+    3. Flow变换特征空间 → 捕获非线性边界, 补充anti_proto的线性反射
 
 
 ════════════════════════════════════════════════════════════════════
-三、osr21b: Flow合成未知类增强训练
+二、osr21a: Flow条件生成器 — 改进伪OOD样本质量
 ════════════════════════════════════════════════════════════════════
 
-  目标: TPR 25-28% (在osr21a基础上)
+  ★ 目标: 提升ood_head_extended的TPR (当前16.33%, 目标20%+)
 
-  Flow原理: ConditionalINN(condition=PAM原型) 采样合成特征
-    - Warmup: 训练Flow MLE loss log_prob(support_feat | proto_c)
-    - 增强: 采样 z~N(0,σ²I) (σ>1), x_synth=flow.inverse(z, proto_c)
-    - 集成: 合成特征加入cross_entropy的(N+1)类
+  ── 问题分析 ──
+    当前伪OOD生成 (CurriculumOODSampler):
+      Level 1: mixup + 高斯噪声 → 太简单, OOD head过拟合
+      Level 2: GMM低密度采样 → GMM假设高斯, 边界不精确
+      Level 3: 对抗样本(高熵) → 依赖当前分类器质量, bootstrap循环
 
-  关键区别:
-    ✅ Flow仅用于训练数据生成, 不用于测试评分
-    ✅ condition_dim=512 (PAM原型), 首次类感知Flow
-    vs osr18/19: condition_dim=0, Flow密度用于评分 → 失败
+    GMM的核心限制:
+      - 假设每个类是高斯分布 → 真实特征分布是非高斯的
+      - 低密度区域采样可能产生"不可能"的特征(脱离流形)
+      - GMM生成的样本不够"真实", OOD head学到的边界泛化差
+
+  ── 方案: 用条件Flow替代GMM做伪OOD生成 ──
+
+    步骤1: 训练条件Flow (在Phase 1后, Phase 2前, 一次性)
+      - 输入: base类特征 (按类条件)
+      - Flow架构: 轻量ConditionalINN, 3 coupling layers
+      - 条件: class_id (one-hot或prototype)
+      - 训练目标: 最大化 p(x | class) (标准MLE)
+      - 训练数据: 只用base类特征, 无泄露
+
+    步骤2: 生成伪OOD样本 (每episode动态)
+      策略A — 类间插值:
+        z1, z2 ~ N(0,I)  (两个不同prior样本)
+        z_interp = α·z1 + (1-α)·z2  (在z空间插值)
+        x_interp = Flow⁻¹(z_interp | class_c)  (逆变换到特征空间)
+        → 生成"在类间游走"的样本, 更像真实unknown
+
+      策略B — 低密度区域采样:
+        z ~ N(0,I), 但|z|较大(远离原点)
+        x = Flow⁻¹(z | class_c)
+        → Flow学到的密度 p(x|c) ∝ exp(-|z|²/2)
+        → |z|大的样本在特征空间是低密度的, 更接近边界
+
+      策略C — 类条件不匹配:
+        z ~ N(0,I)
+        x = Flow⁻¹(z | class_c1)  但标记为 "不属于c2"
+        → 生成对c1合法但对c2非法的样本 → 精确的类间边界
+
+    步骤3: 替换CurriculumOODSampler的Level 2
+      - 保留Level 1 (mixup) 作为warmup
+      - Level 2: 从GMM边界采样 → Flow条件生成
+      - 保留Level 3 (对抗样本) 不变
+
+  ── 代码修改点 (episodic_trainer.py) ──
+
+    1. 新增类 FlowOODGenerator (在CurriculumOODSampler之后):
+       ```python
+       class FlowOODGenerator:
+           """用条件Flow生成高质量伪OOD特征样本"""
+           def __init__(self, base_features, class_labels, device,
+                        n_coupling_layers=3, hidden_dim=64):
+               # 轻量ConditionalINN: input_dim=64, condition=class_id
+               self.flow = ConditionalINN(input_dim=64,
+                                          condition_dim=64,
+                                          n_coupling_layers=n_coupling_layers,
+                                          hidden_dims=[hidden_dim, hidden_dim])
+               # 在base类特征上训练 (一次性)
+               self._fit(base_features, class_labels)
+
+           def _fit(self, features, labels, epochs=200, lr=1e-3):
+               # 标准MLE训练: maximize log p(x | class)
+               ...
+
+           def generate_interpolation(self, n_samples, alpha=0.5):
+               # 策略A: z空间插值 → 类间边界样本
+               ...
+
+           def generate_low_density(self, n_samples, z_scale=2.0):
+               # 策略B: 远离原点的z → 特征空间低密度样本
+               ...
+
+           def generate_cross_class(self, n_samples):
+               # 策略C: 条件不匹配 → 精确边界样本
+               ...
+       ```
+
+    2. 修改CurriculumOODSampler:
+       - __init__: 新增FlowOODGenerator选项
+       - _sample_level2: 从FlowOODGenerator生成, 替代GMM
+
+    3. 修改EpisodicTrainer.__init__:
+       - 初始化FlowOODGenerator
+       - 传入CurriculumOODSampler
+
+  ── 预期效果 ──
+    ood_head_extended TPR: 16.33% → 18-20%
+    → ensemble_anti_oodext: 22.91% → 24-26%
+    原因: 更真实的伪OOD → OOD head学到更精确的边界 → 更好的泛化
+
+  ── 风险 ──
+    - Flow在小数据(每类~200样本, 64维)上可能过拟合 → 需正则化
+    - 生成样本质量取决于Flow训练质量 → 需监控生成样本分布
+    - 训练时间增加(一次性, ~2-5分钟)
 
 
 ════════════════════════════════════════════════════════════════════
-四、osr21c: Flow增强NPM假中心生成
+三、osr21b: Flow特征变换器 — 非线性边界增强anti_prototype
 ════════════════════════════════════════════════════════════════════
 
-  目标: TPR 27-30% (在osr21b基础上)
+  ★ 目标: 提升anti_prototype的TPR (当前18.92%, 目标22%+)
 
-  Flow原理: NPM当前生成单一假中心(确定性)
-    → Flow采样K个多样化假中心
-    → 对比push loss: 推开support特征远离假中心
-    → 多中心评分增强开集边界
+  ── 问题分析 ──
+    anti_prototype的核心: 特征 → L2距离 → 原型反射 → 线性判别
+    限制: 假设类间边界是超平面 → 真实边界可能是非线性的(特别是声景特征)
+    osr20已验证: 余弦距离/方差归一化不如L2 → 问题不在度量, 在空间结构
+
+  ── 方案: 用可学习Flow变换特征空间 ──
+
+    核心思路:
+      原始空间: anti(x) = 2·center - proto, score = -d(x,proto) + d(x,anti)
+      变换后: anti'(x) = 2·center' - proto', score = -d(f(x),f(proto)) + d(f(x),f(anti))
+      其中f是可学习的Flow(双射) → 变换后空间可能有更线性的边界
+
+    步骤1: 添加Flow变换层到EpisodicFlowClassifier
+      - 在feature_adapter之后, distance_head之前
+      - Flow是permutation + coupling layers → 可逆, 不丢信息
+      - 训练目标: 在episodic training中端到端优化
+
+    步骤2: 训练
+      - Flow与现有分类器一起训练
+      - 分类loss → 拉开同类/异类距离 → Flow学到使边界更线性
+      - anti_prototype在变换后空间自动获得非线性边界
+
+    步骤3: 评估
+      - 在变换后特征上做anti_prototype
+      - 原始特征和变换特征可ensemble → 捕获线性和非线性边界
+
+  ── 代码修改点 (episodic_trainer.py) ──
+
+    1. 修改EpisodicFlowClassifier:
+       ```python
+       class EpisodicFlowClassifier(nn.Module):
+           def __init__(self, input_dim=64, ...):
+               ...
+               # osr21b: 可学习特征变换Flow
+               self.feature_transform = LightweightFlowTransform(
+                   input_dim=input_dim,
+                   n_coupling_layers=2,  # 轻量, 避免过拟合
+                   hidden_dim=input_dim // 2)
+
+           def classify(self, features, prototypes):
+               # 原始路径: adapt → distance_head → score
+               features, prototypes = self.adapt_features(features, prototypes)
+
+               # osr21b: 可选Flow变换
+               if self.use_flow_transform:
+                   features = self.feature_transform(features)
+                   prototypes = self.feature_transform(prototypes)
+
+               dist_feats = self.distance_head(features)
+               dist_protos = self.distance_head(prototypes)
+               ...
+       ```
+
+    2. 新增LightweightFlowTransform:
+       ```python
+       class LightweightFlowTransform(nn.Module):
+           """轻量可学习Flow特征变换 (2层coupling)"""
+           def __init__(self, input_dim, n_coupling_layers=2, hidden_dim=32):
+               # 比osr18的ConditionalINN更轻量:
+               # - 无condition (不依赖class_id)
+               # - 2层而非3层
+               # - hidden_dim更小
+               ...
+           def forward(self, x):
+               # 可逆变换, 训练时端到端
+               ...
+           def inverse(self, y):
+               # 逆变换, 用于分析
+               ...
+       ```
+
+    3. 评估时新增方法:
+       - score_anti_prototype_flow: 在Flow变换后空间做anti_proto
+       - ensemble_anti_flow_oodext: anti_flow + ood_head_ext 融合
+
+  ── 预期效果 ──
+    anti_prototype TPR: 18.92% → 20-22%
+    → ensemble: 22.91% → 24-26%
+    原因: 非线性变换 → 更好的类间分离 → anti_proto反射更准确
+
+  ── 风险 ──
+    - Flow可能学到identity (osr19的教训) → 需加regularization
+    - 增加训练复杂度 → 需careful LR tuning
+    - 中等风险, 需osr21a先验证Flow生成器有效
 
 
 ════════════════════════════════════════════════════════════════════
-五、osr21d (备选): 梯度扰动合成未知类 (无Flow)
+四、osr21c: Flow Jacobian局部曲率 — 第三种独立OSR信号
 ════════════════════════════════════════════════════════════════════
 
-  如果ConditionalINN在512维上训练不稳定:
-    - 原型间方向扰动: proto_c + α*(proto_a-proto_b)/||...|| + β*N(0,I)
-    - 对抗扰动: 梯度上升最大化分类不确定性
-    - 课程学习: 简单→困难
+  ★ 目标: 提供ensemble的第三种信号 (目标TPR 25%+)
+
+  ── 问题分析 ──
+    osr20b ensemble = anti_proto(几何) + ood_head_ext(统计)
+    如果有第三种独立信号 → 三路融合 → 更鲁棒
+
+  ── 方案: Flow Jacobian的局部体积变化 ──
+
+    核心原理:
+      Flow f: x → z 是双射, Jacobian J(x) = ∂z/∂x
+      log det J(x) = 局部体积变化率
+      - |log det J| 大 → Flow在该点"大幅拉伸/压缩"空间
+      - 已知类中心附近: Flow已学好 → log det J 接近某稳定值
+      - 未知区域: Flow外推 → log det J 异常(偏大或偏小)
+
+    与anti_proto的互补:
+      anti_proto: "这个点到最近原型的距离" (全局几何)
+      log det J:  "Flow在这个点附近如何变形空间" (局部几何)
+      → 不同视角, 可互补
+
+    与ood_head_ext的互补:
+      ood_head_ext: 11个手工统计特征 (全局)
+      log det J: 单个标量, 但反映模型对局部结构的"不确定性"
+      → log det J可作为ood_head_ext的第12个特征
+
+  ── 代码修改点 (episodic_trainer.py) ──
+
+    1. 在OSRCalibrator中新增:
+       ```python
+       def score_flow_jacobian(self, features, prototypes, batch_size=4096):
+           """osr21c: 用Flow Jacobian的log det作为OSR评分"""
+           self.flow.eval()
+           all_scores = []
+           with torch.no_grad():
+               for i in range(0, len(features), batch_size):
+                   batch = features[i:i+batch_size].to(self.device)
+                   # Forward pass with log_det
+                   z, log_det = self.flow.feature_transform.forward_with_logdet(batch)
+                   all_scores.append(log_det.cpu())
+           return torch.cat(all_scores)
+       ```
+
+    2. 三路ensemble:
+       ```python
+       def train_ensemble_triple(self, prototypes, target_fpr):
+           """osr21c: anti_proto + ood_head_ext + flow_jacobian 三路融合"""
+           # 搜索三维权重: alpha, beta, gamma (alpha+beta+gamma=1)
+           ...
+       ```
+
+  ── 预期效果 ──
+    三路ensemble TPR: 22.91% → 25%+
+    但: 高度依赖osr21b的Flow变换是否学到有意义的空间结构
+
+  ── 风险 ──
+    - osr19教训: Flow可能学identity → log det ≈ 0 → 无信号
+    - 需osr21b先验证Flow学到有意义的变换
+    - 高风险高回报
 
 
 ════════════════════════════════════════════════════════════════════
-六、不做的事
+五、实验优先级与依赖关系
 ════════════════════════════════════════════════════════════════════
 
-    Flow相关 (osr18/19已穷尽):
-    ✗ Flow密度/能量/z空间用于OSR评分
-    ✗ 无条件Flow (condition_dim=0已证明无效)
-    ✗ Flow作为教师/辅助评分器
+  执行顺序:
 
-    评估改进已证伪 (osr20a/b):
-    ✗ 原型正则化 (K_shot≥50时完全无效)
-    ✗ 方差归一化/余弦距离 (均不如L2)
-    ✗ per-class阈值用于概率型方法/ensemble
-    ✗ 减少K_shot (10-shot比50-shot差)
+    ┌─────────────────────────────────────────────────────┐
+    │ osr21a (Flow条件生成器) ← 优先级1, 独立, 低风险     │
+    │   ↓ 若有效: ood_head_ext TPR提升                     │
+    │   ↓ 若无效: 说明伪OOD质量不是瓶颈                     │
+    ├─────────────────────────────────────────────────────┤
+    │ osr21b (Flow特征变换器) ← 优先级2, 依赖osr21a验证    │
+    │   ↓ 若有效: anti_proto TPR提升                       │
+    │   ↓ 若无效: 说明特征空间已经足够线性                   │
+    ├─────────────────────────────────────────────────────┤
+    │ osr21c (Flow Jacobian曲率) ← 优先级3, 依赖osr21b    │
+    │   若有效: 三路ensemble, 冲刺25%+                      │
+    └─────────────────────────────────────────────────────┘
+
+  预期目标:
+    osr21a单独: ensemble TPR 22.91% → 24% (通过更好OOD训练)
+    osr21a+b:   ensemble TPR → 25-26%
+    osr21a+b+c: 三路ensemble TPR → 25-28%
+
+  最低目标: 24% (osr21a必须达到)
+  理想目标: 26% (osr21a+b)
+  挑战目标: 28%+ (三路全有效)
 
 
 ════════════════════════════════════════════════════════════════════
-七、执行顺序
+六、不做的事 (延续osr20排除列表 + 新排除)
 ════════════════════════════════════════════════════════════════════
 
-  osr21a (必须先做, 无Flow, 建立ensemble基线)
-      ├── osr21b (Flow训练增强) ──→ osr21c (Flow+NPM)
-      └── osr21d (备选, 梯度扰动)
+    延续osr20排除:
+    ✗ Flow z空间/密度/边界/几何作为OSR直接评分器 (osr18/19已穷尽)
+    ✗ 原型正则化, 方差归一化, 余弦距离, 减少K_shot (osr20a证伪)
+    ✗ per-class阈值应用于概率型方法/ensemble (osr20b证伪)
+
+    osr21新增排除:
+    ✗ Flow密度作为OOD评分 (与Mahalanobis冗余, osr19已证伪)
+    ✗ 复杂Flow架构 (osr18的ConditionalINN太重, 轻量化优先)
+    ✗ Flow端到端与backbone联合训练 (backbone冻结, 只训练Flow+分类头)
+    ✗ 在Flow z空间做OSR (z空间与特征空间同构, osr19已证伪)
 
 
 ════════════════════════════════════════════════════════════════════
-八、实验结果 (待填写)
+七、关键设计原则
 ════════════════════════════════════════════════════════════════════
 
-  (osr21a 结果待填写)
-  (osr21b 结果待填写)
-  (osr21c 结果待填写)
+    1. Flow不参与评分 → 不与现有OSR方法冲突
+       osr18/19失败 = Flow密度与特征统计量冗余
+       osr21 Flow = 生成器/变换器, 间接提升现有方法
+
+    2. 轻量化 → 避免过拟合
+       64维特征, 每类~200样本 → Flow必须轻量
+       2-3 coupling layers, hidden_dim ≤ input_dim
+
+    3. 与现有架构兼容 → 不破坏已验证的osr20流程
+       osr21a: 只替换CurriculumOODSampler的Level 2
+       osr21b: 在feature_adapter后添加可选Flow层
+       osr21c: 在评估阶段添加log_det特征
+
+    4. 防止Flow学identity → osr19的核心教训
+       osr21a: Flow用于生成, 训练loss = MLE on known features
+               即使Flow学identity, 生成的z空间插值仍有意义
+       osr21b: 添加正则化:
+               - log_det正则: 鼓励|log det J| > ε (非平凡变换)
+               - 分类loss驱动: 变换后分类loss下降 → 有用
+       osr21c: 依赖osr21b的Flow, 仅在osr21b有效时启用

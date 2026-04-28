@@ -1,0 +1,579 @@
+GPU: NVIDIA GeForce RTX 4090
+VRAM: 23.5 GB
+
+======================================================================
+Few-Shot Open Set Recognition - Episodic Training Pipeline
+Backbone: yamnet
+======================================================================
+
+Loading datasets...
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+
+Base feature extractor already exists: experiment/yamnet_fewshot_osr21/base_feature_extractor.pth
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr21/base_feature_extractor.pth
+
+======================================================================
+Phase 1: Feature Extraction
+======================================================================
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+  Loaded norm stats from cache: mean_range=[-0.1241, 0.1265] std_range=[0.8861, 1.0877]
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+
+Computing t-SNE on 5000 samples...
+t-SNE plot saved: experiment/yamnet_fewshot_osr21/tsne_features.png
+
+======================================================================
+Phase 2: Episodic Meta-Training
+======================================================================
+OOD exposure: 4 unknown classes, 7200 total samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: osr21a Flow OOD Generator...
+  Flow class 0: 5000 samples, best NLL=-109.94, params=100,224
+  Flow class 1: 5000 samples, best NLL=-112.20, params=100,224
+  Flow class 2: 5000 samples, best NLL=-109.89, params=100,224
+  Flow class 3: 5000 samples, best NLL=-111.19, params=100,224
+  Flow class 4: 5000 samples, best NLL=-109.66, params=100,224
+  Flow class 5: 5000 samples, best NLL=-113.28, params=100,224
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/yamnet_fewshot_osr21/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 5-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         6000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       150 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        200 episodes
+Stage2 (cls):     400 episodes
+Gaussian prior:   delayed to Phase 2 (ep 201)
+Patience:         3000 episodes (20 evals)
+======================================================================
+
+Ep   150/6000 | CE: 1.5887 Total: 1.5887 Acc: 53.24% | Val Loss: 1.3344 Acc: 65.64% | LR: 3.75e-05 cls:0.0
+  -> Best model saved (Val Acc: 65.64%)
+Ep   300/6000 | CE: 1.5263 Total: 3.3795 Acc: 49.63% | Val Loss: 1.3144 Acc: 66.56% | LR: 5.00e-05 cls:0.2
+  -> Best model saved (Val Acc: 66.56%)
+Ep   450/6000 | CE: 1.4246 Total: 4.1840 Acc: 48.42% | Val Loss: 1.4015 Acc: 64.89% | LR: 4.98e-05 cls:0.5
+Ep   600/6000 | CE: 1.3505 Total: 4.1252 Acc: 48.95% | Val Loss: 1.4203 Acc: 65.60% | LR: 4.95e-05 cls:0.8
+Ep   750/6000 | CE: 1.3177 Total: 4.1341 Acc: 49.19% | Val Loss: 1.3285 Acc: 67.07% | LR: 4.90e-05 cls:1.0
+  -> Best model saved (Val Acc: 67.07%)
+Ep   900/6000 | CE: 1.3010 Total: 4.0909 Acc: 49.48% | Val Loss: 1.3350 Acc: 66.76% | LR: 4.83e-05 cls:1.0
+Ep  1050/6000 | CE: 1.2923 Total: 4.0232 Acc: 49.36% | Val Loss: 1.2574 Acc: 68.24% | LR: 4.76e-05 cls:1.0
+  -> Best model saved (Val Acc: 68.24%)
+Ep  1200/6000 | CE: 1.2878 Total: 4.0516 Acc: 49.52% | Val Loss: 1.2013 Acc: 68.36% | LR: 4.67e-05 cls:1.0
+  -> Best model saved (Val Acc: 68.36%)
+Ep  1350/6000 | CE: 1.2826 Total: 4.0519 Acc: 50.09% | Val Loss: 1.2583 Acc: 65.80% | LR: 4.56e-05 cls:1.0
+Ep  1500/6000 | CE: 1.2321 Total: 4.0499 Acc: 52.47% | Val Loss: 1.2000 Acc: 66.87% | LR: 4.44e-05 cls:1.0
+Ep  1650/6000 | CE: 1.1954 Total: 3.9317 Acc: 54.69% | Val Loss: 1.1978 Acc: 67.13% | LR: 4.31e-05 cls:1.0
+Ep  1800/6000 | CE: 1.1588 Total: 3.8918 Acc: 55.95% | Val Loss: 1.1757 Acc: 67.42% | LR: 4.17e-05 cls:1.0
+Ep  1950/6000 | CE: 1.1330 Total: 3.8997 Acc: 56.53% | Val Loss: 1.1117 Acc: 66.91% | LR: 4.02e-05 cls:1.0
+Ep  2100/6000 | CE: 1.1141 Total: 3.8308 Acc: 57.01% | Val Loss: 1.1233 Acc: 66.49% | LR: 3.86e-05 cls:1.0
+Ep  2250/6000 | CE: 1.0841 Total: 3.7821 Acc: 58.49% | Val Loss: 1.1339 Acc: 66.93% | LR: 3.70e-05 cls:1.0
+Ep  2400/6000 | CE: 1.0859 Total: 3.7955 Acc: 57.82% | Val Loss: 1.0632 Acc: 66.38% | LR: 3.52e-05 cls:1.0
+Ep  2550/6000 | CE: 1.0586 Total: 3.8234 Acc: 58.71% | Val Loss: 1.0549 Acc: 67.69% | LR: 3.34e-05 cls:1.0
+Ep  2700/6000 | CE: 1.0397 Total: 3.7366 Acc: 58.77% | Val Loss: 0.9694 Acc: 66.89% | LR: 3.15e-05 cls:1.0
+Ep  2850/6000 | CE: 1.0432 Total: 3.7313 Acc: 59.02% | Val Loss: 1.0041 Acc: 67.87% | LR: 2.96e-05 cls:1.0
+Ep  3000/6000 | CE: 1.0249 Total: 3.7338 Acc: 58.71% | Val Loss: 0.9891 Acc: 65.82% | LR: 2.77e-05 cls:1.0
+Ep  3150/6000 | CE: 1.0219 Total: 3.7173 Acc: 58.78% | Val Loss: 0.9462 Acc: 66.93% | LR: 2.57e-05 cls:1.0
+Ep  3300/6000 | CE: 1.0273 Total: 3.6942 Acc: 58.23% | Val Loss: 0.9744 Acc: 66.87% | LR: 2.37e-05 cls:1.0
+Ep  3450/6000 | CE: 1.0231 Total: 3.7607 Acc: 58.28% | Val Loss: 0.9431 Acc: 66.31% | LR: 2.18e-05 cls:1.0
+Ep  3600/6000 | CE: 1.0026 Total: 3.7420 Acc: 59.53% | Val Loss: 0.9570 Acc: 65.58% | LR: 1.99e-05 cls:1.0
+Ep  3750/6000 | CE: 1.0123 Total: 3.6683 Acc: 58.60% | Val Loss: 0.9704 Acc: 66.42% | LR: 1.80e-05 cls:1.0
+
+!!! Early stopping at episode 3750 !!!
+
+Loaded best model (Val Acc: 68.36%, Ep 1200)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 68.36%
+======================================================================
+Episode history saved: experiment/yamnet_fewshot_osr21/episodic_history.json
+
+======================================================================
+Phase 3: Evaluation & OSR Calibration
+======================================================================
+
+--- Base class few-shot evaluation (train cache) ---
+5w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w1s eval:   9%|▉         | 9/100 [00:00<00:01, 88.74it/s]5w1s eval:  18%|█▊        | 18/100 [00:00<00:00, 88.97it/s]5w1s eval:  27%|██▋       | 27/100 [00:00<00:00, 88.85it/s]5w1s eval:  36%|███▌      | 36/100 [00:00<00:00, 88.93it/s]5w1s eval:  47%|████▋     | 47/100 [00:00<00:00, 93.03it/s]5w1s eval:  57%|█████▋    | 57/100 [00:00<00:00, 92.42it/s]5w1s eval:  67%|██████▋   | 67/100 [00:00<00:00, 91.63it/s]5w1s eval:  77%|███████▋  | 77/100 [00:00<00:00, 91.85it/s]5w1s eval:  87%|████████▋ | 87/100 [00:00<00:00, 90.97it/s]5w1s eval:  97%|█████████▋| 97/100 [00:01<00:00, 90.27it/s]5w1s eval: 100%|██████████| 100/100 [00:01<00:00, 90.65it/s]
+
+  5-way 1-shot: Acc = 62.64% +/- 2.66% (conf: 91.67%)
+5w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w5s eval:   9%|▉         | 9/100 [00:00<00:01, 88.65it/s]5w5s eval:  19%|█▉        | 19/100 [00:00<00:00, 93.29it/s]5w5s eval:  29%|██▉       | 29/100 [00:00<00:00, 91.78it/s]5w5s eval:  39%|███▉      | 39/100 [00:00<00:00, 92.01it/s]5w5s eval:  49%|████▉     | 49/100 [00:00<00:00, 90.90it/s]5w5s eval:  59%|█████▉    | 59/100 [00:00<00:00, 90.25it/s]5w5s eval:  69%|██████▉   | 69/100 [00:00<00:00, 89.59it/s]5w5s eval:  79%|███████▉  | 79/100 [00:00<00:00, 90.93it/s]5w5s eval:  89%|████████▉ | 89/100 [00:00<00:00, 90.45it/s]5w5s eval:  99%|█████████▉| 99/100 [00:01<00:00, 90.01it/s]5w5s eval: 100%|██████████| 100/100 [00:01<00:00, 90.54it/s]
+
+  5-way 5-shot: Acc = 71.51% +/- 1.31% (conf: 91.04%)
+5w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w10s eval:  10%|█         | 10/100 [00:00<00:00, 90.30it/s]5w10s eval:  20%|██        | 20/100 [00:00<00:00, 88.80it/s]5w10s eval:  29%|██▉       | 29/100 [00:00<00:00, 88.30it/s]5w10s eval:  38%|███▊      | 38/100 [00:00<00:00, 87.59it/s]5w10s eval:  48%|████▊     | 48/100 [00:00<00:00, 90.29it/s]5w10s eval:  58%|█████▊    | 58/100 [00:00<00:00, 90.05it/s]5w10s eval:  68%|██████▊   | 68/100 [00:00<00:00, 90.84it/s]5w10s eval:  78%|███████▊  | 78/100 [00:00<00:00, 90.06it/s]5w10s eval:  88%|████████▊ | 88/100 [00:00<00:00, 89.28it/s]5w10s eval:  97%|█████████▋| 97/100 [00:01<00:00, 88.78it/s]5w10s eval: 100%|██████████| 100/100 [00:01<00:00, 89.23it/s]
+
+  5-way 10-shot: Acc = 72.29% +/- 1.18% (conf: 91.20%)
+
+--- Novel class few-shot evaluation (test cache) ---
+4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:  11%|█         | 11/100 [00:00<00:00, 108.60it/s]4w1s eval:  22%|██▏       | 22/100 [00:00<00:00, 103.56it/s]4w1s eval:  33%|███▎      | 33/100 [00:00<00:00, 102.38it/s]4w1s eval:  44%|████▍     | 44/100 [00:00<00:00, 102.67it/s]4w1s eval:  55%|█████▌    | 55/100 [00:00<00:00, 101.54it/s]4w1s eval:  66%|██████▌   | 66/100 [00:00<00:00, 100.88it/s]4w1s eval:  77%|███████▋  | 77/100 [00:00<00:00, 100.19it/s]4w1s eval:  88%|████████▊ | 88/100 [00:00<00:00, 102.71it/s]4w1s eval:  99%|█████████▉| 99/100 [00:00<00:00, 102.18it/s]4w1s eval: 100%|██████████| 100/100 [00:00<00:00, 102.14it/s]
+
+  4-way 1-shot: Acc = 41.23% +/- 1.97% (conf: 77.70%)
+4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:  11%|█         | 11/100 [00:00<00:00, 102.34it/s]4w5s eval:  22%|██▏       | 22/100 [00:00<00:00, 102.48it/s]4w5s eval:  33%|███▎      | 33/100 [00:00<00:00, 101.20it/s]4w5s eval:  44%|████▍     | 44/100 [00:00<00:00, 100.58it/s]4w5s eval:  55%|█████▌    | 55/100 [00:00<00:00, 100.24it/s]4w5s eval:  66%|██████▌   | 66/100 [00:00<00:00, 102.56it/s]4w5s eval:  77%|███████▋  | 77/100 [00:00<00:00, 102.21it/s]4w5s eval:  88%|████████▊ | 88/100 [00:00<00:00, 101.95it/s]4w5s eval:  99%|█████████▉| 99/100 [00:00<00:00, 102.07it/s]4w5s eval: 100%|██████████| 100/100 [00:00<00:00, 101.74it/s]
+
+  4-way 5-shot: Acc = 46.82% +/- 1.61% (conf: 77.01%)
+4w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w10s eval:  10%|█         | 10/100 [00:00<00:00, 99.26it/s]4w10s eval:  20%|██        | 20/100 [00:00<00:00, 99.47it/s]4w10s eval:  30%|███       | 30/100 [00:00<00:00, 99.52it/s]4w10s eval:  41%|████      | 41/100 [00:00<00:00, 103.14it/s]4w10s eval:  52%|█████▏    | 52/100 [00:00<00:00, 102.34it/s]4w10s eval:  63%|██████▎   | 63/100 [00:00<00:00, 102.89it/s]4w10s eval:  74%|███████▍  | 74/100 [00:00<00:00, 101.82it/s]4w10s eval:  85%|████████▌ | 85/100 [00:00<00:00, 101.11it/s]4w10s eval:  96%|█████████▌| 96/100 [00:00<00:00, 100.71it/s]4w10s eval: 100%|██████████| 100/100 [00:00<00:00, 101.11it/s]
+
+  4-way 10-shot: Acc = 47.63% +/- 1.21% (conf: 75.62%)
+
+--- OSR FEATURE_MAHALANOBIS calibration (calib data) ---
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.55, -1.65] mean=-4.47
+Unknown scores: [-35.31, -1.56] mean=-6.28
+Mean separation: 1.81 (positive = known higher = good)
+
+Threshold (tau): -9.2440
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 15.57%
+
+--- OSR FEATURE_MAHALANOBIS evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   12.54%
+  OSR Score (mean):         53.77%
+
+--- OSR ANTI_PROTOTYPE calibration (calib data) ---
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.71, 12.06] mean=0.40
+Unknown scores: [-6.20, 12.76] mean=1.12
+Mean separation: -0.72 (positive = known higher = good)
+
+Threshold (tau): -2.4658
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 8.89%
+
+--- OSR ANTI_PROTOTYPE evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   18.42%
+  OSR Score (mean):         56.71%
+
+--- OSR GEO_FUSION calibration (calib data) ---
+
+======================================================================
+OSR Calibration (GEO_FUSION)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing geometric fusion normalization stats...
+  Fusion weight: alpha=0.80 (Youden J=0.792)
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-2.85, 5.12] mean=-0.00
+Unknown scores: [-3.68, 5.25] mean=0.16
+Mean separation: -0.16 (positive = known higher = good)
+
+Threshold (tau): -1.2438
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 15.85%
+
+--- OSR GEO_FUSION evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (GEO_FUSION)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   13.98%
+  OSR Score (mean):         54.49%
+
+--- OSR OOD_HEAD calibration (calib data) ---
+
+======================================================================
+OSR Calibration (OOD_HEAD)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [0.23, 0.75] mean=0.59
+Unknown scores: [0.21, 0.74] mean=0.52
+Mean separation: 0.06 (positive = known higher = good)
+
+Threshold (tau): 0.3526
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 15.29%
+
+--- OSR OOD_HEAD evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (OOD_HEAD)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   9.03%
+  OSR Score (mean):         52.01%
+
+--- OSR OOD_HEAD_EXTENDED calibration (calib data) ---
+
+======================================================================
+OSR Calibration (OOD_HEAD_EXTENDED)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training extended OOD head (11-dim features)...
+  Extended OOD head weights:
+              min_dist: -1.4433
+            dist_ratio: -0.0552
+           softmax_max: +0.2249
+               entropy: -0.1670
+             feat_norm: +6.1755
+              2nd_dist: -1.0686
+             score_gap: +0.0667
+        dist_to_center: -4.4889
+       proto_score_var: -0.4001
+       norm_dist_ratio: +1.1158
+      neighbor_density: -0.1442
+  Calib TNR: 95.00%  TPR: 24.71%  (threshold=0.1940)
+Mean separation: 0.22 (positive = known higher = good)
+
+Threshold (tau): 0.1940
+
+--- OSR OOD_HEAD_EXTENDED evaluation (test data, per-round recalib) ---
+
+======================================================================
+OSR Evaluation (OOD_HEAD_EXTENDED)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training extended OOD head (11-dim features)...
+  Extended OOD head weights:
+              min_dist: -0.0552
+            dist_ratio: -0.1504
+           softmax_max: +0.0644
+               entropy: +0.3569
+             feat_norm: -4.4863
+              2nd_dist: -0.2029
+             score_gap: -0.4184
+        dist_to_center: +4.6619
+       proto_score_var: +0.3562
+       norm_dist_ratio: -0.0425
+      neighbor_density: -0.0821
+  Calib TNR: 95.00%  TPR: 19.25%  (threshold=0.2764)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.00%
+  OSR Score (mean):         55.50%
+
+--- OSR ANTI_PROTOTYPE_PER_CLASS calibration (calib data) ---
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.71, 12.06] mean=0.40
+Unknown scores: [-6.20, 12.76] mean=1.12
+Mean separation: -0.72 (positive = known higher = good)
+
+Threshold (tau): -2.4658
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 8.89%
+
+--- OSR ANTI_PROTOTYPE_PER_CLASS evaluation (test data, per-class threshold) ---
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+Threshold: per-class adaptive
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     94.85%
+  Unknown detected (TPR):   20.77%
+  OSR Score (mean):         57.81%
+
+--- OSR OOD_HEAD_EXTENDED_PER_CLASS calibration (calib data) ---
+
+======================================================================
+OSR Calibration (OOD_HEAD_EXTENDED)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training extended OOD head (11-dim features)...
+  Extended OOD head weights:
+              min_dist: -1.4433
+            dist_ratio: -0.0552
+           softmax_max: +0.2249
+               entropy: -0.1670
+             feat_norm: +6.1755
+              2nd_dist: -1.0686
+             score_gap: +0.0667
+        dist_to_center: -4.4889
+       proto_score_var: -0.4001
+       norm_dist_ratio: +1.1158
+      neighbor_density: -0.1442
+  Calib TNR: 95.00%  TPR: 24.71%  (threshold=0.1940)
+Mean separation: 0.22 (positive = known higher = good)
+
+Threshold (tau): 0.1940
+
+--- OSR OOD_HEAD_EXTENDED_PER_CLASS evaluation (test data, per-class threshold) ---
+
+======================================================================
+OSR Evaluation (OOD_HEAD_EXTENDED)
+Mode: per-round recalibration (TNR-fixed at 95%)
+Threshold: per-class adaptive
+======================================================================
+Training extended OOD head (11-dim features)...
+  Extended OOD head weights:
+              min_dist: -0.0552
+            dist_ratio: -0.1504
+           softmax_max: +0.0644
+               entropy: +0.3569
+             feat_norm: -4.4863
+              2nd_dist: -0.2029
+             score_gap: -0.4184
+        dist_to_center: +4.6619
+       proto_score_var: +0.3562
+       norm_dist_ratio: -0.0425
+      neighbor_density: -0.0821
+  Calib TNR: 95.00%  TPR: 19.25%  (threshold=0.2764)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.72%
+  Unknown detected (TPR):   12.01%
+  OSR Score (mean):         53.86%
+
+--- OSR ENSEMBLE_ANTI_OODEXT calibration (calib data) ---
+
+======================================================================
+OSR Calibration (ENSEMBLE_ANTI_OODEXT)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Training ensemble (anti_proto + ood_head_extended) fusion...
+  Ensemble fusion alpha: 0.30 (Youden J=0.149)
+Mean separation: 0.69 (positive = known higher = good)
+
+Threshold (tau): -1.2560
+
+--- OSR ENSEMBLE_ANTI_OODEXT evaluation (test data) ---
+
+======================================================================
+OSR Evaluation (ENSEMBLE_ANTI_OODEXT)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training ensemble (anti_proto + ood_head_extended) fusion...
+  Ensemble fusion alpha: 0.60 (Youden J=0.186)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   22.28%
+  OSR Score (mean):         58.64%
+
+--- OSR ensemble_anti_oodext_per_class evaluation ---
+
+======================================================================
+OSR Evaluation (ENSEMBLE_ANTI_OODEXT)
+Mode: per-round recalibration (TNR-fixed at 95%)
+Threshold: per-class adaptive
+======================================================================
+Training ensemble (anti_proto + ood_head_extended) fusion...
+  Ensemble fusion alpha: 0.60 (Youden J=0.186)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.11%
+  Unknown detected (TPR):   20.41%
+  OSR Score (mean):         57.76%
+
+--- OSR ANTI_PROTOTYPE_FLOW calibration (calib data) ---
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE_FLOW)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Mean separation: 0.52 (positive = known higher = good)
+
+Threshold (tau): -0.8768
+
+--- OSR ANTI_PROTOTYPE_FLOW evaluation (test data) ---
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE_FLOW)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   7.63%
+  OSR Score (mean):         51.32%
+
+--- OSR FLOW_JACOBIAN calibration (calib data) ---
+
+======================================================================
+OSR Calibration (FLOW_JACOBIAN)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Mean separation: 0.00 (positive = known higher = good)
+
+Threshold (tau): 0.0000
+
+--- OSR FLOW_JACOBIAN evaluation (test data) ---
+
+======================================================================
+OSR Evaluation (FLOW_JACOBIAN)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     100.00%
+  Unknown detected (TPR):   0.00%
+  OSR Score (mean):         50.00%
+
+--- OSR ENSEMBLE_TRIPLE calibration (calib data) ---
+
+======================================================================
+OSR Calibration (ENSEMBLE_TRIPLE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training triple ensemble (anti_proto + ood_head_extended + flow_jacobian)...
+Training ensemble (anti_proto + ood_head_extended) fusion...
+  Ensemble fusion alpha: 0.30 (Youden J=0.231)
+  Triple ensemble: alpha(anti)=0.30, beta(ood)=0.70, gamma(jac)=0.00, Youden J=0.231
+Mean separation: 0.88 (positive = known higher = good)
+
+Threshold (tau): -1.4521
+
+--- OSR ENSEMBLE_TRIPLE evaluation (test data) ---
+
+======================================================================
+OSR Evaluation (ENSEMBLE_TRIPLE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training triple ensemble (anti_proto + ood_head_extended + flow_jacobian)...
+Training ensemble (anti_proto + ood_head_extended) fusion...
+  Ensemble fusion alpha: 0.50 (Youden J=0.173)
+  Triple ensemble: alpha(anti)=0.50, beta(ood)=0.50, gamma(jac)=0.00, Youden J=0.173
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   22.81%
+  OSR Score (mean):         58.91%
+
+--- OSR ANTI_PROTOTYPE_FLOW per-class evaluation ---
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE_FLOW)
+Mode: per-round recalibration (TNR-fixed at 95%)
+Threshold: per-class adaptive
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.67%
+  Unknown detected (TPR):   7.47%
+  OSR Score (mean):         51.57%
+
+======================================================================
+OSR Method Comparison (test data, per-round recalibration)
+======================================================================
+  Method                                   TNR      TPR      OSR
+  feature_mahalanobis                  95.00%  12.54%  53.77%
+  anti_prototype                       95.00%  18.42%  56.71%
+  geo_fusion                           95.00%  13.98%  54.49%
+  ood_head                             95.00%   9.03%  52.01%
+  ood_head_extended                    95.00%  16.00%  55.50%
+  anti_prototype_per_class             94.85%  20.77%  57.81%
+  ood_head_extended_per_class          95.72%  12.01%  53.86%
+  ensemble_anti_oodext                 95.00%  22.28%  58.64%
+  ensemble_anti_oodext_per_class       95.11%  20.41%  57.76%
+  anti_prototype_flow                  95.00%   7.63%  51.32%
+  flow_jacobian                       100.00%   0.00%  50.00%
+  ensemble_triple                      95.00%  22.81%  58.91%
+  anti_prototype_flow_per_class        95.67%   7.47%  51.57%
+
+Final model saved: experiment/yamnet_fewshot_osr21/fewshot_final.pth
+
+======================================================================
+Pipeline complete!
+======================================================================
+
+Generating analysis plots from: TAU22_yamnet_osr21a.log
+Output directory: experiment/yamnet_fewshot_osr21
+
+/coding/plot_training.py:313: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+  plt.tight_layout()
+  Saved: experiment/yamnet_fewshot_osr21/phase2_episodic_curves.png
+  Saved: experiment/yamnet_fewshot_osr21/phase3_fewshot_accuracy.png
+/coding/plot_training.py:494: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+  plt.tight_layout()
+  Saved: experiment/yamnet_fewshot_osr21/phase3_osr_analysis.png
+
+All plots saved to: experiment/yamnet_fewshot_osr21/
