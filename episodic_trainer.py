@@ -2093,7 +2093,7 @@ class EpisodicTrainer:
         print("Initializing Curriculum OOD Sampler (3-level progressive training)...")
         self._ood_sampler = CurriculumOODSampler(
             self._base_all, base_classes, device, n_components=len(base_classes),
-            use_flow_generator=True)  # osr21a: Flow OOD Generator
+            use_flow_generator=False)  # osr22: 禁用Flow，使用GMM边界采样器
 
         # Freeze feature extractor
         self.feature_extractor = feature_extractor.freeze()
@@ -2558,6 +2558,108 @@ class OSRCalibrator:
             prototypes.append(proto)
         return torch.stack(prototypes).to(self.device)
 
+    # ---- osr22a: Multi-prototype clustering ----
+
+    def compute_multi_prototypes(self, K_shot: int = 50,
+                                 seed: int = 42,
+                                 K_sub: int = 2,
+                                 adaptive_K: bool = False) -> torch.Tensor:
+        """osr22a: Multi-prototype computation via K-means sub-clustering.
+        Each class is split into K_sub sub-clusters, yielding K_sub*C prototypes total.
+
+        Args:
+            K_shot: samples per class for sub-clustering (use all available if > available)
+            seed: random seed
+            K_sub: number of sub-clusters per class (2-4 recommended)
+            adaptive_K: if True, use silhouette score to select K per class
+
+        Returns:
+            multi_prototypes: (C * K_sub, D) tensor of sub-prototype centers
+            cluster_labels: dict mapping class_id -> list of cluster indices
+        """
+        from sklearn.cluster import MiniBatchKMeans
+        from sklearn.metrics import silhouette_score
+
+        rng = random.Random(seed)
+        all_sub_protos = []
+        cluster_labels = {}
+        sub_proto_idx = 0
+
+        for c_idx, c_id in enumerate(self.base_classes):
+            feats = self.cache.get_class_features(c_id)
+            n = min(K_shot, len(feats))
+            indices = rng.sample(range(len(feats)), n)
+            samples = feats[indices].numpy()  # (n, D)
+
+            # Adaptive K selection using silhouette analysis
+            if adaptive_K and n >= 20:
+                best_k, best_sil = 1, -1.0
+                for k_trial in range(1, min(5, n // 5)):
+                    if n < k_trial * 2:
+                        continue
+                    kmeans = MiniBatchKMeans(n_clusters=k_trial, random_state=seed, batch_size=32)
+                    labels = kmeans.fit_predict(samples)
+                    if len(set(labels)) > 1:
+                        sil = silhouette_score(samples, labels)
+                        if sil > best_sil:
+                            best_k, best_sil = k_trial, sil
+                K_class = best_k
+            else:
+                K_class = K_sub
+
+            # Fit K-means with determined K
+            if K_class == 1 or n < K_class * 2:
+                # Fallback to single prototype if not enough samples
+                sub_proto = samples.mean(axis=0)
+                all_sub_protos.append(sub_proto)
+                cluster_labels[c_id] = [sub_proto_idx]
+                sub_proto_idx += 1
+            else:
+                kmeans = MiniBatchKMeans(n_clusters=K_class, random_state=seed, batch_size=32)
+                kmeans.fit(samples)
+                sub_protos = kmeans.cluster_centers_  # (K_class, D)
+                for sub_proto in sub_protos:
+                    all_sub_protos.append(sub_proto)
+                    cluster_labels[c_id] = list(range(sub_proto_idx, sub_proto_idx + K_class))
+                sub_proto_idx += K_class
+
+        multi_protos = torch.from_numpy(np.stack(all_sub_protos)).float().to(self.device)
+        self._multi_proto_cluster_labels = cluster_labels
+        self._multi_proto_K_sub = K_sub
+
+        return multi_protos
+
+    def score_anti_prototype_multi(self, features: torch.Tensor,
+                                    multi_prototypes: torch.Tensor,
+                                    batch_size: int = 4096) -> torch.Tensor:
+        """osr22a: Multi-prototype anti-prototype OOD scoring.
+        Uses multiple sub-prototypes per class for more precise boundary estimation.
+
+        Scoring: score = -dist_to_nearest_subproto + dist_to_nearest_anti_subproto
+        where anti_subprotos are reflections of subprototypes through batch center.
+        """
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                B = batch.size(0)
+
+                # Query-dependent center
+                feat_center = batch.mean(dim=0, keepdim=True)  # (1, D)
+
+                # Anti-sub-prototypes: reflection through center
+                anti_protos = 2 * feat_center - multi_prototypes  # (M, D)
+
+                # Distances to nearest sub-prototype and anti-sub-prototype
+                dist_proto = torch.cdist(batch, multi_prototypes, p=2).min(dim=1).values
+                dist_anti = torch.cdist(batch, anti_protos, p=2).min(dim=1).values
+
+                # Score: close to proto (good), far from anti (good)
+                scores = -dist_proto + dist_anti
+                all_scores.append(scores.cpu())
+        return torch.cat(all_scores)
+
     # ---- Feature-space Mahalanobis scoring ----
 
     def compute_feat_stats(self):
@@ -2907,6 +3009,218 @@ class OSRCalibrator:
         probs = self._ood_ext_clf.predict_proba(feats_scaled)[:, 1]
         return torch.from_numpy(probs).float()
 
+    # ---- osr22b: GMM cluster-enhanced OOD features ----
+
+    def _fit_global_gmm(self, n_components: int = None, random_state: int = 42):
+        """osr22b: Fit global Gaussian Mixture Model on all base class features.
+        Models the overall feature space structure as a mixture of Gaussians."""
+        from sklearn.mixture import GaussianMixture
+
+        # Collect all base class features
+        all_feats_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            all_feats_list.append(feats.numpy())
+        all_feats = np.concatenate(all_feats_list, axis=0)
+
+        # Default: 2x number of classes (captures sub-structure)
+        if n_components is None:
+            n_components = len(self.base_classes) * 2
+
+        print(f"  Fitting GMM with {n_components} components on {len(all_feats)} samples...")
+        self._gmm = GaussianMixture(
+            n_components=n_components,
+            covariance_type='full',
+            max_iter=200,
+            random_state=random_state,
+            reg_covar=1e-6
+        )
+        self._gmm.fit(all_feats)
+        print(f"  GMM converged: {self._gmm.converged_}")
+
+    def _extract_cluster_features(self, features: torch.Tensor,
+                                   batch_size: int = 4096) -> torch.Tensor:
+        """osr22b: Extract GMM-based cluster features (3-dim).
+        Returns: [cluster_mahal, cluster_posterior_max, cluster_entropy]"""
+        if not hasattr(self, '_gmm'):
+            raise RuntimeError("Call _fit_global_gmm() first")
+
+        self.flow.eval()
+        all_cluster_feats = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].numpy()
+
+                # Get weighted log probabilities for all clusters at once (B, K)
+                log_probs = self._gmm._estimate_weighted_log_prob(batch)  # (B, K)
+
+                # Stable posterior computation using log-sum-exp trick
+                log_prob_max = log_probs.max(axis=1, keepdims=True)  # (B, 1)
+                log_prob_shifted = log_probs - log_prob_max  # shift to avoid overflow
+                posteriors = np.exp(log_prob_shifted)
+                posteriors = posteriors / posteriors.sum(axis=1, keepdims=True)  # normalize
+
+                # Mahalanobis distance to nearest cluster
+                mahal_dists = []
+                for k in range(self._gmm.n_components):
+                    mean = self._gmm.means_[k]  # (D,)
+                    cov = self._gmm.covariances_[k]  # (D, D)
+                    prec = self._gmm.precisions_[k]  # (D, D)
+
+                    diff = batch - mean  # (B, D)
+                    # Mahalanobis: sqrt(diff^T @ prec @ diff)
+                    mahal = np.sqrt(np.sum(diff @ prec * diff, axis=1))
+                    mahal_dists.append(mahal)
+
+                mahal_dists = np.stack(mahal_dists, axis=1)  # (B, K)
+
+                # 1. cluster_mahal: min Mahalanobis distance to any cluster
+                cluster_mahal = mahal_dists.min(axis=1, keepdims=True)  # (B, 1)
+
+                # 2. cluster_posterior_max: maximum posterior probability
+                cluster_posterior_max = posteriors.max(axis=1, keepdims=True)  # (B, 1)
+
+                # 3. cluster_entropy: entropy of posterior distribution
+                # Entropy = -sum(p * log(p))
+                posteriors_clipped = np.clip(posteriors, 1e-10, 1.0)  # avoid log(0)
+                cluster_entropy = -(posteriors_clipped * np.log(posteriors_clipped)).sum(
+                    axis=1, keepdims=True)  # (B, 1)
+
+                cluster_feats = np.concatenate([
+                    cluster_mahal,
+                    cluster_posterior_max,
+                    cluster_entropy
+                ], axis=1)  # (B, 3)
+
+                all_cluster_feats.append(cluster_feats)
+
+        return torch.from_numpy(np.concatenate(all_cluster_feats, axis=0))
+
+    def _extract_ood_features_extended_v2(self, features: torch.Tensor,
+                                           prototypes: torch.Tensor,
+                                           batch_size: int = 4096) -> torch.Tensor:
+        """osr22b: Extended OOD features v2 (14-dim) - replaces neighbor_density with GMM cluster features.
+        Features: [min_d, dist_ratio, softmax_max, entropy, feat_norm,
+                   second_d, score_gap, dist_to_center, proto_score_var,
+                   norm_dist_ratio,
+                   cluster_mahal, cluster_posterior_max, cluster_entropy]"""
+        # Original 10 features (excluding neighbor_density)
+        self.flow.eval()
+        all_feats = []
+        feat_center = prototypes.mean(dim=0, keepdim=True)
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                B = batch.size(0)
+                dists = torch.cdist(batch, prototypes, p=2)
+                sorted_d, _ = dists.sort(dim=1)
+                min_d = sorted_d[:, 0:1]
+                second_d = sorted_d[:, 1:2]
+                dist_ratio = min_d / (second_d + 1e-6)
+                score_gap = (second_d - min_d)
+
+                log_probs = self.flow.classify(batch, prototypes)
+                probs = F.softmax(log_probs, dim=1)
+                softmax_max = probs.max(dim=1, keepdim=True)[0]
+                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1, keepdim=True)
+                feat_norm = (batch ** 2).sum(dim=1, keepdim=True).sqrt()
+
+                dist_to_center = torch.cdist(batch, feat_center, p=2)
+                proto_score_var = probs.var(dim=1, keepdim=True)
+                norm_dist_ratio = min_d / (dist_to_center + 1e-6)
+
+                # GMM cluster features (3-dim)
+                cluster_feats = self._extract_cluster_features(
+                    features[i:i+batch_size], batch_size).to(self.device)
+
+                # Combine: 10 original + 3 cluster = 13 features
+                feats = torch.cat([
+                    min_d, dist_ratio, softmax_max, entropy, feat_norm,
+                    second_d, score_gap, dist_to_center,
+                    proto_score_var, norm_dist_ratio,
+                    cluster_feats
+                ], dim=1)
+                all_feats.append(feats.cpu())
+        return torch.cat(all_feats, dim=0)
+
+    def train_ood_head_extended_v2(self, prototypes: torch.Tensor,
+                                    target_fpr: float = 0.05,
+                                    batch_size: int = 4096,
+                                    n_gmm_components: int = None,
+                                    verbose: bool = True):
+        """osr22b: Train extended OOD head v2 with GMM cluster features (13-dim)."""
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+
+        if verbose:
+            print("Training extended OOD head v2 (13-dim with GMM clusters)...")
+
+        # Fit GMM on base class features
+        self._fit_global_gmm(n_components=n_gmm_components)
+
+        known_feats_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_feats_list.append(self._extract_ood_features_extended_v2(
+                feats, prototypes, batch_size))
+        known_feats = torch.cat(known_feats_list).numpy()
+
+        unknown_feats_list = []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_feats_list.append(self._extract_ood_features_extended_v2(
+                    feats, prototypes, batch_size))
+        if not unknown_feats_list:
+            if verbose:
+                print("  No unknown samples, skipping.")
+            return
+        unknown_feats = torch.cat(unknown_feats_list).numpy()
+
+        X = np.concatenate([known_feats, unknown_feats], axis=0)
+        y = np.concatenate([np.ones(len(known_feats)), np.zeros(len(unknown_feats))], axis=0)
+
+        self._ood_ext_v2_scaler = StandardScaler()
+        X_scaled = self._ood_ext_v2_scaler.fit_transform(X)
+
+        self._ood_ext_v2_clf = LogisticRegression(
+            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+        self._ood_ext_v2_clf.fit(X_scaled, y)
+
+        if verbose:
+            feat_names = ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm',
+                          '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var',
+                          'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
+            w = self._ood_ext_v2_clf.coef_[0]
+            print("  Extended OOD head v2 weights:")
+            for name, wi in zip(feat_names, w):
+                print(f"    {name:>20s}: {wi:+.4f}")
+
+        known_probs = self._ood_ext_v2_clf.predict_proba(
+            self._ood_ext_v2_scaler.transform(known_feats))[:, 1]
+        sorted_probs = np.sort(known_probs)
+        idx = min(int(len(sorted_probs) * target_fpr), len(sorted_probs) - 1)
+        self._ood_ext_v2_threshold = sorted_probs[idx]
+
+        if verbose:
+            unknown_probs = self._ood_ext_v2_clf.predict_proba(
+                self._ood_ext_v2_scaler.transform(unknown_feats))[:, 1]
+            tnr = (known_probs >= self._ood_ext_v2_threshold).mean()
+            tpr = (unknown_probs < self._ood_ext_v2_threshold).mean()
+            print(f"  Calib TNR: {tnr:.2%}  TPR: {tpr:.2%}  "
+                  f"(threshold={self._ood_ext_v2_threshold:.4f})")
+
+    def score_ood_head_extended_v2(self, features: torch.Tensor,
+                                    prototypes: torch.Tensor,
+                                    batch_size: int = 4096) -> torch.Tensor:
+        """osr22b: Score using extended OOD head v2 with GMM cluster features."""
+        if not hasattr(self, '_ood_ext_v2_clf'):
+            raise RuntimeError("Call train_ood_head_extended_v2() first")
+        feats = self._extract_ood_features_extended_v2(features, prototypes, batch_size).numpy()
+        feats_scaled = self._ood_ext_v2_scaler.transform(feats)
+        probs = self._ood_ext_v2_clf.predict_proba(feats_scaled)[:, 1]
+        return torch.from_numpy(probs).float()
+
     # ---- Unified scoring interface ----
 
     def score_samples(self, features: torch.Tensor,
@@ -2939,6 +3253,17 @@ class OSRCalibrator:
             return self.score_anti_proto_rectified(features, prototypes, batch_size)
         if method == 'ood_head_extended':
             return self.score_ood_head_extended(features, prototypes, batch_size)
+        # osr22b: extended OOD head v2 with GMM clusters
+        if method == 'ood_head_extended_v2':
+            return self.score_ood_head_extended_v2(features, prototypes, batch_size)
+        # osr22a: multi-prototype anti_prototype
+        if method == 'anti_prototype_multi':
+            # Use cached multi_prototypes if available, else compute
+            if not hasattr(self, '_cached_multi_protos'):
+                K_sub = getattr(self, '_multi_proto_K_sub', 2)
+                multi_protos = self.compute_multi_prototypes(K_shot=50, K_sub=K_sub)
+                self._cached_multi_protos = multi_protos
+            return self.score_anti_prototype_multi(features, self._cached_multi_protos, batch_size)
         # osr20b: ensemble
         if method == 'ensemble_anti_oodext':
             return self.score_ensemble_anti_oodext(features, prototypes, batch_size)
@@ -2951,6 +3276,15 @@ class OSRCalibrator:
         # osr21c: triple ensemble
         if method == 'ensemble_triple':
             return self.score_ensemble_triple(features, prototypes, batch_size)
+        # osr22c: adaptive ensemble fusion
+        if method == 'ensemble_adaptive':
+            return self.score_ensemble_adaptive(features, prototypes, batch_size)
+        # osr22d: cluster boundary detection
+        if method == 'cluster_boundary':
+            return self.score_cluster_boundary(features, prototypes, batch_size)
+        # osr22d: three-way ensemble with cluster boundary
+        if method == 'ensemble_cluster':
+            return self.score_ensemble_cluster(features, prototypes, batch_size)
         return self.score_samples_feat_mahalanobis(features, prototypes, batch_size)
 
     # ---- osr20b: Ensemble anti_prototype + ood_head_extended ----
@@ -3045,6 +3379,364 @@ class OSRCalibrator:
 
         alpha = getattr(self, '_ens_fusion_alpha', 0.7)
         return alpha * norm_anti + (1 - alpha) * norm_ood
+
+    # ---- osr22c: Adaptive cluster-weighted ensemble fusion ----
+
+    def train_ensemble_adaptive(self, prototypes: torch.Tensor,
+                                 target_fpr: float = 0.05,
+                                 batch_size: int = 4096,
+                                 alpha_min: float = 0.3,
+                                 alpha_max: float = 0.9):
+        """osr22c: Train adaptive ensemble fusion with density-based alpha adjustment.
+        Uses GMM cluster posterior to dynamically adjust fusion weight:
+        - High density (high posterior) → trust anti_prototype → alpha close to alpha_max
+        - Low density (low posterior) → trust ood_head → alpha close to alpha_min
+
+        Args:
+            prototypes: class prototypes
+            target_fpr: target false positive rate for threshold
+            batch_size: batch size for feature extraction
+            alpha_min: minimum alpha (for sparse regions)
+            alpha_max: maximum alpha (for dense regions)
+        """
+        from sklearn.preprocessing import StandardScaler
+
+        print("Training adaptive ensemble fusion (GMM density-based alpha)...")
+
+        # Fit GMM for density estimation
+        self._fit_global_gmm()
+
+        # Get anti_prototype scores
+        known_anti_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_anti_list.append(self.score_anti_prototype_all(feats, prototypes, batch_size))
+        known_anti = torch.cat(known_anti_list)
+
+        # Get ood_head_extended_v2 scores (with GMM features)
+        self.train_ood_head_extended_v2(prototypes, target_fpr, batch_size, verbose=False)
+        known_ood_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_ood_list.append(self.score_ood_head_extended_v2(feats, prototypes, batch_size))
+        known_ood = torch.cat(known_ood_list)
+
+        # Get cluster posterior (density) for each sample
+        known_density = self._extract_cluster_features(
+            torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+            batch_size)[:, 1]  # cluster_posterior_max
+
+        # Store normalization stats
+        self._ens_anti_mu = known_anti.mean().item()
+        self._ens_anti_std = known_anti.std().item() + 1e-8
+        self._ens_ood_mu = known_ood.mean().item()
+        self._ens_ood_std = known_ood.std().item() + 1e-8
+
+        # Normalize density to [0, 1] for alpha interpolation
+        density_min = known_density.min().item()
+        density_max = known_density.max().item()
+        self._ens_density_min = density_min
+        self._ens_density_max = density_max - density_min + 1e-8
+
+        # Normalize scores
+        norm_known_anti = (known_anti - self._ens_anti_mu) / self._ens_anti_std
+        norm_known_ood = (known_ood - self._ens_ood_mu) / self._ens_ood_std
+
+        # Compute adaptive alpha for each sample
+        norm_density = (known_density - density_min) / self._ens_density_max
+        adaptive_alpha = alpha_min + (alpha_max - alpha_min) * norm_density
+
+        # Adaptive fusion
+        combined_known = adaptive_alpha * norm_known_anti + (1 - adaptive_alpha) * norm_known_ood
+
+        # Set threshold at target FPR
+        sorted_k, _ = combined_known.sort()
+        idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+        self._ens_adaptive_threshold = sorted_k[idx].item()
+
+        # Compute TNR
+        tnr = (combined_known >= self._ens_adaptive_threshold).float().mean().item()
+
+        # Compute TPR on unknown samples
+        unknown_anti_list = []
+        unknown_ood_list = []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_anti_list.append(self.score_anti_prototype_all(feats, prototypes, batch_size))
+                unknown_ood_list.append(self.score_ood_head_extended_v2(feats, prototypes, batch_size))
+
+        if unknown_anti_list and unknown_ood_list:
+            unknown_anti = torch.cat(unknown_anti_list)
+            unknown_ood = torch.cat(unknown_ood_list)
+            unknown_density = self._extract_cluster_features(
+                torch.cat([self.cache.get_class_features(c) for c in self.unknown_classes
+                           if len(self.cache.get_class_features(c)) > 0]),
+                batch_size)[:, 1]
+
+            norm_unknown_anti = (unknown_anti - self._ens_anti_mu) / self._ens_anti_std
+            norm_unknown_ood = (unknown_ood - self._ens_ood_mu) / self._ens_ood_std
+            norm_unknown_density = (unknown_density - density_min) / self._ens_density_max
+            adaptive_alpha_unknown = alpha_min + (alpha_max - alpha_min) * norm_unknown_density
+
+            combined_unknown = adaptive_alpha_unknown * norm_unknown_anti + (1 - adaptive_alpha_unknown) * norm_unknown_ood
+            tpr = (combined_unknown < self._ens_adaptive_threshold).float().mean().item()
+        else:
+            tpr = 0.0
+
+        j = tnr + tpr - 1.0
+        self._ens_adaptive_alpha_min = alpha_min
+        self._ens_adaptive_alpha_max = alpha_max
+        print(f"  Adaptive ensemble: alpha in [{alpha_min:.2f}, {alpha_max:.2f}], "
+              f"Youden J={j:.3f} (TNR={tnr:.2%}, TPR={tpr:.2%})")
+
+    def score_ensemble_adaptive(self, features: torch.Tensor,
+                                 prototypes: torch.Tensor,
+                                 batch_size: int = 4096) -> torch.Tensor:
+        """osr22c: Score using adaptive ensemble fusion with density-based alpha."""
+        # Get scores
+        anti_scores = self.score_anti_prototype_all(features, prototypes, batch_size)
+        ood_scores = self.score_ood_head_extended_v2(features, prototypes, batch_size)
+
+        # Get density (cluster posterior)
+        density = self._extract_cluster_features(features, batch_size)[:, 1]  # cluster_posterior_max
+
+        # Normalize
+        anti_mu = getattr(self, '_ens_anti_mu', anti_scores.mean().item())
+        anti_std = getattr(self, '_ens_anti_std', anti_scores.std().item() + 1e-8)
+        ood_mu = getattr(self, '_ens_ood_mu', ood_scores.mean().item())
+        ood_std = getattr(self, '_ens_ood_std', ood_scores.std().item() + 1e-8)
+
+        norm_anti = (anti_scores - anti_mu) / anti_std
+        norm_ood = (ood_scores - ood_mu) / ood_std
+
+        # Compute adaptive alpha based on density
+        density_min = getattr(self, '_ens_density_min', 0.0)
+        density_range = getattr(self, '_ens_density_max', 1.0)
+        alpha_min = getattr(self, '_ens_adaptive_alpha_min', 0.3)
+        alpha_max = getattr(self, '_ens_adaptive_alpha_max', 0.9)
+
+        norm_density = (density - density_min) / density_range
+        norm_density = norm_density.clamp(0.0, 1.0)  # ensure in [0, 1]
+        adaptive_alpha = alpha_min + (alpha_max - alpha_min) * norm_density
+
+        return adaptive_alpha * norm_anti + (1 - adaptive_alpha) * norm_ood
+
+    # ---- osr22d: Cluster boundary detection + three-way ensemble ----
+
+    def train_cluster_boundary(self, prototypes: torch.Tensor,
+                                K_shot: int = 50,
+                                K_sub: int = 2,
+                                beta: float = 1.5,
+                                seed: int = 42):
+        """osr22d: Train cluster boundary detector using per-class K-means sub-clustering.
+        For each class, fits K_sub sub-clusters and defines a boundary radius.
+        Samples within the boundary (radius) are considered "known".
+
+        Args:
+            prototypes: base class prototypes (not used for sub-clustering)
+            K_shot: samples per class for sub-clustering
+            K_sub: number of sub-clusters per class
+            beta: boundary radius multiplier (radius = mean_dist + beta * std_dist)
+            seed: random seed
+        """
+        from sklearn.cluster import MiniBatchKMeans
+
+        print(f"Training cluster boundary detector (K_sub={K_sub}, beta={beta})...")
+
+        self._cluster_boundaries = {}  # {class_id: [(center, radius, weight), ...]}
+        rng = random.Random(seed)
+
+        for c_id in self.base_classes:
+            feats = self.cache.get_class_features(c_id)
+            n = min(K_shot, len(feats))
+            indices = rng.sample(range(len(feats)), n)
+            samples = feats[indices].numpy()
+
+            # Fit K-means sub-clusters
+            if K_sub == 1 or n < K_sub * 2:
+                # Single cluster fallback
+                center = samples.mean(axis=0)
+                dists = np.linalg.norm(samples - center, axis=1)
+                mean_dist = dists.mean()
+                std_dist = dists.std()
+                radius = mean_dist + beta * std_dist
+                self._cluster_boundaries[c_id] = [(center, radius, n)]
+            else:
+                kmeans = MiniBatchKMeans(n_clusters=K_sub, random_state=seed, batch_size=32)
+                labels = kmeans.fit_predict(samples)
+
+                boundaries = []
+                for k in range(K_sub):
+                    mask = labels == k
+                    if mask.sum() == 0:
+                        continue
+                    cluster_samples = samples[mask]
+                    center = cluster_samples.mean(axis=0)
+                    dists = np.linalg.norm(cluster_samples - center, axis=1)
+                    mean_dist = dists.mean()
+                    std_dist = dists.std()
+                    radius = mean_dist + beta * std_dist
+                    weight = mask.sum()
+                    boundaries.append((center, radius, weight))
+                self._cluster_boundaries[c_id] = boundaries
+
+        total_clusters = sum(len(v) for v in self._cluster_boundaries.values())
+        print(f"  Cluster boundary detector: {total_clusters} sub-clusters across {len(self.base_classes)} classes")
+
+    def score_cluster_boundary(self, features: torch.Tensor,
+                                prototypes: torch.Tensor,
+                                batch_size: int = 4096) -> torch.Tensor:
+        """osr22d: Score using cluster boundary detection.
+        Higher score = inside cluster boundary = known.
+        Lower score = outside all cluster boundaries = unknown.
+
+        Score = max(0, max_boundary_radius - min_distance_to_any_boundary_center)
+        """
+        if not hasattr(self, '_cluster_boundaries'):
+            raise RuntimeError("Call train_cluster_boundary() first")
+
+        self.flow.eval()
+        all_scores = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].numpy()
+                B = batch.shape[0]  # batch is numpy array, use .shape
+
+                batch_scores = np.full(B, -np.inf)
+
+                # For each sample, find the nearest cluster and compute boundary score
+                for c_id, boundaries in self._cluster_boundaries.items():
+                    for center, radius, weight in boundaries:
+                        # Distance from sample to this cluster center
+                        dists = np.linalg.norm(batch - center, axis=1)  # (B,)
+                        # Score = radius - distance (positive = inside boundary)
+                        cluster_score = radius - dists
+                        batch_scores = np.maximum(batch_scores, cluster_score)
+
+                all_scores.append(torch.from_numpy(batch_scores).float())
+
+        return torch.cat(all_scores)
+
+    def train_ensemble_cluster(self, prototypes: torch.Tensor,
+                                target_fpr: float = 0.05,
+                                batch_size: int = 4096,
+                                K_sub: int = 2,
+                                beta: float = 1.5):
+        """osr22d: Train three-way ensemble = anti_proto + ood_head_ext_v2 + cluster_boundary.
+        Searches optimal fusion weights for combining the three signals."""
+        print("Training three-way ensemble (anti_proto + ood_head_v2 + cluster_boundary)...")
+
+        # Train base ensemble (anti + ood_v2)
+        self.train_ensemble_adaptive(prototypes, target_fpr, batch_size)
+
+        # Train cluster boundary
+        self.train_cluster_boundary(prototypes, K_shot=50, K_sub=K_sub, beta=beta)
+
+        # Get all three scores for known samples
+        known_anti_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_anti_list.append(self.score_anti_prototype_all(feats, prototypes, batch_size))
+        known_anti = torch.cat(known_anti_list)
+
+        known_ood_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_ood_list.append(self.score_ood_head_extended_v2(feats, prototypes, batch_size))
+        known_ood = torch.cat(known_ood_list)
+
+        known_boundary_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_boundary_list.append(self.score_cluster_boundary(feats, prototypes, batch_size))
+        known_boundary = torch.cat(known_boundary_list)
+
+        # Get scores for unknown samples
+        unknown_anti_list, unknown_ood_list, unknown_boundary_list = [], [], []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_anti_list.append(self.score_anti_prototype_all(feats, prototypes, batch_size))
+                unknown_ood_list.append(self.score_ood_head_extended_v2(feats, prototypes, batch_size))
+                unknown_boundary_list.append(self.score_cluster_boundary(feats, prototypes, batch_size))
+
+        has_unknown = len(unknown_anti_list) > 0
+        if has_unknown:
+            unknown_anti = torch.cat(unknown_anti_list)
+            unknown_ood = torch.cat(unknown_ood_list)
+            unknown_boundary = torch.cat(unknown_boundary_list)
+
+        # Normalize each component
+        self._cluster_ens_anti_mu = known_anti.mean().item()
+        self._cluster_ens_anti_std = known_anti.std().item() + 1e-8
+        self._cluster_ens_ood_mu = known_ood.mean().item()
+        self._cluster_ens_ood_std = known_ood.std().item() + 1e-8
+        self._cluster_ens_boundary_mu = known_boundary.mean().item()
+        self._cluster_ens_boundary_std = known_boundary.std().item() + 1e-8
+
+        norm_known_anti = (known_anti - self._cluster_ens_anti_mu) / self._cluster_ens_anti_std
+        norm_known_ood = (known_ood - self._cluster_ens_ood_mu) / self._cluster_ens_ood_std
+        norm_known_boundary = (known_boundary - self._cluster_ens_boundary_mu) / self._cluster_ens_boundary_std
+
+        if has_unknown:
+            norm_unknown_anti = (unknown_anti - self._cluster_ens_anti_mu) / self._cluster_ens_anti_std
+            norm_unknown_ood = (unknown_ood - self._cluster_ens_ood_mu) / self._cluster_ens_ood_std
+            norm_unknown_boundary = (unknown_boundary - self._cluster_ens_boundary_mu) / self._cluster_ens_boundary_std
+
+        # Search optimal three-way weights
+        # Score = w1 * anti + w2 * ood + w3 * boundary, where w1 + w2 + w3 = 1
+        best_weights, best_j = (0.5, 0.3, 0.2), -1.0
+
+        for w1 in [0.4, 0.5, 0.6, 0.7]:  # anti_proto weight
+            for w2 in [0.1, 0.2, 0.3, 0.4]:  # ood_head weight
+                w3 = 1.0 - w1 - w2  # boundary weight
+                if w3 < 0 or w3 > 0.5:
+                    continue
+
+                combined_known = w1 * norm_known_anti + w2 * norm_known_ood + w3 * norm_known_boundary
+                sorted_k = combined_known.sort()[0]
+                idx = min(int(len(sorted_k) * target_fpr), len(sorted_k) - 1)
+                tau = sorted_k[idx].item()
+                tnr = (combined_known >= tau).float().mean().item()
+
+                if has_unknown:
+                    combined_unknown = w1 * norm_unknown_anti + w2 * norm_unknown_ood + w3 * norm_unknown_boundary
+                    tpr = (combined_unknown < tau).float().mean().item()
+                else:
+                    tpr = 0.0
+
+                j = tnr + tpr - 1.0
+                if j > best_j:
+                    best_j, best_weights = j, (w1, w2, w3)
+
+        self._cluster_ens_weights = best_weights
+        print(f"  Three-way ensemble weights: anti={best_weights[0]:.2f}, "
+              f"ood={best_weights[1]:.2f}, boundary={best_weights[2]:.2f}, "
+              f"Youden J={best_j:.3f}")
+
+    def score_ensemble_cluster(self, features: torch.Tensor,
+                                 prototypes: torch.Tensor,
+                                 batch_size: int = 4096) -> torch.Tensor:
+        """osr22d: Score using three-way ensemble (anti_proto + ood_head_v2 + cluster_boundary)."""
+        anti_scores = self.score_anti_prototype_all(features, prototypes, batch_size)
+        ood_scores = self.score_ood_head_extended_v2(features, prototypes, batch_size)
+        boundary_scores = self.score_cluster_boundary(features, prototypes, batch_size)
+
+        # Normalize
+        anti_mu = getattr(self, '_cluster_ens_anti_mu', anti_scores.mean().item())
+        anti_std = getattr(self, '_cluster_ens_anti_std', anti_scores.std().item() + 1e-8)
+        ood_mu = getattr(self, '_cluster_ens_ood_mu', ood_scores.mean().item())
+        ood_std = getattr(self, '_cluster_ens_ood_std', ood_scores.std().item() + 1e-8)
+        boundary_mu = getattr(self, '_cluster_ens_boundary_mu', boundary_scores.mean().item())
+        boundary_std = getattr(self, '_cluster_ens_boundary_std', boundary_scores.std().item() + 1e-8)
+
+        norm_anti = (anti_scores - anti_mu) / anti_std
+        norm_ood = (ood_scores - ood_mu) / ood_std
+        norm_boundary = (boundary_scores - boundary_mu) / boundary_std
+
+        weights = getattr(self, '_cluster_ens_weights', (0.5, 0.3, 0.2))
+        return weights[0] * norm_anti + weights[1] * norm_ood + weights[2] * norm_boundary
 
     # ---- osr21b: Anti-prototype in Flow-transformed space ----
 
@@ -3294,10 +3986,11 @@ class OSRCalibrator:
 
         # Compute stats needed for each method
         if method in ('feature_mahalanobis', 'feat_mahalanobis_relative', 'geo_fusion',
-                       'anti_prototype', 'anti_prototype_enhanced', 'ood_head',
-                       'learned_ensemble', 'anti_proto_var_norm', 'anti_proto_cosine',
-                       'ood_head_extended', 'anti_prototype_flow', 'flow_jacobian',
-                       'ensemble_triple'):
+                       'anti_prototype', 'anti_prototype_enhanced', 'anti_prototype_multi',
+                       'ood_head', 'learned_ensemble', 'anti_proto_var_norm', 'anti_proto_cosine',
+                       'ood_head_extended', 'ood_head_extended_v2', 'cluster_boundary'):
+            print("Computing feature-space statistics...")
+            self.compute_feat_stats()
             print("Computing feature-space statistics...")
             self.compute_feat_stats()
 
@@ -3306,7 +3999,9 @@ class OSRCalibrator:
             self.compute_class_variances(prototypes)
 
         # Transductive refinement
-        if method not in ('learned_ensemble', 'ood_head_extended', 'flow_jacobian', 'ensemble_triple'):
+        if method not in ('learned_ensemble', 'ood_head_extended', 'ood_head_extended_v2',
+                          'anti_prototype_multi', 'cluster_boundary',
+                          'ensemble_adaptive', 'ensemble_cluster'):
             support_feats_list = []
             support_labels_list = []
             query_feats_list = []
@@ -3451,9 +4146,30 @@ class OSRCalibrator:
             print(f"\nThreshold (tau): {self.threshold:.4f}")
             return self.threshold
 
-        # osr21b: anti_prototype_flow calibration
-        if method == 'anti_prototype_flow':
-            known_scores = self.score_anti_prototype_flow(
+        # ============ osr22 new methods calibration ============
+
+        # osr22a: anti_prototype_multi calibration
+        if method == 'anti_prototype_multi':
+            known_scores = self.score_samples(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes, method='anti_prototype_multi')
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_samples(
+                    torch.cat(unknown_feats), prototypes, method='anti_prototype_multi')
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
+        # osr22b: ood_head_extended_v2 calibration
+        if method == 'ood_head_extended_v2':
+            self.train_ood_head_extended_v2(prototypes, target_fpr)
+            known_scores = self.score_ood_head_extended_v2(
                 torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
                 prototypes)
             sorted_known, _ = known_scores.sort()
@@ -3462,35 +4178,36 @@ class OSRCalibrator:
             unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
             unknown_feats = [f for f in unknown_feats if len(f) > 0]
             if unknown_feats:
-                unknown_scores = self.score_anti_prototype_flow(
+                unknown_scores = self.score_ood_head_extended_v2(
                     torch.cat(unknown_feats), prototypes)
                 sep = known_scores.mean() - unknown_scores.mean()
                 print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
             print(f"\nThreshold (tau): {self.threshold:.4f}")
             return self.threshold
 
-        # osr21c: Flow Jacobian calibration
-        if method == 'flow_jacobian':
-            known_scores = self.score_flow_jacobian(
+        # osr22c: ensemble_adaptive calibration
+        if method == 'ensemble_adaptive':
+            self.train_ensemble_adaptive(prototypes, target_fpr)
+            known_scores = self.score_ensemble_adaptive(
                 torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
                 prototypes)
             sorted_known, _ = known_scores.sort()
             idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
-            self.threshold = sorted_known[idx].item()
+            self.threshold = self._ens_adaptive_threshold
             unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
             unknown_feats = [f for f in unknown_feats if len(f) > 0]
             if unknown_feats:
-                unknown_scores = self.score_flow_jacobian(
+                unknown_scores = self.score_ensemble_adaptive(
                     torch.cat(unknown_feats), prototypes)
                 sep = known_scores.mean() - unknown_scores.mean()
                 print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
             print(f"\nThreshold (tau): {self.threshold:.4f}")
             return self.threshold
 
-        # osr21c: Triple ensemble calibration
-        if method == 'ensemble_triple':
-            self.train_ensemble_triple(prototypes, target_fpr)
-            known_scores = self.score_ensemble_triple(
+        # osr22d: cluster_boundary calibration
+        if method == 'cluster_boundary':
+            self.train_cluster_boundary(prototypes)
+            known_scores = self.score_cluster_boundary(
                 torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
                 prototypes)
             sorted_known, _ = known_scores.sort()
@@ -3499,7 +4216,26 @@ class OSRCalibrator:
             unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
             unknown_feats = [f for f in unknown_feats if len(f) > 0]
             if unknown_feats:
-                unknown_scores = self.score_ensemble_triple(
+                unknown_scores = self.score_cluster_boundary(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
+        # osr22d: ensemble_cluster calibration
+        if method == 'ensemble_cluster':
+            self.train_ensemble_cluster(prototypes, target_fpr)
+            known_scores = self.score_ensemble_cluster(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_ensemble_cluster(
                     torch.cat(unknown_feats), prototypes)
                 sep = known_scores.mean() - unknown_scores.mean()
                 print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
@@ -3592,7 +4328,8 @@ class OSRCalibrator:
             # Transductive refinement
             if method not in ('feature_mahalanobis', 'feat_mahalanobis_relative',
                               'learned_ensemble', 'ood_head_extended',
-                              'flow_jacobian', 'ensemble_triple'):
+                              'anti_prototype_multi', 'ood_head_extended_v2',
+                              'cluster_boundary', 'ensemble_adaptive', 'ensemble_cluster'):
                 support_feats_list = []
                 support_labels_list = []
                 query_feats_list = []
@@ -3698,16 +4435,39 @@ class OSRCalibrator:
                 else:
                     self.train_ood_head_extended(prototypes, target_fpr, verbose=False)
 
-            # osr21b: anti_prototype_flow (no per-round training needed)
+            # ============ osr22 new methods per-round setup ============
 
-            # osr21c: Flow Jacobian (no per-round training needed)
+            # osr22a: anti_prototype_multi (no per-round training needed)
 
-            # osr21c: triple ensemble setup
-            if method == 'ensemble_triple':
+            # osr22b: ood_head_extended_v2 setup
+            if method == 'ood_head_extended_v2':
                 if round_i == 0:
-                    self.train_ensemble_triple(prototypes, target_fpr)
+                    self.train_ood_head_extended_v2(prototypes, target_fpr, verbose=True)
                 else:
-                    self.train_ood_head_extended(prototypes, target_fpr, verbose=False)
+                    # Still need to fit GMM each round for cluster features
+                    self._fit_global_gmm()
+
+            # osr22c: ensemble_adaptive setup
+            if method == 'ensemble_adaptive':
+                if round_i == 0:
+                    self.train_ensemble_adaptive(prototypes, target_fpr)
+                else:
+                    # Still need to fit GMM each round
+                    self._fit_global_gmm()
+                    self.train_ood_head_extended_v2(prototypes, target_fpr, verbose=False)
+
+            # osr22d: cluster_boundary setup
+            if method == 'cluster_boundary':
+                if round_i == 0:
+                    self.train_cluster_boundary(prototypes)
+
+            # osr22d: ensemble_cluster setup
+            if method == 'ensemble_cluster':
+                if round_i == 0:
+                    self.train_ensemble_cluster(prototypes, target_fpr)
+                else:
+                    self._fit_global_gmm()
+                    self.train_ood_head_extended_v2(prototypes, target_fpr, verbose=False)
 
             # Score known samples
             known_scores_list = []
@@ -3974,15 +4734,15 @@ def main():
     base_classes = [0, 1, 2, 3, 4, 5]
     unknown_classes = [6, 7, 8, 9]
 
-    N_way = 5
+    N_way = 6  # osr22: 使用全部6个base classes (原来是5-way)
     K_shot = 5
-    Q_query = 30  # 15→30: 2x query samples提升GPU利用率 (5-way * 30 = 150 queries/episode)
-    num_episodes = 6000  # osr17b: reduced from 10000 — patience=3000 will stop earlier anyway
-    gradient_accum_steps = 1  # 2→1: Q_query增大后不需要累积
+    Q_query = 100  # osr22: 大幅提升GPU利用率 (6-way * 100 = 600 queries/episode)
+    num_episodes = 6000
+    gradient_accum_steps = 1
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr21'  # osr21: Flow-augmented feature-space OSR
+    experiment_dir = 'experiment/yamnet_fewshot_osr22'  # osr22: Clustering-augmented feature-space OSR
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
@@ -4104,7 +4864,7 @@ def main():
     flow_classifier = EpisodicFlowClassifier(
         input_dim=feature_dim,
         condition_dim=feature_dim,
-        use_flow_transform=False,  # osr21a: 仅Flow OOD Generator, 不启用LightweightFlowTransform
+        use_flow_transform=False,  # osr22: 纯聚类OSR，无Flow变换
     )
 
     # OOD exposure: provide unknown class features for open-set training
@@ -4139,8 +4899,8 @@ def main():
 
     trainer.train(
         num_episodes=num_episodes,
-        eval_every=150,
-        num_val_episodes=30,
+        eval_every=500,  # 减少验证频率 (150→500)
+        num_val_episodes=10,  # 减少验证episode数 (30→10)
         save_dir=experiment_dir,
         resume=True  # Resume from checkpoint if exists
     )
@@ -4231,62 +4991,84 @@ def main():
         method='ensemble_anti_oodext', recalibrate_per_round=True,
         use_per_class_threshold=True)
 
-    # ============ osr21 new methods ============
+    # ============ osr22 new methods: clustering-augmented OSR ============
 
-    # osr21b: Anti-prototype in Flow-transformed space
-    print(f"\n--- OSR ANTI_PROTOTYPE_FLOW calibration (calib data) ---")
+    # osr22a: Multi-prototype anti_prototype (K-means sub-clusters)
+    print(f"\n--- OSR ANTI_PROTOTYPE_MULTI calibration (calib data) ---")
     calibrator = OSRCalibrator(
         trainer.flow_classifier, calib_cache,
         base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='anti_prototype_flow')
+    calibrator._multi_proto_K_sub = 2
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='anti_prototype_multi')
 
-    print(f"\n--- OSR ANTI_PROTOTYPE_FLOW evaluation (test data) ---")
+    print(f"\n--- OSR ANTI_PROTOTYPE_MULTI evaluation (test data) ---")
     test_calibrator = OSRCalibrator(
         trainer.flow_classifier, test_cache,
         base_classes, unknown_classes, device)
-    osr_results['anti_prototype_flow'] = test_calibrator.evaluate_osr(
+    test_calibrator._multi_proto_K_sub = 2
+    osr_results['anti_prototype_multi'] = test_calibrator.evaluate_osr(
         K_shot=50, num_rounds=10,
-        method='anti_prototype_flow', recalibrate_per_round=True)
+        method='anti_prototype_multi', recalibrate_per_round=True)
 
-    # osr21c: Flow Jacobian scoring
-    print(f"\n--- OSR FLOW_JACOBIAN calibration (calib data) ---")
+    # osr22b: Extended OOD head v2 (with GMM cluster features)
+    print(f"\n--- OSR OOD_HEAD_EXTENDED_V2 calibration (calib data) ---")
     calibrator = OSRCalibrator(
         trainer.flow_classifier, calib_cache,
         base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='flow_jacobian')
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ood_head_extended_v2')
 
-    print(f"\n--- OSR FLOW_JACOBIAN evaluation (test data) ---")
+    print(f"\n--- OSR OOD_HEAD_EXTENDED_V2 evaluation (test data) ---")
     test_calibrator = OSRCalibrator(
         trainer.flow_classifier, test_cache,
         base_classes, unknown_classes, device)
-    osr_results['flow_jacobian'] = test_calibrator.evaluate_osr(
+    osr_results['ood_head_extended_v2'] = test_calibrator.evaluate_osr(
         K_shot=50, num_rounds=10,
-        method='flow_jacobian', recalibrate_per_round=True)
+        method='ood_head_extended_v2', recalibrate_per_round=True)
 
-    # osr21c: Triple ensemble (anti_proto + ood_head_ext + flow_jacobian)
-    print(f"\n--- OSR ENSEMBLE_TRIPLE calibration (calib data) ---")
+    # osr22c: Adaptive ensemble fusion (density-based alpha)
+    print(f"\n--- OSR ENSEMBLE_ADAPTIVE calibration (calib data) ---")
     calibrator = OSRCalibrator(
         trainer.flow_classifier, calib_cache,
         base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_triple')
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_adaptive')
 
-    print(f"\n--- OSR ENSEMBLE_TRIPLE evaluation (test data) ---")
+    print(f"\n--- OSR ENSEMBLE_ADAPTIVE evaluation (test data) ---")
     test_calibrator = OSRCalibrator(
         trainer.flow_classifier, test_cache,
         base_classes, unknown_classes, device)
-    osr_results['ensemble_triple'] = test_calibrator.evaluate_osr(
+    osr_results['ensemble_adaptive'] = test_calibrator.evaluate_osr(
         K_shot=50, num_rounds=10,
-        method='ensemble_triple', recalibrate_per_round=True)
+        method='ensemble_adaptive', recalibrate_per_round=True)
 
-    # osr21 bonus: Flow anti_proto + Flow Jacobian ensemble
-    print(f"\n--- OSR ANTI_PROTOTYPE_FLOW per-class evaluation ---")
+    # osr22d: Cluster boundary detection
+    print(f"\n--- OSR CLUSTER_BOUNDARY calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='cluster_boundary')
+
+    print(f"\n--- OSR CLUSTER_BOUNDARY evaluation (test data) ---")
     test_calibrator = OSRCalibrator(
         trainer.flow_classifier, test_cache,
         base_classes, unknown_classes, device)
-    osr_results['anti_prototype_flow_per_class'] = test_calibrator.evaluate_osr(
+    osr_results['cluster_boundary'] = test_calibrator.evaluate_osr(
         K_shot=50, num_rounds=10,
-        method='anti_prototype_flow', recalibrate_per_round=True,
-        use_per_class_threshold=True)
+        method='cluster_boundary', recalibrate_per_round=True)
+
+    # osr22d: Three-way ensemble (anti_proto + ood_head_v2 + cluster_boundary)
+    print(f"\n--- OSR ENSEMBLE_CLUSTER calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_cluster')
+
+    print(f"\n--- OSR ENSEMBLE_CLUSTER evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['ensemble_cluster'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='ensemble_cluster', recalibrate_per_round=True)
 
     # Summary comparison
     print(f"\n{'='*70}")
@@ -4309,7 +5091,7 @@ def main():
             'base_classes': base_classes,
             'unknown_classes': unknown_classes,
             'scoring_method': best_method,
-            'use_flow_transform': True,  # osr21b
+            'use_flow_transform': False,  # osr22: clustering-based OSR, no Flow transform
         },
         'base_results': base_results,
         'novel_results': novel_results,
