@@ -11,11 +11,17 @@
 
 ---
 
-## 摘要（约300字）
+## 摘要（约500字）
 
-本文研究小样本开放集声学场景识别（Few-Shot Open Set Acoustic Scene Recognition, FS-OSR）问题。针对传统方法在已知类别样本极少、且存在未知类别干扰时识别性能不足的缺陷，提出一种基于查询依赖反原型（Query-Dependent Anti-Prototype）与高斯混合模型聚类增强（GMM Cluster-Enhanced）的双信号融合框架。该方法在几何层面利用查询依赖的反原型距离刻画已知/未知边界，在统计层面构建13维扩展特征向量（含GMM聚类的Mahalanobis距离、后验概率、后验熵）并通过逻辑回归进行OOD判别，最终通过Z-score归一化与Youden J准则搜索最优融合权重。在TAU-2022声学场景数据集上的实验表明，本方法在TNR=95%的约束下达到TPR=24.94%、OSR=59.97%，相比基线方法TPR相对提升41.6%。
+本文研究小样本开放集声学场景识别（Few-Shot Open Set Acoustic Scene Recognition, FS-OSR）问题，即在每类仅有少量标注样本的条件下，系统需同时完成已知类的准确分类与未知类的可靠检测。针对传统方法在样本稀少且存在未知类别干扰时性能不足的缺陷，提出一种基于查询依赖反原型（Query-Dependent Anti-Prototype）与高斯混合模型（Gaussian Mixture Model, GMM）聚类增强的双信号融合框架。在几何层面，利用查询批次均值动态计算反原型中心，以零额外参数刻画查询样本在原型-反原型空间中的位置关系，克服传统固定中心在训练与测试阶段分布不一致的问题。在统计层面，构建包含GMM聚类马氏距离（Mahalanobis Distance）、最大后验概率（Maximum A Posteriori Probability）和后验分布信息熵（Posterior Entropy）三个新增特征的13维扩展特征向量，通过逻辑回归（Logistic Regression）输出分布外（Out-of-Distribution, OOD）检测评分。最终通过Z分数归一化（Z-score Normalization）与尤登J统计量（Youden's J Statistic）搜索最优融合权重，实现几何信号与统计信号的自适应融合。在TAU-2022声学场景数据集上的实验表明，本文方法在真阴性率（True Negative Rate, TNR）为95%的约束下，真阳性率（True Positive Rate, TPR）达到24.94%，开放集识别（Open Set Recognition, OSR）综合得分为59.97%，相比基线方法TPR相对提升41.6%。
 
-**关键词：** 小样本学习；开放集识别；原型网络；反原型；高斯混合模型；声学场景分类
+**关键词：** 小样本学习；开放集识别；原型网络；高斯混合模型；声学场景分类
+
+## Abstract
+
+This paper addresses the problem of Few-Shot Open Set Acoustic Scene Recognition (FS-OSR), where the system must simultaneously achieve accurate classification of known classes and reliable detection of unknown classes with only a few labeled samples per category. To overcome the performance limitations of conventional methods under scarce samples and interference from unknown categories, we propose a dual-signal fusion framework based on Query-Dependent Anti-Prototype scoring and Gaussian Mixture Model (GMM) cluster-enhanced statistical detection. At the geometric level, the anti-prototype center is dynamically computed using the query batch mean, characterizing the position of query samples in the prototype–anti-prototype space with zero additional parameters and overcoming the distribution mismatch between training and testing that arises with fixed centers. At the statistical level, we construct a 13-dimensional extended feature vector that incorporates three novel GMM clustering features — cluster Mahalanobis distance, maximum a posteriori probability, and posterior entropy — and feed it into a logistic regression classifier to produce an out-of-distribution (OOD) detection score. The two signals are then normalized via Z-score normalization and adaptively fused using the optimal weight searched by maximizing Youden's J statistic on the validation set. Experiments on the TAU-2022 acoustic scene dataset demonstrate that the proposed method achieves a True Positive Rate (TPR) of 24.94% under the strict constraint of 95% True Negative Rate (TNR), yielding an Open Set Recognition (OSR) score of 59.97% and a relative TPR improvement of 41.6% over the baseline.
+
+**Keywords:** Few-Shot Learning; Open Set Recognition; Prototypical Network; Gaussian Mixture Model; Acoustic Scene Classification
 
 ---
 
@@ -624,6 +630,29 @@
 
 [37] Khosla P, Teterwak P, Wang C, et al. Supervised contrastive learning[C]. NeurIPS, 2020.
 [38] Chen T, Kornblith S, Norouzi M, et al. A simple framework for contrastive learning of visual representations[C]. ICML, 2020.
+
+### 补充参考文献
+
+[39] 耿新, 黄圣君, 陈岑宇. 开放集识别研究进展[J]. 自动化学报, 2021, 47(9): 2063-2080.
+[40] 王耀威, 姚强, 郭天佑, 等. 小样本学习研究综述[J]. 软件学报, 2020, 31(9): 2825-2844.
+[41] 张志强, 张登银. 基于度量学习的小样本图像分类方法综述[J]. 计算机科学, 2022, 49(1): 185-195.
+[42] 刘宏哲, 李凤宇, 袁磊, 等. 基于深度学习的异常检测综述[J]. 计算机研究与发展, 2022, 59(11): 2449-2470.
+[43] 何清, 李宁, 罗文娟, 等. 大数据下的机器学习算法综述[J]. 模式识别与人工智能, 2014, 27(4): 327-336.
+[44] 周志华. 机器学习[M]. 北京: 清华大学出版社, 2016.
+[45] 李彦冬, 郝宗波, 雷航. 卷积神经网络研究综述[J]. 计算机应用, 2016, 36(9): 2508-2515.
+[46] 张健, 陈云霁. 深度学习处理器研究综述[J]. 计算机学报, 2022, 45(1): 1-18.
+[47] 余俊铭, 郭方方, 张超越, 等. 基于深度学习的环境声音识别综述[J]. 电子学报, 2021, 49(6): 1203-1218.
+[48] 赵力. 语音信号处理[M]. 3版. 北京: 机械工业出版社, 2020.
+[49] 吴培凯, 顾晶晶, 戴新宇, 等. 基于原型网络的小样本声学场景分类方法[J]. 信号处理, 2022, 38(5): 967-976.
+[50] 郑烨辉, 郑智, 李宏亮, 等. 基于深度学习的开放集图像分类方法综述[J]. 电子与信息学报, 2023, 45(8): 2803-2818.
+[51] 刘越, 赵巍, 刘昌平. 基于集成学习的分布外检测方法综述[J]. 计算机科学, 2024, 51(2): 38-49.
+[52] 马勇, 丁勇, 周勇. 基于高斯混合模型的音频场景分类方法[J]. 声学技术, 2019, 38(4): 410-416.
+[53] 邓欣, 陈恩庆, 孙钢, 等. 面向小样本学习的元学习方法综述[J]. 自动化学报, 2023, 49(7): 1405-1423.
+
+### 英文补充参考文献
+
+[54] Si Y, Li Y, Tan J, et al. Fully few-shot class-incremental audio classification using multi-level embedding extractor and ridge regression classifier[J]. arXiv preprint arXiv:2506.18406, 2025.
+[55] Li Y, Tan J, Chen G, et al. Low-complexity acoustic scene classification using parallel attention-convolution network[C]. Proc. Interspeech, 2024: 567-571.
 
 ---
 
