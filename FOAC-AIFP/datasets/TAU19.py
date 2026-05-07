@@ -88,8 +88,13 @@ class OpenTAU19(Dataset):
     def __init__(self, args, index, root, partition='test', fix_seed=True):
         super().__init__()
         self.fix_seed = fix_seed
-        self.n_ways = args.n_ways
-        self.n_open_ways = args.n_open_ways
+        # For test partition, use test-specific way settings if available
+        if partition == 'test' and hasattr(args, 'test_n_ways') and args.test_n_ways is not None:
+            self.n_ways = args.test_n_ways
+            self.n_open_ways = args.test_n_open_ways
+        else:
+            self.n_ways = args.n_ways
+            self.n_open_ways = args.n_open_ways
         self.n_shots = args.n_shots
         self.n_queries = args.n_queries
         self.n_episodes = (args.n_test_runs if partition == 'test'
@@ -105,17 +110,26 @@ class OpenTAU19(Dataset):
         self.all_test_df = pd.read_csv(
             os.path.join(csv_dir, 'sampled_fold1_evaluate.csv'), sep='\t')
 
-        if self.partition == 'train':
-            datapath, labels = self._select_from_classes(
-                self.all_train_df, index)
-        else:
-            datapath, labels = self._select_from_classes(
-                self.all_test_df, index)
-
-        # Build per-class file list  {class_id: [path, path, ...]}
+        # Build per-class file list: for train partition, load base from train CSV, novel from eval CSV
         self.data = {}
-        for p, lbl in zip(datapath, labels):
-            self.data.setdefault(lbl, []).append(p)
+        for class_id in index:
+            label_name = [k for k, v in LABEL_TO_IX.items() if v == class_id][0]
+
+            # For train partition, try train CSV first, then eval CSV for novel classes
+            if self.partition == 'train':
+                # Check if class exists in train CSV (base classes)
+                if label_name in self.all_train_df['scene_label'].values:
+                    df = self.all_train_df
+                else:
+                    # Novel classes not in train CSV, load from eval CSV
+                    df = self.all_test_df
+            else:
+                df = self.all_test_df
+
+            ind_cl = np.where(df['scene_label'] == label_name)[0]
+            for j in ind_cl:
+                path = os.path.join(self.root, df['filename'].iloc[j])
+                self.data.setdefault(class_id, []).append(path)
 
         # Preload all audio into memory (fixed length: 16000 samples = 1s @ 16kHz)
         target_len = 16000
@@ -157,7 +171,41 @@ class OpenTAU19(Dataset):
         if self.fix_seed:
             np.random.seed(item)
 
-        cls_sampled = np.random.choice(self.index, self.n_ways, False)
+        # Available classes from the data we loaded
+        available_classes = np.array(sorted(self.data.keys()))
+
+        if self.partition == 'test':
+            # Test partition: all classes are novel, split into known and open
+            n_total_needed = self.n_ways + self.n_open_ways
+            n_available = len(available_classes)
+            if n_available >= n_total_needed:
+                # Sample all at once then split
+                sampled = np.random.choice(available_classes, n_total_needed, False)
+                cls_sampled = sampled[:self.n_ways]
+                cls_open_ids = sampled[self.n_ways:]
+            else:
+                # Not enough classes - split available classes
+                n_known = min(self.n_ways, max(1, n_available - self.n_open_ways))
+                n_open = min(self.n_open_ways, n_available - n_known)
+                perm = np.random.permutation(available_classes)
+                cls_sampled = perm[:n_known]
+                cls_open_ids = perm[n_known:n_known + n_open]
+        else:
+            # Train partition: base classes [0-5] for known, novel [6-9] for open
+            base_classes = np.intersect1d(np.arange(self.train_classes), available_classes)
+            novel_classes = np.setxor1d(available_classes, base_classes)
+
+            cls_sampled = np.random.choice(base_classes,
+                min(self.n_ways, len(base_classes)), False)
+
+            if len(novel_classes) >= self.n_open_ways:
+                cls_open_ids = np.random.choice(novel_classes, self.n_open_ways, False)
+            else:
+                remaining_base = np.setxor1d(base_classes, cls_sampled)
+                if len(remaining_base) >= self.n_open_ways:
+                    cls_open_ids = np.random.choice(remaining_base, self.n_open_ways, False)
+                else:
+                    cls_open_ids = np.random.choice(available_classes, self.n_open_ways, False)
 
         support_xs, support_ys = [], []
         query_xs, query_ys = [], []
@@ -182,9 +230,6 @@ class OpenTAU19(Dataset):
         query_xs = torch.cat(query_xs, dim=0)
 
         # ---- Open-set: support-open + open query ----
-        cls_open_ids = np.setxor1d(self.index, cls_sampled)
-        cls_open_ids = np.random.choice(cls_open_ids, self.n_open_ways, False)
-
         for idx, the_cls in enumerate(cls_open_ids):
             paths = self.data[the_cls]
             audio = [self._audio_cache[p] for p in paths]

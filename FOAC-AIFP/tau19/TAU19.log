@@ -1,0 +1,16 @@
+[05/07 10:40:09] start training!
+[05/07 10:40:44] 
+[05/07 10:40:44] epoch 1/80, iter 400:
+[05/07 10:40:44] train_loss: 2.90162
+[05/07 10:40:44] train_acc: 0.670
+[05/07 10:40:44] train_auroc: 0.707
+[05/07 10:40:50] Summary name val_6-way-5-shot_tpr@tnr95 is illegal; using val_6-way-5-shot_tpr_tnr95 instead.
+[05/07 10:40:50] val_6-way-5-shot_acc: 80.333	1.791
+[05/07 10:40:50] val_6-way-5-shot_auroc: 66.484	1.562
+[05/07 10:40:50] val_6-way-5-shot_fscore: 36.173	0.231
+[05/07 10:40:50] val_6-way-5-shot_tpr@tnr95: 20.317	2.091
+[05/07 10:40:50] val_6-way-5-shot_osr: 58.492	1.046
+[05/07 10:40:50] BEST ACC!
+[05/07 10:40:50] BEST Auroc!
+[05/07 10:40:50] BEST Fscore!
+[05/07 10:40:50] BEST OSR Score!

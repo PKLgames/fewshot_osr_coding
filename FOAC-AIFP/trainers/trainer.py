@@ -321,7 +321,7 @@ class Train_Manager:
             openset_data,openset_label              = openset_data.float().cuda(),openset_label.cuda().long()
             supp_idx, open_idx = supp_idx.cuda().long(), open_idx.cuda().long()
             
-            openset_label = args.n_ways * torch.ones_like(openset_label)
+            openset_label = support_label.squeeze().max().item() + 1 + torch.zeros_like(openset_label)
             support_data, query_data, suppopen_data, openset_data = support_data.squeeze(), query_data.squeeze(), suppopen_data.squeeze(), openset_data.squeeze()
             the_label = tuple(x.squeeze() for x in (support_label, query_label, suppopen_label, openset_label))
             the_img     = (support_data, query_data, suppopen_data, openset_data)

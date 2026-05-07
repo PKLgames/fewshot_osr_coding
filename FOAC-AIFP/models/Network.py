@@ -103,17 +103,28 @@ class My_Net(nn.Module):
             q1,query_feat = self.encode(query_data.cuda())
             supopen_feat,so1= self.encode(suppopen_data.cuda())
             openset_feat,q2 = self.encode(openset_data.cuda())
-            #Task 1
-            open_label = self.args.n_ways * torch.ones_like(openset_label)
+            #Task 1: dynamically compute number of known classes from query_label
+            actual_n_ways = query_label.max().item() + 1
+            open_label = actual_n_ways * torch.ones_like(openset_label)
             cls_label = torch.cat([query_label, open_label])
 
             if test:
                  loss_cls,loss_fake,prediction = self.task(s1,support_feat,query_feat,q1,openset_feat,support_label.cuda(),cls_label.cuda(),query_label.cuda())
                  return prediction,loss_cls,loss_fake
             loss_cls,loss_fake,prediction = self.task(s1,support_feat,query_feat,q1,openset_feat,support_label.cuda(),cls_label.cuda(),query_label.cuda(),supp_ids.cuda())
-            #Task 2要改变label
-            binary_labels = torch.cat([torch.full((15,), i) for i in range(5)])
-            loss_cls_aug,loss_aug_fake,_= self.task(so1,supopen_feat,q2,openset_feat,q1,support_label.cuda(),cls_label.cuda(),binary_labels.cuda(),supp_ids.cuda())
+            #Task 2: data augmentation with open classes as "known" and query classes as "unknown"
+            # Dynamically compute open class count from supopen_label
+            actual_n_open_ways = supopen_label.max().item() + 1
+            # Map openset_label to contiguous indices [0, actual_n_open_ways-1]
+            unique_open = torch.unique(openset_label)
+            open_to_idx = {v.item(): i for i, v in enumerate(unique_open)}
+            open_query_label = torch.tensor([open_to_idx[l.item()] for l in openset_label],
+                                            dtype=torch.long, device=openset_label.device)
+            # Query samples are "unknown" in Task 2
+            task2_unknown_label = actual_n_open_ways * torch.ones_like(query_label)
+            cls_label_aug = torch.cat([open_query_label, task2_unknown_label])
+            # Use supopen_label for prototype generation
+            loss_cls_aug,loss_aug_fake,_= self.task(so1,supopen_feat,q2,openset_feat,q1,supopen_label.cuda(),cls_label_aug.cuda(),open_query_label,supp_ids.cuda())
 
 
             return prediction,(loss_cls+loss_cls_aug,loss_fake+loss_aug_fake)
@@ -121,7 +132,7 @@ class My_Net(nn.Module):
     def task(self,s1,support_feat,query_feat,q1,openset_feat,support_label,cls_label,query_label,supp_ids=None):
         aug_supp = self.CIAM(s1,query_feat)
         supp_protos= self.PAM(aug_supp,support_label)
-       
+
         base_weights,base_open_weights = self.get_representation(supp_ids)
 
         recip_units, fake_center = self.NPM(supp_protos,base_weights,base_open_weights)
@@ -129,7 +140,7 @@ class My_Net(nn.Module):
 
         query_score = self.metric(cls_protos,q1.unsqueeze(0)).squeeze()
         open_score = self.metric(cls_protos,openset_feat.unsqueeze(0)).squeeze()
-    
+
         cls_score =torch.cat([query_score.squeeze(),open_score.squeeze()],dim=0)
         loss_cls =F.cross_entropy(cls_score, cls_label)
         

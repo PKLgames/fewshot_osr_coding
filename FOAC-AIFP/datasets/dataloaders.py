@@ -7,7 +7,12 @@ from .TAU22 import OpenTAU22
 from .TAU19 import OpenTAU19
 
 def meta_train_dataloader(args):
-    class_index = np.arange(args.train_classes)
+    # For OSR with n_ways + n_open_ways > train_classes, load all classes
+    if args.dataset in ['TAU22', 'TAU19'] and (args.n_ways + args.n_open_ways) > args.train_classes:
+        class_index = np.arange(10)  # Load all 10 classes for OSR training
+    else:
+        class_index = np.arange(args.train_classes)
+
     if args.dataset == 'librispeech':
         trainset = Openlbrs(root=args.dataroot,index=class_index,args=args,partition='train', fix_seed=True)
     elif  'Nsynth' in args.dataset:
