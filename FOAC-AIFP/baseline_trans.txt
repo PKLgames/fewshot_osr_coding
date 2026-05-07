@@ -361,7 +361,7 @@ Episode 设置 (适配6基类):
   python main.py --config default.yml
 
   # Step 3: 元测试 (加载保存的最佳模型)
-  python main.py --config default.yml --test True
+  python main.py --config default.yml --test true
 
 运行命令 (快速试运行, debug.yml: 2 epoch × 5 episodes):
   # Step 1: 预训练

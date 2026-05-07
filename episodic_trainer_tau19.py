@@ -4742,7 +4742,7 @@ def main():
     feature_dim = 64
 
     # Reuse TAU-22 trained backbone (same YAMNet architecture), only re-extract features for TAU-19
-    experiment_dir = 'experiment/yamnet_fewshot_osr22_tau19'  # osr22 on TAU-19 dataset
+    experiment_dir = 'experiment/yamnet_fewshot_osr22_relabel'  # osr22 on TAU-19 dataset
     base_pretrained_path = 'experiment/yamnet_fewshot_osr22/base_feature_extractor.pth'
     contrastive_pretrained_path = 'experiment/yamnet_fewshot_osr22/contrastive_feature_extractor.pth'
 

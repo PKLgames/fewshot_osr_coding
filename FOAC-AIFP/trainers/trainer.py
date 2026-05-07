@@ -168,6 +168,7 @@ class Train_Manager:
         best_epoch = 0
         best_auroc = 0
         best_fscore = 0
+        best_osr = 0
 
         model.train()
         total_epoch = args.epoch
@@ -196,10 +197,14 @@ class Train_Manager:
                         writer.add_scalar('val_%d-way-%d-shot_acc' % (test_way, val_shot), result[0][0], iter_counter)
                         writer.add_scalar('val_%d-way-%d-shot_auroc' % (test_way, val_shot), result[1][0], iter_counter)
                         writer.add_scalar('val_%d-way-%d-shot_fscore' % (test_way, val_shot), result[2][0], iter_counter)
+                        writer.add_scalar('val_%d-way-%d-shot_tpr@tnr95' % (test_way, val_shot), result[4][0], iter_counter)
+                        writer.add_scalar('val_%d-way-%d-shot_osr' % (test_way, val_shot), result[5][0], iter_counter)
 
                     logger.info('val_%d-way-%d-shot_acc: %.3f\t%.3f' % (test_way, val_shot, result[0][0], result[0][1]))
                     logger.info('val_%d-way-%d-shot_auroc: %.3f\t%.3f' % (test_way, val_shot, result[1][0], result[1][1]))
                     logger.info('val_%d-way-%d-shot_fscore: %.3f\t%.3f' % (test_way, val_shot, result[2][0], result[2][1]))
+                    logger.info('val_%d-way-%d-shot_tpr@tnr95: %.3f\t%.3f' % (test_way, val_shot, result[4][0], result[4][1]))
+                    logger.info('val_%d-way-%d-shot_osr: %.3f\t%.3f' % (test_way, val_shot, result[5][0], result[5][1]))
 
                     if result[0][0] > best_val_acc:
                         best_val_acc = result[0][0]
@@ -217,6 +222,11 @@ class Train_Manager:
                         best_epoch = e+1
                         torch.save(model.state_dict(), save_path+'_max_fscore.pth')
                         logger.info('BEST Fscore!')
+                    if result[5][0]>best_osr:
+                        best_osr = result[5][0]
+                        best_epoch = e+1
+                        torch.save(model.state_dict(), save_path+'_max_osr.pth')
+                        logger.info('BEST OSR Score!')
                     model.train()
 
             scheduler.step()
@@ -260,21 +270,27 @@ class Train_Manager:
 
     def run_test_fsl(self,net, openloader):
         net = net.eval()
-        
+
         with tqdm(openloader, total=len(openloader), leave=False) as pbar:
             acc_trace = []
             auroc_trace = []
             fscore_trace = []
+            tnr_trace = []
+            tpr_trace = []
+            osr_trace = []
             loss_trace = []
             for idx, data in enumerate(pbar):
 
                 labels, probs,loss = self.compute_feats(self.args,net, data)
-                acc, auroc,fscore = self.eval_fsl_nplus1(labels, probs)
- 
+                acc, auroc,fscore, tnr, tpr, osr_score = self.eval_fsl_nplus1(labels, probs)
+
                 loss = loss.cpu().numpy()
                 acc_trace.append(acc)
                 auroc_trace.append(auroc)
                 fscore_trace.append(fscore)
+                tnr_trace.append(tnr)
+                tpr_trace.append(tpr)
+                osr_trace.append(osr_score)
                 loss_trace.append(loss)
 
                 pbar.set_postfix({
@@ -286,9 +302,12 @@ class Train_Manager:
             acc = mean_confidence_interval(acc_trace)
             auroc = mean_confidence_interval(auroc_trace)
             fscore=mean_confidence_interval(fscore_trace)
+            tnr_ci = mean_confidence_interval(tnr_trace)
+            tpr_ci = mean_confidence_interval(tpr_trace)
+            osr_ci = mean_confidence_interval(osr_trace)
 
             loss = mean_confidence_interval(loss_trace)
-            result=[acc,auroc,fscore]
+            result=[acc,auroc,fscore,tnr_ci,tpr_ci,osr_ci]
         return result,loss[0]/100.0
 
     def compute_feats(self,args,net, data):
@@ -336,12 +355,20 @@ class Train_Manager:
         unknown_scores = np.max(all_probs[num_query:,:-1], axis=-1)
         auroc_result,_,_,fscore= calc_auroc(known_scores,unknown_scores)
 
+        # --- TPR@TNR95% and OSR Score (matching episodic trainer metric) ---
+        sorted_known = np.sort(known_scores)
+        idx95 = min(int(len(sorted_known) * 0.05), len(sorted_known) - 1)
+        threshold_95 = sorted_known[idx95]
+        tnr = float(np.mean(known_scores >= threshold_95))
+        tpr = float(np.mean(unknown_scores < threshold_95))
+        osr_score = (tnr + tpr) / 2.0
+
         # assert all_probs.shape[-1] == 6
         num_query = query_label.shape[0]
         query_pred = np.argmax(all_probs[:num_query,:-1], axis=-1)
         acc = metrics.accuracy_score(query_label, query_pred)
-        
-        return acc, auroc_result,fscore
+
+        return acc, auroc_result, fscore, tnr, tpr, osr_score
 
     def Pretrain(self,model):
         if self.args.dataset == 'librispeech':

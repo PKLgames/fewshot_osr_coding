@@ -55,15 +55,17 @@ if not args.pretrain:
                 model.weight_base_open = state_dict['weight_base_open'].to('cuda')
                 model.load_state_dict(state_dict, strict=False)
                 result, loss = tm.run_test_fsl(model, eval_loader)
-                acc, tnr, tpr, osr_score = result
+                acc, auroc, fscore, tnr, tpr, osr_score = result
                 f.write(f"{'='*50}\n")
                 f.write(f"{ckpt_name}\n")
                 f.write(f"ACC:       {acc[0]:.3f} ± {acc[1]:.3f}\n")
+                f.write(f"AUROC:     {auroc[0]:.3f} ± {auroc[1]:.3f}\n")
+                f.write(f"F-score:   {fscore[0]:.3f} ± {fscore[1]:.3f}\n")
                 f.write(f"TNR:       {tnr[0]:.3f} ± {tnr[1]:.3f}\n")
-                f.write(f"TPR:       {tpr[0]:.3f} ± {tpr[1]:.3f}\n")
+                f.write(f"TPR@TNR95: {tpr[0]:.3f} ± {tpr[1]:.3f}\n")
                 f.write(f"OSR Score: {osr_score[0]:.3f} ± {osr_score[1]:.3f}\n")
                 f.write(f"Loss:      {loss:.5f}\n\n")
-                print(f"{ckpt_name}: ACC={acc[0]:.3f}±{acc[1]:.3f}  TNR={tnr[0]:.3f}±{tnr[1]:.3f}  TPR={tpr[0]:.3f}±{tpr[1]:.3f}  OSR={osr_score[0]:.3f}±{osr_score[1]:.3f}")
+                print(f"{ckpt_name}: ACC={acc[0]:.3f}±{acc[1]:.3f}  AUROC={auroc[0]:.3f}±{auroc[1]:.3f}  F1={fscore[0]:.3f}±{fscore[1]:.3f}  TPR@TNR95={tpr[0]:.3f}±{tpr[1]:.3f}  OSR={osr_score[0]:.3f}±{osr_score[1]:.3f}")
 
         print(f"\nResults saved to {test_log_path}")
         exit()

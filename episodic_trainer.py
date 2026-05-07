@@ -1015,7 +1015,7 @@ class FeatureCache:
     旧缓存自动失效, 重新提取特征.
     """
 
-    CACHE_VERSION = 'v20_yamnet_normalized'  # Same features as osr20 (same backbone)
+    CACHE_VERSION = 'v20_tau22relabel_yamnet_normalized'  # Same features as osr20 (same backbone)
 
     def __init__(self, cache_dir: str = 'experiment/fewshot_cache'):
         self.cache_dir = cache_dir
@@ -4728,9 +4728,10 @@ def main():
         print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
 
     # 10 acoustic scene classes -> 6 base (known), 4 novel (unknown)
-    # 0=airport, 1=tram, 2=bus, 3=public_square,
-    # 4=shopping_mall, 5=street_pedestrian
-    # 6=metro_station, 7=street_traffic, 8=metro, 9=park
+    # New mapping: 0=airport, 1=shopping_mall, 2=metro_station, 3=street_pedestrian,
+    #              4=public_square, 5=street_traffic, 6=tram, 7=bus, 8=metro, 9=park
+    # Base (known): airport(0), tram(6), bus(7), public_square(4), shopping_mall(1), street_pedestrian(3)
+    # Unknown (novel): metro_station(2), street_traffic(5), metro(8), park(9)
     base_classes = [0, 1, 2, 3, 4, 5]
     unknown_classes = [6, 7, 8, 9]
 
@@ -4742,7 +4743,7 @@ def main():
     feature_dim = 64
 
     # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr22'  # osr22: Clustering-augmented feature-space OSR
+    experiment_dir = 'experiment/yamnet_fewshot_osr22_relabel'  # osr22: resetlabel with new vocabulary mapping
     base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
     contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
