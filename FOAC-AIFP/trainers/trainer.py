@@ -74,7 +74,7 @@ def train_parser():
     parser.add_argument("--test_query_shot", help="number of query images per class during meta-testing", type=int, default=15)
 
     parser.add_argument('--dataset', type=str, default='TAU22',
-                        choices=['FMC', 'Nsynth',  'librispeech', 'TAU22'])
+                        choices=['FMC', 'Nsynth',  'librispeech', 'TAU22', 'TAU19'])
     parser.add_argument('--config', type=str, default="./default.yml")
     parser.add_argument('--pretrain', default=False, type=bool)
     parser.add_argument('--test', default=False, type=bool)
@@ -357,6 +357,10 @@ class Train_Manager:
             from datasets.TAU22 import TAU22Pretrain
             train_set = TAU22Pretrain(root=self.args.dataroot, phase="train", index=self.args.train_classes, base_sess=True)
             save_model_path = os.path.join(self.args.save_folder, f'pretrain_model_tau22.pth')
+        elif self.args.dataset == 'TAU19':
+            from datasets.TAU19 import TAU19Pretrain
+            train_set = TAU19Pretrain(root=self.args.dataroot, phase="train", index=self.args.train_classes, base_sess=True)
+            save_model_path = os.path.join(self.args.save_folder, f'pretrain_model_tau19.pth')
 
         trainloader = torch.utils.data.DataLoader(dataset=train_set, batch_size=self.args.batch_size, shuffle=True,
                                               num_workers=8, pin_memory=True)
@@ -387,8 +391,10 @@ class Train_Manager:
             data, train_label = [_.to('cuda') for _ in batch]
 
             logits= model(data)
-            
+
             # loss = nn.BCEWithLogitsLoss(logits, train_label.repeat(4))+0.7*nn.BCEWithLogitsLoss(rot_logits, rot_labe.long().cuda())
+            if isinstance(logits, tuple):
+                logits = logits[1]  # Backbone returns (resfeat, cls_logit)
             loss = F.cross_entropy(logits, train_label)
             acc = count_acc(logits, train_label)
 
@@ -536,8 +542,9 @@ def run_osr_eval(net, args, logger=None):
     - Uses test data for both prototype computation and evaluation
     """
     from datasets.TAU22 import TAU22Pretrain
+    from datasets.TAU19 import TAU19Pretrain
     if logger is None:
-        logger = get_logger(os.path.join(args.save_folder, 'TAU22osr.log'))
+        logger = get_logger(os.path.join(args.save_folder, 'osr.log'))
 
     net.eval()
     logger.info("=" * 70)
@@ -546,7 +553,8 @@ def run_osr_eval(net, args, logger=None):
 
     # Step 1: Extract features from test data (all 10 classes)
     logger.info("Extracting test features (all 10 classes)...")
-    test_dataset = TAU22Pretrain(
+    PretrainClass = TAU22Pretrain if args.dataset == 'TAU22' else TAU19Pretrain
+    test_dataset = PretrainClass(
         root=args.dataroot, phase='test', index=10
     )
     test_feats = extract_all_features(net, test_dataset)

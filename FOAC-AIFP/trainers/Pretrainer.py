@@ -45,7 +45,7 @@ def train_parser():
     parser.add_argument("--test_query_shot", help="number of query images per class during meta-testing", type=int, default=15)
     parser.add_argument("--val_trial", help="number of meta-testing episodes during validation", type=int, default=1000)
     parser.add_argument('--dataset', type=str, default='TAU22',
-                        choices=['FMC', 'Nsynth',  'librispeech', 'TAU22',
+                        choices=['FMC', 'Nsynth',  'librispeech', 'TAU22', 'TAU19',
                         'f2n', 'f2l', 'n2f', 'n2l', 'l2f', 'l2n'])
     parser.add_argument('-config', type=str, default="./default.yml") 
     

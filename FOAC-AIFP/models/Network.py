@@ -159,12 +159,20 @@ class My_Net(nn.Module):
         return x,x1
         
     def init_representation(self, params):
-        params_RPL = params['RPL_params']
-        params_GCPL = params['GCPL_params']
-        base_open = params_RPL['centers']
-        self.weight_base_open = nn.Parameter( base_open * self.args.open_weight_sum_cali, requires_grad=True)
-        base = params_GCPL['centers'].view(self.args.train_classes, 512)
-        self.weight_base = nn.Parameter(base * self.args.open_weight_sum_cali , requires_grad=True)
+        if 'RPL_params' in params and 'GCPL_params' in params:
+            # Legacy format: RPL/GCPL centers saved explicitly
+            params_RPL = params['RPL_params']
+            params_GCPL = params['GCPL_params']
+            base_open = params_RPL['centers']
+            self.weight_base_open = nn.Parameter( base_open * self.args.open_weight_sum_cali, requires_grad=True)
+            base = params_GCPL['centers'].view(self.args.train_classes, 512)
+            self.weight_base = nn.Parameter(base * self.args.open_weight_sum_cali , requires_grad=True)
+        else:
+            # New format: derive centers from fc layer weights in state_dict
+            state_dict = params.get('params', params.get('feature_params', params))
+            fc_weight = state_dict['fc.weight']  # (train_classes, 512)
+            self.weight_base = nn.Parameter(fc_weight * self.args.open_weight_sum_cali, requires_grad=True)
+            self.weight_base_open = nn.Parameter(-fc_weight * self.args.open_weight_sum_cali, requires_grad=True)
 
     def get_representation(self, base_ids=None):
         if base_ids is not None and len(base_ids) > 0:

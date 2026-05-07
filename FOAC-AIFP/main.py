@@ -9,6 +9,7 @@ import torch
 import yaml
 import argparse
 from datasets.TAU22 import TAU22Pretrain
+from datasets.TAU19 import TAU19Pretrain
 
 
 
@@ -23,8 +24,11 @@ args = trainer.train_parser()
 with open(args.config) as f:           #training configuration file
         cfg = yaml.safe_load(f)
 cfg = cfg['train']
-cfg.update(vars(args))
-args = dict2namespace(cfg)
+# YAML config takes precedence over argparse defaults
+# (argparse fills gaps for fields not in yaml)
+merged = vars(args)
+merged.update(cfg)
+args = dict2namespace(merged)
 
 train_loader = dataloaders.meta_train_dataloader(args)
 eval_loader = dataloaders.meta_test_dataloader(args)
@@ -37,9 +41,9 @@ if not args.pretrain:
     
     if args.test:
         model.eval()
-        ckpt_names = ['model_TAU22_max_acc.pth', 'model_TAU22_max_osr.pth',
-                       'model_TAU22_max_auroc.pth', 'model_TAU22_max_fscore.pth']
-        test_log_path = os.path.join(args.save_folder, 'TAU22test.log')
+        ckpt_names = [f'model_{args.dataset}_max_acc.pth', f'model_{args.dataset}_max_osr.pth',
+                       f'model_{args.dataset}_max_auroc.pth', f'model_{args.dataset}_max_fscore.pth']
+        test_log_path = os.path.join(args.save_folder, f'{args.dataset}test.log')
         with open(test_log_path, 'w') as f:
             for ckpt_name in ckpt_names:
                 ckpt_path = os.path.join(args.save_folder, ckpt_name)
@@ -63,8 +67,8 @@ if not args.pretrain:
 
         print(f"\nResults saved to {test_log_path}")
         exit()
-    state_dict = torch.load(args.pretrained_model_path)['feature_params']
-    full_params = torch.load(args.pretrained_model_path)
+    full_params = torch.load(args.pretrained_model_path, weights_only=False)
+    state_dict = full_params.get('feature_params', full_params.get('params', full_params))
 
     model.load_state_dict(state_dict,strict=False)
     model.init_representation(full_params)
