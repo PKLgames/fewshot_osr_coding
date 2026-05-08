@@ -69,6 +69,6 @@ train:
   # ========== Misc ==========
   dataset: 'TAU22'
   pretrain: false
-  test: false
+  test: true
   finetune: false
   no_val: false

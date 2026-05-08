@@ -1468,16 +1468,21 @@ class EpisodicFlowClassifier(nn.Module):
     """
 
     def __init__(self, input_dim: int = 64, condition_dim: int = 64,
-                 use_flow_transform: bool = True):
+                 use_flow_transform: bool = True,
+                 use_ood_head: bool = True,
+                 use_reciprocal: bool = True,
+                 use_threshold: bool = True):
         super().__init__()
 
         self.input_dim = input_dim
         self.condition_dim = condition_dim
         self.use_flow_transform = use_flow_transform
+        # Ablation flags
+        self.use_ood_head = use_ood_head
+        self.use_reciprocal = use_reciprocal
+        self.use_threshold = use_threshold
 
         # Feature adapter: trainable transform to refine frozen cached features
-        # Learns a class-agnostic rotation/scaling of the feature space
-        # that improves few-shot discrimination for both base and novel classes
         self.feature_adapter = nn.Sequential(
             nn.Linear(input_dim, input_dim),
             nn.LayerNorm(input_dim),
@@ -1492,7 +1497,6 @@ class EpisodicFlowClassifier(nn.Module):
             )
 
         # Prototypical distance head (strong few-shot classification signal)
-        # Operates in full 64-dim space for classification quality
         self.distance_head = nn.Sequential(
             nn.Linear(input_dim, input_dim),
             nn.LayerNorm(input_dim),
@@ -1503,21 +1507,23 @@ class EpisodicFlowClassifier(nn.Module):
         self.temperature = nn.Parameter(torch.tensor(10.0))
 
         # Binary OOD detection head: operates on feature-space statistics (5-dim)
-        # [min_dist, dist_ratio, softmax_max, entropy, feat_norm]
-        self.ood_head = nn.Sequential(
-            nn.Linear(5, 32), nn.ReLU(), nn.Dropout(0.3),
-            nn.Linear(32, 16), nn.ReLU(),
-            nn.Linear(16, 1),  # logit for known(1) / unknown(0)
-        )
+        if use_ood_head:
+            self.ood_head = nn.Sequential(
+                nn.Linear(5, 32), nn.ReLU(), nn.Dropout(0.3),
+                nn.Linear(32, 16), nn.ReLU(),
+                nn.Linear(16, 1),  # logit for known(1) / unknown(0)
+            )
 
         # osr17a: Learnable OSR threshold (trained during episodic training)
-        self.osr_threshold = LearnableOSRThreshold(num_scores=1, init_value=0.0)
+        if use_threshold:
+            self.osr_threshold = LearnableOSRThreshold(num_scores=1, init_value=0.0)
 
         # osr17b: Reciprocal points for OSR scoring (one per max possible class)
-        self.num_max_classes = 20
-        self.reciprocal_points = nn.Parameter(
-            torch.randn(self.num_max_classes, input_dim) * 0.1
-        )
+        if use_reciprocal:
+            self.num_max_classes = 20
+            self.reciprocal_points = nn.Parameter(
+                torch.randn(self.num_max_classes, input_dim) * 0.1
+            )
 
     def project(self, x: torch.Tensor) -> torch.Tensor:
         """Apply feature adapter."""
@@ -2205,7 +2211,7 @@ class EpisodicTrainer:
             scale_cls=scale_cls)
 
         # OOD head loss: binary classifier on 5-dim feature-space statistics
-        if scale_cls > 0:
+        if scale_cls > 0 and self.flow_classifier.use_ood_head and hasattr(self.flow_classifier, 'ood_head'):
             def _compute_ood_features_feat(feat_batch, proto_batch, log_probs_batch):
                 """Extract 5-dim OOD feature vector."""
                 dists = torch.cdist(feat_batch, proto_batch, p=2)  # (B, N)
@@ -2237,7 +2243,7 @@ class EpisodicTrainer:
             loss = loss + scale_cls * 0.1 * ood_loss
 
         # Learnable threshold loss
-        if scale_cls > 0:
+        if scale_cls > 0 and self.flow_classifier.use_threshold and hasattr(self.flow_classifier, 'osr_threshold'):
             with torch.no_grad():
                 adapted_q, adapted_p = self.flow_classifier.adapt_features(query_feats, prototypes)
                 dist_q = torch.cdist(adapted_q, adapted_p, p=2).min(dim=1).values
@@ -2256,7 +2262,7 @@ class EpisodicTrainer:
             loss = loss + 0.1 * L_threshold
 
         # Reciprocal point loss
-        if scale_cls > 0 and query_labels.max() < self.flow_classifier.num_max_classes:
+        if scale_cls > 0 and self.flow_classifier.use_reciprocal and hasattr(self.flow_classifier, 'reciprocal_points') and query_labels.max() < self.flow_classifier.num_max_classes:
             L_reciprocal = self.flow_classifier.compute_reciprocal_loss(
                 query_feats, prototypes, query_labels)
             loss = loss + 3.0 * L_reciprocal

@@ -1,0 +1,29 @@
+# foac_exp_cross_domain.yml
+# Cross-domain evaluation config: used by foac_exp_cross_domain.py
+# Specifies source/target dataset pairs and evaluation parameters
+
+# TAU22 base classes (0-5): airport, shopping_mall, metro_station,
+#                           street_pedestrian, public_square, street_traffic
+# TAU22 novel classes (6-9): tram, bus, metro, park
+
+# TAU19 base classes (0-5): airport, shopping_mall, metro_station,
+#                           street_pedestrian, public_square, street_traffic
+# TAU19 novel classes (6-9): tram, bus, metro, park
+
+cross_domain:
+  pairs:
+    - source: TAU22
+      target: TAU19
+      source_config: tau22_aligned.yml
+      target_config: tau19_aligned.yml
+    - source: TAU19
+      target: TAU22
+      source_config: tau19_aligned.yml
+      target_config: tau22_aligned.yml
+
+  eval:
+    n_ways: 6
+    n_open_ways: 4
+    n_shots: 5
+    n_queries: 15
+    num_episodes: 100

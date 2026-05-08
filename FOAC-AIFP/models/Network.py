@@ -60,20 +60,26 @@ class Backbone(nn.Module):
             self.compute_fbanks = Filterbank(n_mels=self.args.extractor.mel_bins)
 
 class My_Net(nn.Module):
-    def __init__(self, args=None,mode=None):
+    def __init__(self, args=None,mode=None, use_ciam=True, use_pam=True, use_npm=True):
         super().__init__()
         self.args = args
         self.mode = mode
+        # Ablation flags: toggle core components on/off
+        self.use_ciam = use_ciam
+        self.use_pam = use_pam
+        self.use_npm = use_npm
         self.shots = [self.args.train_shot, self.args.train_query_shot]
         self.way = self.args.train_way
         self.resnet = self.args.resnet
         self.metric  = Metric_Cosine()
         self.num_channel = 512
-        self.dim = 512 * 52 
+        self.dim = 512 * 52
         self.encoder = resnet18(True,args)
-        self.PAM = PrototypeDynamicAggregation(self.num_channel)
-        self.CIAM = ConditionalInformationCouplingModule(512,512,1)
-        self.NPM = OpenSetGenerater(self.num_channel, n_head=1,agg='mlp') 
+        self.PAM = PrototypeDynamicAggregation(self.num_channel) if use_pam else None
+        self.CIAM = ConditionalInformationCouplingModule(512,512,1) if use_ciam else None
+        self.NPM = OpenSetGenerater(self.num_channel, n_head=1,agg='mlp') if use_npm else None
+        # Fallback for ablation: simple mean pool when PAM is off
+        self.gap = nn.AdaptiveAvgPool2d((1, 1)) 
 
         self.set_module_for_audio()
         self.fc = nn.Linear(self.num_channel,self.args.train_classes, bias=True)
@@ -130,12 +136,35 @@ class My_Net(nn.Module):
             return prediction,(loss_cls+loss_cls_aug,loss_fake+loss_aug_fake)
 
     def task(self,s1,support_feat,query_feat,q1,openset_feat,support_label,cls_label,query_label,supp_ids=None):
-        aug_supp = self.CIAM(s1,query_feat)
-        supp_protos= self.PAM(aug_supp,support_label)
+        # CIAM: conditional information coupling (query-conditioned support)
+        if self.use_ciam and self.CIAM is not None:
+            aug_supp = self.CIAM(s1,query_feat)
+        else:
+            aug_supp = support_feat
+
+        # PAM: prototype dynamic aggregation (weighted prototype generation)
+        if self.use_pam and self.PAM is not None:
+            supp_protos = self.PAM(aug_supp,support_label)
+        else:
+            # Simple mean pooling fallback
+            supp_protos = self.gap(aug_supp).squeeze(-1).squeeze(-1)
+            out_feats = []
+            label = torch.unique(support_label, sorted=False)
+            for cls_id in label:
+                out_feat = supp_protos[support_label == cls_id]
+                out_feat = torch.mean(out_feat, dim=0).unsqueeze(0)
+                out_feats.append(out_feat)
+            supp_protos = torch.cat(out_feats, dim=0)
 
         base_weights,base_open_weights = self.get_representation(supp_ids)
 
-        recip_units, fake_center = self.NPM(supp_protos,base_weights,base_open_weights)
+        # NPM: open-set prototype generation
+        if self.use_npm and self.NPM is not None:
+            recip_units, fake_center = self.NPM(supp_protos,base_weights,base_open_weights)
+        else:
+            # Simple fallback: mean of base open weights as fake center
+            fake_center = base_open_weights.mean(dim=0, keepdim=True).unsqueeze(0)  # [1, 1, D]
+
         cls_protos = torch.cat([supp_protos.unsqueeze(0), fake_center], dim=1)
 
         query_score = self.metric(cls_protos,q1.unsqueeze(0)).squeeze()
