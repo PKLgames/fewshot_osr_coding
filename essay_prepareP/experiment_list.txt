@@ -1,0 +1,315 @@
+================================================================================
+论文实验规划：已有实验 vs 待做实验
+参照 learned_outline.txt 的实验结构 (A-G)
+================================================================================
+
+一、项目代码体系概述
+────────────────────────────────────────────────────────────────────────────────
+本项目存在两套并行的实验系统：
+
+【系统A】FOAC-AIFP (论文方法，ResNet18 backbone)
+  代码：FOAC-AIFP/ 目录
+  入口：FOAC-AIFP/main.py
+  训练：FOAC-AIFP/trainers/trainer.py + C2_Net_train.py
+  模型：models/Network.py (My_Net) — 含 PGFC/PGOC/PAPN 等核心组件
+  数据集：TAU22.py, TAU19.py (以及 FMC.py, nsynth.py, librispeech.py 可用)
+  配置：default.yml, tau19_aligned.yml, tau22_aligned.yml
+  特点：端到端训练，原型网络+注意力信息融合，是论文的核心方法
+
+【系统B】Episodic Trainer (对比基线，YAMNet/PANNs/AST backbone)
+  代码：/coding/episodic_trainer.py, episodic_trainer_tau19.py
+  入口：直接运行 (main函数)
+  特点：三阶段流水线（特征预提取 → 元训练 → OSR校准）
+  实验：22+个实验目录 (experiment/yamnet_fewshot_osr*), pann, ast 等
+  作用：作为对比方法的基线，已探索多种 OSR 策略
+
+================================================================================
+二、已有实验结果汇总
+================================================================================
+
+【2.1】FOAC-AIFP 基线结果
+────────────────────────────────────────────────────────────────────────────────
+
+实验1: TAU22 原始配置 (2-way 2-open-way 5-shot, Q=15)
+  配置: default.yml
+  结果 (save_tau22/):
+    ACC = 64.93 ± 2.50
+    TNR = 96.67, TPR = 6.77, OSR = 51.72
+    (无 AUROC/F-score 指标)
+  结果 (tau22_v2/, 可能是改进配置):
+    ACC = 69.95 ± 2.28
+    AUROC = 58.78 ± 1.45
+    F-score = 56.36 ± 1.14
+    TPR@TNR95 = 15.82, OSR = 55.41
+
+实验2: TAU19 原始配置 (类似 2-way 配置)
+  结果 (tau19/):
+    ACC = 80.52 ± 1.89
+    AUROC = 60.88 ± 2.04
+    F-score = 57.47 ± 1.42
+    TPR@TNR95 = 20.83, OSR = 58.27
+
+实验3: TAU19 aligned (6-way 4-open-way 5-shot, Q=15)  ← 关键实验
+  配置: tau19_aligned.yml
+  结果 (tau19_aligned/):
+    max_acc:  ACC=100.00, AUROC=66.77, F1=46.49, TPR@TNR95=17.82, OSR=58.91
+    max_osr:  ACC=100.00, AUROC=86.75, F1=48.55, TPR@TNR95=46.73, OSR=73.37
+    OSR Evaluation (anti_prototype):     TNR=95.00%, TPR=1.50%,  OSR=48.25%
+    OSR Evaluation (feature_mahalanobis): TNR=95.00%, TPR=4.00%,  OSR=49.50%
+
+实验4: TAU22 aligned (6-way 4-open-way 5-shot, Q=100)
+  配置: tau22_aligned.yml
+  状态: 训练刚开始，尚未出结果
+
+
+【2.2】Episodic Trainer 实验 (YAMNet backbone, TAU22)
+────────────────────────────────────────────────────────────────────────────────
+22+个实验版本 (osr → osr22_relabel)，持续迭代 OSR 策略：
+  最佳 val_acc: osr13 = 74.0%, osr12 = 72.6%, osr11 = 72.0%
+  最新版本 osr22_relabel: best_val_acc = 52.6% (relabeled, 结果偏低)
+  osr22_tau19 (TAU19数据集): best_val_acc = 43.0%
+
+每个实验包含：
+  ✓ Phase 0: 对比预训练 + 监督微调
+  ✓ Phase 2: Episodic 元训练 (含训练历史)
+  ✓ Phase 3: OSR 校准与评估 (多方法: anti_prototype, mahalanobis, ood_head, ensemble 等)
+  ✓ Few-shot 评估 (1-shot, 5-shot, 10-shot)
+  ✓ t-SNE 特征可视化
+
+其他 backbone 实验：
+  ✓ pann_fewshot_osr1-4 (PANNs CNN14 backbone)
+  ✓ ast_fewshot_osr1 (DistilAST backbone)
+
+
+================================================================================
+三、对照论文大纲，逐项分析已完成与待完成
+================================================================================
+
+A. 实验数据集与设置 (Experimental Datasets and Setup)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ TAU22 数据集：10类，6 base + 4 novel，已划分 train/calib/test
+  ✓ TAU19 数据集：10类，6 base + 4 novel，已划分 train/calib/test
+  ✓ 评估指标：ACC, AUROC, F-score, TNR, TPR@TNR95, OSR Score
+  ✓ 硬件配置信息可从代码推断 (CUDA GPU)
+  ✓ 两种少样本设置隐含存在: aligned 配置用 6-way 5-shot
+
+[待完成/待统一]
+  △ 参考论文用了3个数据集 (FSC-89环境音, NSynth-100乐器音, LS-100语音)
+    → 本项目目前只有 TAU22+TAU19 (同域声景数据)，需决定：
+      方案1: 仅用 TAU22+TAU19（论文需调整叙述，改为2个声景数据集）
+      方案2: 加入第3个数据集 (代码已有 FMC.py=FSC, nsynth.py, librispeech.py)
+    → 建议：至少补一个跨域数据集以增强说服力
+  △ 需要明确统一的实验设置描述：N-way, K-shot 的具体数值
+  △ 需要补充详细的 train/val/test 划分说明 (每个类别的样本数)
+
+
+B. 对比实验：准确率与AUROC (Comparison in Accuracy and AUROC)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ FOAC-AIFP 方法在 TAU19 上的结果 (aligned: ACC=100%, AUROC=86.8%)
+  ✓ FOAC-AIFP 方法在 TAU22 上的部分结果 (v2: ACC=70.0%, AUROC=58.8%)
+  ✓ Episodic Trainer (多 backbone) 的基线对比结果
+  ✓ 两种 OSR 评估方法 (anti_prototype, feature_mahalanobis)
+
+[待完成]
+  △ TAU22 aligned 结果：训练刚开始，需等训练完成获得最终结果
+  △ 与 SOTA 方法的对比：参考论文对比了 8 种方法
+    (FEAT, L³-Net, D-ProtoNet, MET 等)
+    → 需要实现或引用这些方法的代码来跑对比实验
+    → 或者用 Episodic Trainer 的不同配置作为"对比方法"
+  △ 5-way 1-shot 设置：当前实验主要是 6-way 5-shot
+    → 需补充 1-shot 结果
+  △ 统一评估协议：确保 FOAC-AIFP 和对比方法使用完全相同的评估流程
+  △ 生成标准对比表格 (Acc ± CI, AUROC ± CI)
+
+
+C. 统计显著性检验 (Statistical Significance Test)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ 均值±置信区间 (mean_confidence_interval, 95% CI) — 在 trainer.py 中
+
+[待完成]  ← 整个部分缺失
+  ✗ Friedman 检验：非参数检验，比较多方法在多数据集上的整体差异
+  ✗ Nemenyi 后续检验：两两方法之间的显著性差异
+  ✗ 在100个随机子集上评估各方法并计算平均排序
+  ✗ 生成 Friedman 检验的临界差图 (Critical Difference Diagram)
+  → 需要编写 Friedman/Nemenyi 检验代码
+  → 需要所有对比方法在多个数据集上的完整结果
+
+
+D. 复杂度对比 (Comparison in Complexity)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ 模型参数量可通过 model.parameters() 计算
+
+[待完成]  ← 整个部分缺失
+  ✗ MACs (Multiply-Accumulate Operations) 计算
+    → 使用 thop 或 fvcore 库的 profile/flop_count
+  ✗ AIT (Average Inference Time)：单样本平均推理时间
+    → 需要标准化计时代码 (warmup + 多次推理取平均)
+  ✗ NP (Number of Parameters)：模型总参数量
+  ✗ 生成复杂度对比表格
+  → 需要对 FOAC-AIFP 模型和所有对比方法分别测量
+
+
+E. 泛化能力对比 (Comparison in Generalizability)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ 两个数据集 (TAU22, TAU19) 的独立结果
+  ✓ episodic_trainer 有 osr22_tau19 实验 (用 TAU22 训练，TAU19 测试?)
+
+[待完成]
+  △ 正式的跨域实验设计 (Cross-Domain Evaluation)
+    → TAU22→TAU19: 在 TAU22 上训练，在 TAU19 上测试
+    → TAU19→TAU22: 在 TAU19 上训练，在 TAU22 上测试
+  △ 如果加入第3数据集：所有两两组合 (6种跨域设置)
+  △ 对比方法的跨域结果
+  → 需要修改训练/测试代码支持跨域评估
+
+
+F. 消融实验 (Ablation Experiments)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ 模型代码中包含可配置的组件 (PGFC, PGOC 等)
+
+[待完成]  ← 整个部分缺失
+  ✗ 消融实验设计：逐一移除核心组件
+    组合1: Full model (PGFC + PGOC + PAPN)
+    组合2: w/o PGFC (移除少样本类原型生成器)
+    组合3: w/o PGOC (移除开放集类原型生成器) ← 预期影响最大
+    组合4: w/o PAPN (移除增强基类原型)
+    组合5: PGOC only (仅保留开放集原型生成)
+    组合6: Baseline (全部移除)
+  ✗ 在 TAU22 和 TAU19 上分别运行消融实验
+  ✗ 生成消融对比表格
+  → 需要修改模型代码支持组件的 on/off 切换
+  → 或通过配置文件控制组件启用/禁用
+
+
+G. 扩展实验 (Extended Experiments)
+────────────────────────────────────────────────────────────────────────────────
+[已完成]
+  ✓ t-SNE 特征可视化：episodic_trainer.py 中已实现
+    (visualize_features_tsne 函数)
+  ✓ 1-shot / 5-shot / 10-shot 评估：episodic_trainer.py 中已实现
+
+[待完成]
+  △ G1. Way-Shot 影响分析
+    → 需要测试 N ∈ {2,3,4,5,6} 和 K ∈ {1,3,5,7,10} 的组合
+    → 需在 FOAC-AIFP 系统中统一运行（目前只在 episodic trainer 有部分数据）
+    → 生成 Acc/AUROC 随 N/K 变化的曲线图
+
+  △ G2. Openness 影响分析
+    → 需要测试不同开放度 (未知类别比例) 下的 AUROC
+    → 例如：1-open, 2-open, 3-open, 4-open
+    → 生成 AUROC vs Openness 的变化曲线
+
+  △ G3. t-SNE 可视化
+    → episodic_trainer 中已有，但 FOAC-AIFP 系统中可能缺少
+    → 需要展示已知类和未知类在特征空间中的分布差异
+    → 需要对比 "有PGOC" vs "无PGOC" 的 t-SNE 图
+
+  △ G4. 家居环境数据集测试 (可选)
+    → 参考论文在特定数据集上做了额外验证
+    → 本项目可考虑在 FMC(FSC-89) 上做额外测试
+
+
+================================================================================
+四、优先级排序：建议的实验执行计划
+================================================================================
+
+【P0 - 阻塞项 (必须先完成)】
+  1. 等待 TAU22 aligned 训练完成，获得最终结果
+  2. 确定 FOAC-AIFP 模型的最佳检查点（确定用哪个 config/epoch 的模型做后续实验）
+
+【P1 - 核心实验 (论文必需)】
+  3. 消融实验 (F)
+     → 实现组件开关，在 TAU22 + TAU19 上分别跑 6 个组合
+     → 预计 12 次训练运行 (2数据集 × 6组合)
+     → 最能体现论文贡献，建议优先
+
+  4. Way-Shot 扩展实验 (G1)
+     → 修改配置运行不同 N/K 组合
+     → 生成变化曲线
+
+  5. Openness 扩展实验 (G2)
+     → 修改 n_open_ways 测试不同开放度
+
+  6. 对比实验表格化 (B)
+     → 整理已有结果 + 补充 1-shot 结果
+     → 如果要与外部方法对比，需实现或引入对比方法代码
+
+【P2 - 强化实验 (提升论文质量)】
+  7. 统计显著性检验 (C)
+     → 编写 Friedman + Nemenyi 检验代码
+     → 需先完成所有方法的完整对比实验
+
+  8. 复杂度对比 (D)
+     → 编写 MACs/AIT/NP 测量代码
+     → 对所有方法统一测量
+
+  9. 泛化能力对比 (E)
+     → 实现跨域训练/测试代码
+     → TAU22↔TAU19 交叉评估
+
+  10. FOAC-AIFP 的 t-SNE 可视化 (G3)
+     → 在 FOAC-AIFP 特征空间中可视化
+
+【P3 - 可选增强】
+  11. 第三个数据集实验 (A)
+      → 选择 FMC(FSC-89) 或 NSynth 或 LibriSpeech
+      → 需要数据准备 + 全套训练流程
+
+  12. 家居环境数据集测试 (G4)
+      → 仅在有数据的情况下考虑
+
+
+================================================================================
+五、需要编写的代码/脚本清单
+================================================================================
+
+  [1] ablation_runner.py — 消融实验运行脚本
+      - 修改模型支持组件 on/off
+      - 自动遍历所有组合并记录结果
+
+  [2] way_shot_sweep.py — Way/Shot 参数扫描脚本
+      - 遍历 N ∈ {2,3,4,5,6}, K ∈ {1,3,5,7,10}
+      - 记录 Acc, AUROC, OSR
+
+  [3] openness_sweep.py — 开放度影响分析脚本
+      - 遍历 n_open_ways ∈ {1,2,3,4}
+      - 记录 AUROC 变化
+
+  [4] statistical_test.py — Friedman + Nemenyi 检验脚本
+      - 输入：各方法在各数据集上的结果矩阵
+      - 输出：p-value, 临界差图
+
+  [5] complexity_analysis.py — 复杂度分析脚本
+      - 使用 thop/fvcore 计算 MACs
+      - 计时推理时间
+      - 统计参数量
+
+  [6] cross_domain_eval.py — 跨域评估脚本
+      - 加载一个数据集训练的模型
+      - 在另一个数据集上评估
+
+  [7] tsne_foac.py — FOAC-AIFP 特征空间的 t-SNE 可视化
+      - 提取 FOAC-AIFP 的特征
+      - 绘制已知类/未知类分布对比图
+
+
+================================================================================
+六、关键风险与注意事项
+================================================================================
+
+  1. TAU22 aligned 正在训练中，需确认训练完成后再做后续实验
+  2. TAU19 aligned 的 ACC=100% 看起来可能存在数据泄露或过拟合问题
+     → 需要仔细检查 train/test 划分是否严格分离
+  3. FOAC-AIFP (ResNet18) 和 Episodic Trainer (YAMNet) 使用不同 backbone
+     → 论文中需明确区分，不能直接对比
+     → 建议论文以 FOAC-AIFP 为主体，Episodic Trainer 作为附录/补充
+  4. 参考论文用了 3 个数据集，本项目目前只有 2 个同域数据集
+     → 审稿人可能质疑泛化性，建议至少补 1 个跨域数据集
+  5. 对比方法 (FEAT, MET 等) 的实现需要找到原始代码库
+     → 可以从 GitHub 获取，但需确认音频域适配

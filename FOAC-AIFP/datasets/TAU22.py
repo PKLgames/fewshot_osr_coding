@@ -29,6 +29,8 @@ class TAU22Pretrain(Dataset):
         csv_dir = os.path.join(root, 'sampled_setup')
         self.all_train_df = pd.read_csv(
             os.path.join(csv_dir, 'sampled_fold1_train.csv'), sep='\t')
+        self.all_calib_df = pd.read_csv(
+            os.path.join(csv_dir, 'sampled_fold1_calib.csv'), sep='\t')
         self.all_test_df = pd.read_csv(
             os.path.join(csv_dir, 'sampled_fold1_evaluate.csv'), sep='\t')
 
@@ -37,6 +39,9 @@ class TAU22Pretrain(Dataset):
         if phase == 'train':
             self.data, self.targets = self._select_from_classes(
                 self.all_train_df, index)
+        elif phase == 'calib':
+            self.data, self.targets = self._select_from_classes(
+                self.all_calib_df, index)
         elif phase == 'test':
             self.data, self.targets = self._select_from_classes(
                 self.all_test_df, index)

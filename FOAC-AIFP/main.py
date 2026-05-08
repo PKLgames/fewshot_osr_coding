@@ -1,6 +1,7 @@
 import os
 from functools import partial
 from trainers import trainer, C2_Net_train
+from trainers.trainer import run_osr_eval
 from models.Network import My_Net
 from datasets import dataloaders
 from utils.util import *
@@ -68,6 +69,11 @@ if not args.pretrain:
                 print(f"{ckpt_name}: ACC={acc[0]:.3f}±{acc[1]:.3f}  AUROC={auroc[0]:.3f}±{auroc[1]:.3f}  F1={fscore[0]:.3f}±{fscore[1]:.3f}  TPR@TNR95={tpr[0]:.3f}±{tpr[1]:.3f}  OSR={osr_score[0]:.3f}±{osr_score[1]:.3f}")
 
         print(f"\nResults saved to {test_log_path}")
+
+        # OSR evaluation with same protocol as episodic_trainer.py
+        print("\n--- OSR Evaluation (episodic_trainer.py aligned protocol) ---")
+        run_osr_eval(model, args, logger=tm.logger)
+
         exit()
     full_params = torch.load(args.pretrained_model_path, weights_only=False)
     state_dict = full_params.get('feature_params', full_params.get('params', full_params))

@@ -43,7 +43,7 @@ def default_train(train_loader, model, optimizer, writer, iter_counter, args):
             open_label_binary = np.concatenate((np.ones(close_pred.shape),np.zeros(openset_cls_probs.shape[0])))
             query_cls_probs = query_cls_probs.view(-1, args.n_ways+1)
             openset_cls_probs = openset_cls_probs.view(-1,args.n_ways+1)
-            open_scores = torch.cat([query_cls_probs,openset_cls_probs], dim=0).detach().cpu().numpy()[:,:5]
+            open_scores = torch.cat([query_cls_probs,openset_cls_probs], dim=0).detach().cpu().numpy()[:,:args.n_ways]
             open_scores = np.max(open_scores,axis=-1)
             auroc = metrics.roc_auc_score(open_label_binary,open_scores)
  

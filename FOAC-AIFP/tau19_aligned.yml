@@ -9,17 +9,19 @@ train:
     fmax: 8000
     window: 'hann'
 
-  # ========== Episode structure ==========
-  # TAU-19 has 6 base classes → n_ways + n_open_ways <= 6
-  # NOTE: n_ways must equal n_open_ways (model architecture constraint in Network.py)
-  # Each episode samples n_ways classes uniformly from train_classes
-  n_ways: 2
-  n_open_ways: 2
+  # ========== Episode structure (aligned with episodic_trainer.py) ==========
+  # TAU-19: 6 base classes, 4 novel classes
+  # Note: TAU-19 has only ~50 test samples/class, so Q_query=100 is impossible
+  # (max ~45 after 5-shot support). Keep n_queries=15 as ceiling.
+  n_ways: 6
+  n_open_ways: 4
+  test_n_ways: 6            # Aligned: consistent 6-way eval (was 2)
+  test_n_open_ways: 4       # Aligned: use all 4 unknown classes at test (was 2)
   n_shots: 5
-  n_queries: 50           # Max possible: 50-5shot=45 per class
-  train_classes: 6          # base classes: episode samples 2 out of 6
+  n_queries: 15             # Data limit: TAU-19 only has ~50 samples/class
+  train_classes: 6
 
-  # Meta-train / meta-test episode counts (same as improved.yml)
+  # Meta-train / meta-test episode counts
   n_train_runs: 400
   n_test_runs: 200
   test_times: 200
@@ -27,7 +29,7 @@ train:
   # ========== Training hyper-parameters ==========
   epoch: 80
   epochs_pre: 80
-  batch_size: 512          # 256→512: 预训练阶段GPU利用率翻倍
+  batch_size: 512
   learning_rate: 0.05
   lr: 0.001
   gamma: 0.1
@@ -39,13 +41,13 @@ train:
   val_epoch: 1
 
   # ========== Model ==========
-  test_way: 2
-  train_way: 2
+  test_way: 6
+  train_way: 6
   train_shot: 5
   test_shot:
     - 5
-  train_query_shot: 35     # 匹配n_queries
-  test_query_shot: 35      # 匹配n_queries
+  train_query_shot: 15
+  test_query_shot: 15
   resnet: true
 
   temp: 10.0
@@ -54,17 +56,21 @@ train:
   open_weight_sum_cali: 0.3
 
   # ========== Paths ==========
-  save_folder: './tau19'
+  save_folder: './tau19_aligned'
   dataroot: '/coding/TAU-urban-acoustic-scenes-2019-development'
   pretrained_model_path1: ''
-  pretrained_model_path: './tau19/pretrain_model_tau19.pth'
+  pretrained_model_path: './tau19_aligned/pretrain_model_tau19.pth'
 
   # ========== Loss ==========
   num-centers: 1
 
+  # ========== OSR evaluation protocol (matching episodic_trainer.py) ==========
+  osr_num_rounds: 10
+  osr_k_shot: 50
+
   # ========== Misc ==========
   dataset: 'TAU19'
   pretrain: false
-  test: ture              # Set to true for evaluation only
+  test: true
   finetune: false
   no_val: false

@@ -563,10 +563,11 @@ def compute_tpr_at_tnr(known_scores, unknown_scores, target_tnr=0.95):
 def run_osr_eval(net, args, logger=None):
     """
     Evaluate OSR with same protocol as episodic_trainer.py:
+    - Calib set (calib.csv) for prototype computation and threshold calibration
+    - Test set (evaluate.csv) for final evaluation
     - Methods: anti_prototype, feature_mahalanobis
     - Metrics: TPR@TNR=95%, OSR Score = (TNR+TPR)/2
     - Per-round recalibration (10 rounds, K_shot=50)
-    - Uses test data for both prototype computation and evaluation
     """
     from datasets.TAU22 import TAU22Pretrain
     from datasets.TAU19 import TAU19Pretrain
@@ -576,11 +577,21 @@ def run_osr_eval(net, args, logger=None):
     net.eval()
     logger.info("=" * 70)
     logger.info("OSR Evaluation (matching episodic_trainer.py protocol)")
+    logger.info("  Calib set: prototype computation + threshold calibration")
+    logger.info("  Test set:  final evaluation")
     logger.info("=" * 70)
 
-    # Step 1: Extract features from test data (all 10 classes)
-    logger.info("Extracting test features (all 10 classes)...")
     PretrainClass = TAU22Pretrain if args.dataset == 'TAU22' else TAU19Pretrain
+
+    # Step 1a: Extract features from calib data (all 10 classes) — for prototypes
+    logger.info("Extracting calib features (all 10 classes)...")
+    calib_dataset = PretrainClass(
+        root=args.dataroot, phase='calib', index=10
+    )
+    calib_feats = extract_all_features(net, calib_dataset)
+
+    # Step 1b: Extract features from test data (all 10 classes) — for evaluation
+    logger.info("Extracting test features (all 10 classes)...")
     test_dataset = PretrainClass(
         root=args.dataroot, phase='test', index=10
     )
@@ -589,27 +600,28 @@ def run_osr_eval(net, args, logger=None):
     known_classes = list(range(args.train_classes))  # 0-5
     unknown_classes = list(range(args.train_classes, 10))  # 6-9
 
+    # Evaluation uses test set
     known_all = torch.cat([test_feats[c] for c in known_classes])
     unknown_all = torch.cat([test_feats[c] for c in unknown_classes])
 
     feat_dim = known_all.shape[1]
-    logger.info(f"Known samples:   {len(known_all)} ({len(known_classes)} classes)")
-    logger.info(f"Unknown samples: {len(unknown_all)} ({len(unknown_classes)} classes)")
-    logger.info(f"Feature dim:     {feat_dim}")
+    logger.info(f"Calib set: {sum(len(v) for v in calib_feats.values())} samples")
+    logger.info(f"Test  set: {len(known_all)} known + {len(unknown_all)} unknown")
+    logger.info(f"Feature dim: {feat_dim}")
 
-    # Step 2: Per-round evaluation
-    num_rounds = 10
-    K_shot = 50
+    # Step 2: Per-round evaluation (configurable via args)
+    num_rounds = getattr(args, 'osr_num_rounds', 10)
+    K_shot = getattr(args, 'osr_k_shot', 50)
     methods = ['anti_prototype', 'feature_mahalanobis']
     results = {m: {'tnr': [], 'tpr': [], 'osr': []} for m in methods}
 
     for round_idx in range(num_rounds):
         np.random.seed(42 + round_idx)
 
-        # Sample prototypes from known test data
+        # Sample prototypes from CALIB known data (not test!)
         prototypes = []
         for c in known_classes:
-            cf = test_feats[c]
+            cf = calib_feats[c]
             idx = np.random.choice(len(cf), min(K_shot, len(cf)), False)
             prototypes.append(cf[idx].mean(dim=0))
         prototypes = torch.stack(prototypes)  # [6, D]
@@ -625,12 +637,12 @@ def run_osr_eval(net, args, logger=None):
         dist_anti_u = torch.cdist(unknown_all, anti_protos).min(dim=1).values
         unknown_scores_anti = -dist_proto_u + dist_anti_u
 
-        # --- feature_mahalanobis scores ---
+        # --- feature_mahalanobis scores (statistics from calib) ---
         class_means = []
         covs_inv = []
         eye = torch.eye(feat_dim)
         for c in known_classes:
-            cf = test_feats[c]
+            cf = calib_feats[c]
             mean_c = cf.mean(dim=0)
             class_means.append(mean_c)
             diff = cf - mean_c
@@ -654,7 +666,7 @@ def run_osr_eval(net, args, logger=None):
     # Step 3: Print comparison table
     logger.info("")
     logger.info("=" * 70)
-    logger.info("OSR Method Comparison (test data, per-round recalibration)")
+    logger.info("OSR Method Comparison (calib=prototype, test=eval, per-round recalibration)")
     logger.info("=" * 70)
     logger.info(f"  {'Method':<22s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s}")
     for method in methods:

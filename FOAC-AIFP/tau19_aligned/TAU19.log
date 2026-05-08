@@ -1,0 +1,17 @@
+[05/07 12:14:48] ======================================================================
+[05/07 12:14:48] OSR Evaluation (matching episodic_trainer.py protocol)
+[05/07 12:14:48]   Calib set: prototype computation + threshold calibration
+[05/07 12:14:48]   Test set:  final evaluation
+[05/07 12:14:48] ======================================================================
+[05/07 12:14:48] Extracting calib features (all 10 classes)...
+[05/07 12:15:05] Extracting test features (all 10 classes)...
+[05/07 12:15:20] Calib set: 500 samples
+[05/07 12:15:20] Test  set: 300 known + 200 unknown
+[05/07 12:15:20] Feature dim: 512
+[05/07 12:15:20] 
+[05/07 12:15:20] ======================================================================
+[05/07 12:15:20] OSR Method Comparison (calib=prototype, test=eval, per-round recalibration)
+[05/07 12:15:20] ======================================================================
+[05/07 12:15:20]   Method                      TNR      TPR      OSR
+[05/07 12:15:20]   anti_prototype          95.00%   1.50%  48.25%
+[05/07 12:15:20]   feature_mahalanobis     95.00%   4.00%  49.50%
