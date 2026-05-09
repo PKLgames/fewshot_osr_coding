@@ -2388,8 +2388,9 @@ class EpisodicTrainer:
             # Step optimizer at end of accumulation cycle
             if ep % accum_steps == 0 or ep == num_episodes:
                 # Gradient clipping: exclude reciprocal_points to allow them to train
+                reciprocal = getattr(self.flow_classifier, 'reciprocal_points', None)
                 params_to_clip = [p for p in self.flow_classifier.parameters()
-                                 if p is not self.flow_classifier.reciprocal_points]
+                                 if p is not reciprocal]
                 if params_to_clip:
                     torch.nn.utils.clip_grad_norm_(params_to_clip, 0.5)
 

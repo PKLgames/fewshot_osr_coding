@@ -1,0 +1,62 @@
+{
+  "5w1s": {
+    "acc": 0.425333344489336,
+    "ci95": 0.02185378153694212,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.30437500051921235,
+      "osr_score": 0.6271874942991417,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "5w5s": {
+    "acc": 0.5364000129699708,
+    "ci95": 0.014920531465119546,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3200555563322268,
+      "osr_score": 0.635027772205649,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w1s": {
+    "acc": 0.3868888959288597,
+    "ci95": 0.017308552194726937,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.30968055535340683,
+      "osr_score": 0.6298402717162389,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w5s": {
+    "acc": 0.4778888949751854,
+    "ci95": 0.011599585589540173,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3137083350273315,
+      "osr_score": 0.6318541615532013,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  }
+}

@@ -38,8 +38,11 @@ def load_config(config_path):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     cfg = cfg['train']
+    saved_argv = sys.argv
+    sys.argv = [sys.argv[0]]
     base_parser = trainer.train_parser()
-    merged = vars(base_parser.parse_args([]))
+    sys.argv = saved_argv
+    merged = vars(base_parser)
     merged.update(cfg)
     args = argparse.Namespace(**merged)
     for k, v in vars(args).items():
@@ -190,9 +193,9 @@ def main():
         print(f"No checkpoint found at {ckpt_path}")
         return
 
-    state_dict = torch.load(ckpt_path, map_location='cuda')
-    model.weight_base = state_dict['weight_base'].to('cuda')
-    model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+    state_dict = torch.load(ckpt_path, map_location='cuda', weights_only=False)
+    model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
+    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
     model.load_state_dict(state_dict, strict=False)
 
     test_loader = dataloaders.meta_test_dataloader(args)

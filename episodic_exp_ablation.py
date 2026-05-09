@@ -55,10 +55,10 @@ ABLATION_CONFIGS = [
 def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
                  base_classes, unknown_classes, backbone_choice='yamnet',
                  N_way=6, K_shot=5, Q_query=15, num_episodes=3000,
-                 feature_dim=64):
+                 feature_dim=64, output_root='experiment/episodic_exp'):
     """Run one ablation configuration."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    experiment_dir = f'experiment/episodic_ablation/{config_name}'
+    experiment_dir = f'{output_root}/ablation/{config_name}'
 
     print(f"\n{'='*60}")
     print(f"Ablation: {config_name}")
@@ -185,6 +185,8 @@ def main():
                         help='Run only specific configs (e.g. full_model wo_ood_head)')
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true', help='Fewer episodes for debugging')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     if cl_args.quick:
@@ -204,12 +206,14 @@ def main():
                 continue
             r = run_ablation(mod, name, flow, ood, recip, thresh,
                              base_classes, unknown_classes,
-                             num_episodes=cl_args.num_episodes)
+                             num_episodes=cl_args.num_episodes,
+                             output_root=cl_args.output_dir)
             if r:
                 all_results[dataset][name] = r
 
     # Save
-    save_path = 'episodic_exp_ablation_results.json'
+    os.makedirs(cl_args.output_dir, exist_ok=True)
+    save_path = os.path.join(cl_args.output_dir, 'ablation', 'results.json')
     with open(save_path, 'w') as f:
         json.dump(all_results, f, indent=2, default=str)
     print(f"\nResults saved to {save_path}")

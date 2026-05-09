@@ -1,0 +1,1760 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+============================================================
+Ablation: full_model
+  flow=True, ood=True, recip=True, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 40,100
+
+Resumed from episode 500 (Val Acc: 51.22%)
+Continuing from episode 501 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep  1000/3000 | CE: 1.6909 Total: 3.8253 Acc: 34.83% | Val Loss: 1.9357 Acc: 48.11% | LR: 4.91e-05 cls:0.4
+Ep  1500/3000 | CE: 1.6601 Total: 3.7635 Acc: 35.54% | Val Loss: 2.1354 Acc: 47.00% | LR: 4.67e-05 cls:0.8
+Ep  2000/3000 | CE: 1.6558 Total: 3.7108 Acc: 35.58% | Val Loss: 2.1334 Acc: 50.44% | LR: 4.27e-05 cls:1.0
+Ep  2500/3000 | CE: 1.6464 Total: 3.6757 Acc: 35.81% | Val Loss: 2.1245 Acc: 48.89% | LR: 3.75e-05 cls:1.0
+Ep  3000/3000 | CE: 1.6439 Total: 3.7033 Acc: 35.98% | Val Loss: 2.0565 Acc: 46.33% | LR: 3.15e-05 cls:1.0
+
+Loaded best model (Val Acc: 51.22%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 51.22%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/full_model/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 44.80it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:01, 45.14it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 45.40it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 45.32it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 45.55it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 45.58it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 45.59it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 45.70it/s]6w1s eval:  45%|████▌     | 45/100 [00:00<00:01, 45.63it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 45.67it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:00, 45.70it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 45.83it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 45.78it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 45.83it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 45.79it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 45.69it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 45.77it/s]6w1s eval:  90%|█████████ | 90/100 [00:01<00:00, 45.74it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 45.82it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 45.74it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 45.66it/s]
+
+  6-way 1-shot: Acc = 37.70% +/- 1.71% (conf: 66.03%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 45.62it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:01, 45.58it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 45.41it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 45.37it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 45.30it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 45.74it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 46.26it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 46.54it/s]6w5s eval:  45%|████▌     | 45/100 [00:00<00:01, 46.82it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 46.88it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:00, 47.00it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 47.03it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 47.02it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 47.18it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 47.16it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 47.28it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 47.31it/s]6w5s eval:  90%|█████████ | 90/100 [00:01<00:00, 47.32it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 47.37it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 47.35it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 46.76it/s]
+
+  6-way 5-shot: Acc = 50.50% +/- 1.04% (conf: 70.50%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 47.47it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:01, 47.43it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 47.31it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 46.82it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 46.52it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 46.68it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 46.91it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 46.94it/s]6w10s eval:  45%|████▌     | 45/100 [00:00<00:01, 47.05it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 46.97it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:00, 47.03it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 47.31it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 47.35it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 47.54it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 47.49it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 47.32it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 46.64it/s]6w10s eval:  90%|█████████ | 90/100 [00:01<00:00, 47.01it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 47.31it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 47.41it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 47.14it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 49.88% +/- 1.08% (conf: 70.10%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-5.65, 10.27] mean=0.75
+Unknown scores: [-14.94, 28.11] mean=-0.07
+Mean separation: 0.82 (positive = known higher = good)
+
+Threshold (tau): -2.7398
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 38.67%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   37.75%
+  OSR Score (mean):         66.37%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.45, -1.72] mean=-4.72
+Unknown scores: [-28.90, -1.95] mean=-7.06
+Mean separation: 2.34 (positive = known higher = good)
+
+Threshold (tau): -9.6339
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.87%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.31%
+  OSR Score (mean):         55.65%
+
+============================================================
+Ablation: wo_flow_transform
+  flow=False, ood=True, recip=True, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Resumed from episode 3000 (Val Acc: 54.11%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 54.11%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 54.11%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_flow_transform/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 129.73it/s]6w1s eval:  27%|██▋       | 27/100 [00:00<00:00, 131.14it/s]6w1s eval:  41%|████      | 41/100 [00:00<00:00, 131.27it/s]6w1s eval:  55%|█████▌    | 55/100 [00:00<00:00, 132.06it/s]6w1s eval:  69%|██████▉   | 69/100 [00:00<00:00, 132.34it/s]6w1s eval:  83%|████████▎ | 83/100 [00:00<00:00, 131.52it/s]6w1s eval:  97%|█████████▋| 97/100 [00:00<00:00, 132.47it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 131.91it/s]
+
+  6-way 1-shot: Acc = 37.93% +/- 1.98% (conf: 80.89%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  14%|█▍        | 14/100 [00:00<00:00, 130.24it/s]6w5s eval:  28%|██▊       | 28/100 [00:00<00:00, 126.22it/s]6w5s eval:  41%|████      | 41/100 [00:00<00:00, 124.39it/s]6w5s eval:  54%|█████▍    | 54/100 [00:00<00:00, 123.06it/s]6w5s eval:  67%|██████▋   | 67/100 [00:00<00:00, 123.19it/s]6w5s eval:  80%|████████  | 80/100 [00:00<00:00, 122.80it/s]6w5s eval:  93%|█████████▎| 93/100 [00:00<00:00, 122.92it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 123.57it/s]
+
+  6-way 5-shot: Acc = 52.77% +/- 1.25% (conf: 84.28%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:  13%|█▎        | 13/100 [00:00<00:00, 120.31it/s]6w10s eval:  26%|██▌       | 26/100 [00:00<00:00, 121.78it/s]6w10s eval:  39%|███▉      | 39/100 [00:00<00:00, 122.00it/s]6w10s eval:  52%|█████▏    | 52/100 [00:00<00:00, 121.61it/s]6w10s eval:  65%|██████▌   | 65/100 [00:00<00:00, 121.89it/s]6w10s eval:  78%|███████▊  | 78/100 [00:00<00:00, 121.88it/s]6w10s eval:  91%|█████████ | 91/100 [00:00<00:00, 121.77it/s]6w10s eval: 100%|██████████| 100/100 [00:00<00:00, 121.79it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 53.67% +/- 1.05% (conf: 85.05%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.72, 10.84] mean=0.74
+Unknown scores: [-14.53, 27.11] mean=-0.10
+Mean separation: 0.84 (positive = known higher = good)
+
+Threshold (tau): -2.2633
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 40.83%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   38.38%
+  OSR Score (mean):         66.69%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.45, -1.72] mean=-4.72
+Unknown scores: [-28.90, -1.95] mean=-7.06
+Mean separation: 2.34 (positive = known higher = good)
+
+Threshold (tau): -9.6339
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.87%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.31%
+  OSR Score (mean):         55.65%
+
+============================================================
+Ablation: wo_ood_head
+  flow=True, ood=False, recip=True, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 39,363
+
+Resumed from episode 3000 (Val Acc: 54.44%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 54.44%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 54.44%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_ood_head/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 45.12it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:02, 43.71it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.59it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 45.05it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 43.43it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 43.59it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 43.86it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 43.92it/s]6w1s eval:  45%|████▌     | 45/100 [00:01<00:01, 43.91it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 44.00it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.04it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 44.05it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.13it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 44.26it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.36it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 44.34it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.47it/s]6w1s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.47it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.45it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.52it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.22it/s]
+
+  6-way 1-shot: Acc = 39.34% +/- 1.98% (conf: 84.11%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 44.61it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:02, 44.46it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.48it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 44.45it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.48it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 44.35it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.46it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 45.29it/s]6w5s eval:  45%|████▌     | 45/100 [00:00<00:01, 45.84it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 45.99it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:00, 45.36it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 45.55it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 45.41it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 45.10it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 45.10it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 45.75it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 46.18it/s]6w5s eval:  90%|█████████ | 90/100 [00:01<00:00, 46.14it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 46.08it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 45.39it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 45.30it/s]
+
+  6-way 5-shot: Acc = 52.64% +/- 1.16% (conf: 86.45%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 43.87it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:02, 44.87it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 45.24it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 45.84it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 46.31it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 46.13it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 45.37it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 44.96it/s]6w10s eval:  45%|████▌     | 45/100 [00:00<00:01, 45.19it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 44.53it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.81it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 45.53it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 45.80it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 45.86it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 45.76it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 44.83it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.32it/s]6w10s eval:  90%|█████████ | 90/100 [00:01<00:00, 44.57it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.90it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 45.50it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 45.26it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 53.24% +/- 1.22% (conf: 86.59%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.81, 10.72] mean=0.76
+Unknown scores: [-14.58, 27.14] mean=-0.09
+Mean separation: 0.85 (positive = known higher = good)
+
+Threshold (tau): -2.4142
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 40.06%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   38.12%
+  OSR Score (mean):         66.56%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.45, -1.72] mean=-4.72
+Unknown scores: [-28.90, -1.95] mean=-7.06
+Mean separation: 2.34 (positive = known higher = good)
+
+Threshold (tau): -9.6339
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.87%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.31%
+  OSR Score (mean):         55.65%
+
+============================================================
+Ablation: wo_reciprocal
+  flow=True, ood=True, recip=False, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 38,820
+
+Checkpoint not found at experiment/episodic_exp/ablation/wo_reciprocal/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7614 Total: 1.7614 Acc: 35.99% | Val Loss: 1.9225 Acc: 47.11% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 47.11%)
+Ep  1000/3000 | CE: 1.7028 Total: 2.1807 Acc: 36.82% | Val Loss: 1.9524 Acc: 49.56% | LR: 4.91e-05 cls:0.4
+  -> Best model saved (Val Acc: 49.56%)
+Ep  1500/3000 | CE: 1.6591 Total: 2.1127 Acc: 37.52% | Val Loss: 1.9140 Acc: 52.00% | LR: 4.67e-05 cls:0.8
+  -> Best model saved (Val Acc: 52.00%)
+Ep  2000/3000 | CE: 1.6390 Total: 2.0765 Acc: 37.73% | Val Loss: 2.0294 Acc: 52.22% | LR: 4.27e-05 cls:1.0
+  -> Best model saved (Val Acc: 52.22%)
+Ep  2500/3000 | CE: 1.5857 Total: 2.0013 Acc: 39.51% | Val Loss: 2.0786 Acc: 52.22% | LR: 3.75e-05 cls:1.0
+Ep  3000/3000 | CE: 1.5522 Total: 1.9545 Acc: 40.56% | Val Loss: 2.0251 Acc: 54.00% | LR: 3.15e-05 cls:1.0
+  -> Best model saved (Val Acc: 54.00%)
+
+Loaded best model (Val Acc: 54.00%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 54.00%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_reciprocal/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 46.62it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:01, 46.78it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 46.86it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 46.86it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 46.27it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 45.66it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 45.34it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 45.12it/s]6w1s eval:  45%|████▌     | 45/100 [00:00<00:01, 44.94it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 44.89it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.80it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 44.84it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.82it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 44.85it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.81it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 44.77it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.78it/s]6w1s eval:  90%|█████████ | 90/100 [00:01<00:00, 44.76it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.74it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.74it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 45.15it/s]
+
+  6-way 1-shot: Acc = 41.10% +/- 1.90% (conf: 86.03%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 44.56it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:02, 44.57it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.62it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 44.65it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.69it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 44.71it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.66it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 44.69it/s]6w5s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.66it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 44.60it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.66it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 44.64it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.70it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 44.61it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.65it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 44.66it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.33it/s]6w5s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.47it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.54it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 44.66it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 44.62it/s]
+
+  6-way 5-shot: Acc = 52.88% +/- 1.07% (conf: 88.42%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 44.64it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:02, 44.66it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.67it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 44.60it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.67it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 44.25it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.42it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 44.46it/s]6w10s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.51it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 44.57it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.60it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 44.66it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.62it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 44.68it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.40it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 44.55it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.64it/s]6w10s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.68it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.75it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.74it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.60it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 55.67% +/- 0.96% (conf: 88.72%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.92, 10.77] mean=0.77
+Unknown scores: [-14.52, 27.31] mean=-0.07
+Mean separation: 0.84 (positive = known higher = good)
+
+Threshold (tau): -2.3209
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 40.89%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   38.36%
+  OSR Score (mean):         66.68%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.45, -1.72] mean=-4.72
+Unknown scores: [-28.90, -1.95] mean=-7.06
+Mean separation: 2.34 (positive = known higher = good)
+
+Threshold (tau): -9.6339
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.87%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.31%
+  OSR Score (mean):         55.65%
+
+============================================================
+Ablation: wo_threshold
+  flow=True, ood=True, recip=True, thresh=False
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 40,098
+
+Checkpoint not found at experiment/episodic_exp/ablation/wo_threshold/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7542 Total: 1.7542 Acc: 35.81% | Val Loss: 1.8905 Acc: 49.00% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 49.00%)
+Ep  1000/3000 | CE: 1.6768 Total: 3.3265 Acc: 34.91% | Val Loss: 2.0345 Acc: 51.33% | LR: 4.91e-05 cls:0.4
+  -> Best model saved (Val Acc: 51.33%)
+Ep  1500/3000 | CE: 1.6487 Total: 3.3166 Acc: 35.71% | Val Loss: 2.1656 Acc: 46.89% | LR: 4.67e-05 cls:0.8
+Ep  2000/3000 | CE: 1.6446 Total: 3.3248 Acc: 35.90% | Val Loss: 2.0949 Acc: 45.67% | LR: 4.27e-05 cls:1.0
+Ep  2500/3000 | CE: 1.6296 Total: 3.2864 Acc: 36.92% | Val Loss: 1.9528 Acc: 51.56% | LR: 3.75e-05 cls:1.0
+  -> Best model saved (Val Acc: 51.56%)
+Ep  3000/3000 | CE: 1.6024 Total: 3.2654 Acc: 38.17% | Val Loss: 2.0205 Acc: 52.00% | LR: 3.15e-05 cls:1.0
+  -> Best model saved (Val Acc: 52.00%)
+
+Loaded best model (Val Acc: 52.00%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 52.00%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_threshold/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 44.90it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:01, 45.05it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 45.04it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 45.01it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 45.02it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 45.06it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 45.05it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 44.62it/s]6w1s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.52it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 44.13it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.02it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 43.89it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 43.87it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 43.87it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 43.71it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 43.86it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.04it/s]6w1s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.17it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.05it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.16it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.30it/s]
+
+  6-way 1-shot: Acc = 39.10% +/- 1.93% (conf: 88.08%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 44.54it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:02, 44.43it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.48it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 44.43it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.27it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 44.41it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.38it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 44.62it/s]6w5s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.73it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 44.82it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.85it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 44.93it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.81it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 44.87it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.96it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 44.88it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.97it/s]6w5s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.98it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 45.03it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 45.09it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 44.79it/s]
+
+  6-way 5-shot: Acc = 52.34% +/- 1.21% (conf: 89.39%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 44.87it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:02, 44.94it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.86it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 44.95it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.75it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 44.77it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.83it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 44.81it/s]6w10s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.87it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 44.90it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.87it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 44.88it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.92it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 44.84it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.86it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 44.92it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.88it/s]6w10s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.95it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.96it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.86it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.87it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 53.07% +/- 0.97% (conf: 88.79%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.46, 10.74] mean=0.76
+Unknown scores: [-14.32, 26.84] mean=-0.08
+Mean separation: 0.84 (positive = known higher = good)
+
+Threshold (tau): -2.2931
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 40.50%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   38.26%
+  OSR Score (mean):         66.63%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.45, -1.72] mean=-4.72
+Unknown scores: [-28.90, -1.95] mean=-7.06
+Mean separation: 2.34 (positive = known higher = good)
+
+Threshold (tau): -9.6339
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.87%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.31%
+  OSR Score (mean):         55.65%
+
+============================================================
+Ablation: only_distance_head
+  flow=False, ood=False, recip=False, thresh=False
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v20_tau22relabel_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 12,737
+
+Checkpoint not found at experiment/episodic_exp/ablation/only_distance_head/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7619 Total: 1.7619 Acc: 35.06% | Val Loss: 1.8281 Acc: 47.89% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 47.89%)
+Ep  1000/3000 | CE: 1.6944 Total: 1.6744 Acc: 35.19% | Val Loss: 1.9698 Acc: 47.00% | LR: 4.91e-05 cls:0.4
+Ep  1500/3000 | CE: 1.6765 Total: 1.6165 Acc: 34.97% | Val Loss: 2.0245 Acc: 46.78% | LR: 4.67e-05 cls:0.8
+Ep  2000/3000 | CE: 1.6599 Total: 1.5599 Acc: 35.72% | Val Loss: 1.9627 Acc: 49.33% | LR: 4.27e-05 cls:1.0
+  -> Best model saved (Val Acc: 49.33%)
+Ep  2500/3000 | CE: 1.6560 Total: 1.5560 Acc: 35.42% | Val Loss: 1.9717 Acc: 48.22% | LR: 3.75e-05 cls:1.0
+Ep  3000/3000 | CE: 1.6541 Total: 1.5541 Acc: 35.64% | Val Loss: 2.0580 Acc: 50.78% | LR: 3.15e-05 cls:1.0
+  -> Best model saved (Val Acc: 50.78%)
+
+Loaded best model (Val Acc: 50.78%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 50.78%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/only_distance_head/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 122.57it/s]6w1s eval:  26%|██▌       | 26/100 [00:00<00:00, 123.64it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:00, 127.07it/s]6w1s eval:  54%|█████▍    | 54/100 [00:00<00:00, 128.48it/s]6w1s eval:  68%|██████▊   | 68/100 [00:00<00:00, 130.29it/s]6w1s eval:  82%|████████▏ | 82/100 [00:00<00:00, 130.87it/s]6w1s eval:  96%|█████████▌| 96/100 [00:00<00:00, 130.78it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 129.31it/s]
+
+  6-way 1-shot: Acc = 36.13% +/- 1.62% (conf: 78.94%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  13%|█▎        | 13/100 [00:00<00:00, 129.52it/s]6w5s eval:  27%|██▋       | 27/100 [00:00<00:00, 130.34it/s]6w5s eval:  41%|████      | 41/100 [00:00<00:00, 127.29it/s]6w5s eval:  55%|█████▌    | 55/100 [00:00<00:00, 128.46it/s]6w5s eval:  69%|██████▉   | 69/100 [00:00<00:00, 129.73it/s]6w5s eval:  82%|████████▏ | 82/100 [00:00<00:00, 129.24it/s]6w5s eval:  96%|█████████▌| 96/100 [00:00<00:00, 129.76it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 129.38it/s]
+
+  6-way 5-shot: Acc = 50.39% +/- 1.05% (conf: 80.22%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:  13%|█▎        | 13/100 [00:00<00:00, 127.99it/s]6w10s eval:  26%|██▌       | 26/100 [00:00<00:00, 129.02it/s]6w10s eval:  39%|███▉      | 39/100 [00:00<00:00, 128.62it/s]6w10s eval:  52%|█████▏    | 52/100 [00:00<00:00, 120.43it/s]6w10s eval:  65%|██████▌   | 65/100 [00:00<00:00, 121.03it/s]6w10s eval:  78%|███████▊  | 78/100 [00:00<00:00, 121.00it/s]6w10s eval:  91%|█████████ | 91/100 [00:00<00:00, 121.68it/s]6w10s eval: 100%|██████████| 100/100 [00:00<00:00, 122.71it/s]
+
+  6-way 10-shot: Acc = 52.40% +/- 1.00% (conf: 80.49%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-4.56, 10.75] mean=0.72
+Unknown scores: [-14.40, 26.92] mean=-0.10
+Mean separation: 0.83 (positive = known higher = good)
+
+Threshold (tau): -2.3217
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 40.13%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   37.83%
+  OSR Score (mean):         66.41%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-32.45, -1.72] mean=-4.72
+Unknown scores: [-28.90, -1.95] mean=-7.06
+Mean separation: 2.34 (positive = known higher = good)
+
+Threshold (tau): -9.6339
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 17.87%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   16.31%
+  OSR Score (mean):         55.65%
+
+============================================================
+Ablation: full_model
+  flow=True, ood=True, recip=True, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Extracting features for 'train' split...
+Extracting train:   0%|          | 0/235 [00:00<?, ?it/s]Extracting train:   0%|          | 1/235 [00:01<05:41,  1.46s/it]Extracting train:   6%|▋         | 15/235 [00:01<00:16, 13.09it/s]Extracting train:  13%|█▎        | 30/235 [00:01<00:07, 28.47it/s]Extracting train:  20%|█▉        | 46/235 [00:01<00:04, 46.34it/s]Extracting train:  26%|██▌       | 61/235 [00:01<00:02, 62.98it/s]Extracting train:  32%|███▏      | 75/235 [00:01<00:02, 77.36it/s]Extracting train:  38%|███▊      | 89/235 [00:02<00:01, 89.65it/s]Extracting train:  44%|████▍     | 103/235 [00:02<00:01, 101.13it/s]Extracting train:  50%|█████     | 118/235 [00:02<00:01, 111.53it/s]Extracting train:  57%|█████▋    | 133/235 [00:02<00:00, 120.27it/s]Extracting train:  63%|██████▎   | 147/235 [00:02<00:00, 122.44it/s]Extracting train:  69%|██████▊   | 161/235 [00:02<00:00, 126.02it/s]Extracting train:  75%|███████▍  | 176/235 [00:02<00:00, 130.45it/s]Extracting train:  81%|████████  | 190/235 [00:02<00:00, 131.65it/s]Extracting train:  87%|████████▋ | 204/235 [00:02<00:00, 126.32it/s]Extracting train:  93%|█████████▎| 219/235 [00:03<00:00, 130.71it/s]Extracting train: 100%|██████████| 235/235 [00:03<00:00, 61.26it/s] Extracting train: 100%|██████████| 235/235 [00:03<00:00, 63.66it/s]
+  Feature normalization: mean_range=[-0.9542, 0.8949] std_range=[0.3111, 1.1853]
+Cached 15000 features -> experiment/fewshot_cache/train_features.pt
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Extracting features for 'calib' split...
+Extracting calib:   0%|          | 0/79 [00:00<?, ?it/s]Extracting calib:   1%|▏         | 1/79 [00:00<00:29,  2.63it/s]Extracting calib:  13%|█▎        | 10/79 [00:00<00:02, 26.08it/s]Extracting calib:  32%|███▏      | 25/79 [00:00<00:00, 59.57it/s]Extracting calib:  51%|█████     | 40/79 [00:00<00:00, 84.88it/s]Extracting calib:  70%|██████▉   | 55/79 [00:00<00:00, 103.50it/s]Extracting calib:  92%|█████████▏| 73/79 [00:00<00:00, 124.99it/s]Extracting calib: 100%|██████████| 79/79 [00:01<00:00, 53.55it/s] 
+Cached 5000 features -> experiment/fewshot_cache/calib_features.pt
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Extracting features for 'test' split...
+Extracting test:   0%|          | 0/79 [00:00<?, ?it/s]Extracting test:   1%|▏         | 1/79 [00:00<00:36,  2.13it/s]Extracting test:  13%|█▎        | 10/79 [00:00<00:03, 22.26it/s]Extracting test:  33%|███▎      | 26/79 [00:00<00:00, 55.48it/s]Extracting test:  52%|█████▏    | 41/79 [00:00<00:00, 78.35it/s]Extracting test:  71%|███████   | 56/79 [00:00<00:00, 97.34it/s]Extracting test:  96%|█████████▌| 76/79 [00:00<00:00, 124.36it/s]Extracting test: 100%|██████████| 79/79 [00:01<00:00, 70.73it/s] 
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+Cached 5000 features -> experiment/fewshot_cache/test_features.pt
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Real OOD exposure: 2000 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 15000 samples, dim=64
+  GMM train log-likelihood: mean=148.07, 10th percentile=107.46
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 40,100
+
+Resumed from episode 500 (Val Acc: 51.22%)
+Continuing from episode 501 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep  1000/3000 | CE: 1.7258 Total: 3.5707 Acc: 29.85% | Val Loss: 2.4626 Acc: 38.89% | LR: 4.91e-05 cls:0.4
+Ep  1500/3000 | CE: 1.7103 Total: 3.5406 Acc: 30.26% | Val Loss: 2.4805 Acc: 34.78% | LR: 4.67e-05 cls:0.8
+Ep  2000/3000 | CE: 1.7024 Total: 3.5285 Acc: 30.64% | Val Loss: 2.5355 Acc: 40.33% | LR: 4.27e-05 cls:1.0
+Ep  2500/3000 | CE: 1.6924 Total: 3.4888 Acc: 31.48% | Val Loss: 2.4901 Acc: 40.22% | LR: 3.75e-05 cls:1.0
+Ep  3000/3000 | CE: 1.6887 Total: 3.4421 Acc: 31.43% | Val Loss: 2.4865 Acc: 38.67% | LR: 3.15e-05 cls:1.0
+
+Loaded best model (Val Acc: 51.22%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 51.22%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/full_model/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 44.68it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:02, 44.75it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.83it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 44.79it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 45.11it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 45.03it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 45.17it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 45.17it/s]6w1s eval:  45%|████▌     | 45/100 [00:00<00:01, 45.15it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 45.17it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:00, 45.10it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 45.03it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.87it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 44.95it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.99it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 44.60it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.32it/s]6w1s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.58it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.76it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.82it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.89it/s]
+
+  6-way 1-shot: Acc = 30.09% +/- 1.57% (conf: 63.27%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 45.21it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:01, 45.06it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.92it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 44.93it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.86it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 44.89it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.95it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 44.83it/s]6w5s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.86it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 44.68it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.66it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 44.56it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.51it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 44.51it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.36it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 44.43it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.38it/s]6w5s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.44it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 43.90it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 44.10it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 44.53it/s]
+
+  6-way 5-shot: Acc = 40.26% +/- 1.09% (conf: 65.91%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 44.47it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:02, 44.33it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.33it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 44.26it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.36it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 44.31it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.22it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 44.29it/s]6w10s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.22it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 44.16it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.22it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 44.30it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.53it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 44.72it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 43.91it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 43.34it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 43.80it/s]6w10s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.23it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.52it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.70it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.29it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 40.74% +/- 1.11% (conf: 65.24%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-4.68, 6.41] mean=0.26
+Unknown scores: [-9.64, 16.68] mean=-0.02
+Mean separation: 0.28 (positive = known higher = good)
+
+Threshold (tau): -2.6435
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 39.55%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   45.91%
+  OSR Score (mean):         70.46%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-14.93, -1.76] mean=-4.04
+Unknown scores: [-29.33, -2.62] mean=-7.76
+Mean separation: 3.73 (positive = known higher = good)
+
+Threshold (tau): -7.2205
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.95%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.95%
+  OSR Score (mean):         69.97%
+
+============================================================
+Ablation: wo_flow_transform
+  flow=False, ood=True, recip=True, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Real OOD exposure: 2000 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 15000 samples, dim=64
+  GMM train log-likelihood: mean=148.07, 10th percentile=107.46
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Resumed from episode 3000 (Val Acc: 54.11%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 54.11%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 54.11%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_flow_transform/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  12%|█▏        | 12/100 [00:00<00:00, 119.37it/s]6w1s eval:  26%|██▌       | 26/100 [00:00<00:00, 126.16it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:00, 128.97it/s]6w1s eval:  54%|█████▍    | 54/100 [00:00<00:00, 129.55it/s]6w1s eval:  68%|██████▊   | 68/100 [00:00<00:00, 130.24it/s]6w1s eval:  82%|████████▏ | 82/100 [00:00<00:00, 130.48it/s]6w1s eval:  96%|█████████▌| 96/100 [00:00<00:00, 131.24it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 129.80it/s]
+
+  6-way 1-shot: Acc = 29.86% +/- 1.46% (conf: 80.86%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  13%|█▎        | 13/100 [00:00<00:00, 129.70it/s]6w5s eval:  27%|██▋       | 27/100 [00:00<00:00, 131.30it/s]6w5s eval:  41%|████      | 41/100 [00:00<00:00, 131.64it/s]6w5s eval:  55%|█████▌    | 55/100 [00:00<00:00, 131.43it/s]6w5s eval:  69%|██████▉   | 69/100 [00:00<00:00, 131.54it/s]6w5s eval:  83%|████████▎ | 83/100 [00:00<00:00, 130.96it/s]6w5s eval:  97%|█████████▋| 97/100 [00:00<00:00, 131.24it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 131.25it/s]
+
+  6-way 5-shot: Acc = 35.80% +/- 1.19% (conf: 81.28%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:  13%|█▎        | 13/100 [00:00<00:00, 128.87it/s]6w10s eval:  27%|██▋       | 27/100 [00:00<00:00, 129.73it/s]6w10s eval:  41%|████      | 41/100 [00:00<00:00, 130.49it/s]6w10s eval:  55%|█████▌    | 55/100 [00:00<00:00, 130.19it/s]6w10s eval:  69%|██████▉   | 69/100 [00:00<00:00, 130.61it/s]6w10s eval:  83%|████████▎ | 83/100 [00:00<00:00, 130.17it/s]6w10s eval:  97%|█████████▋| 97/100 [00:00<00:00, 130.60it/s]6w10s eval: 100%|██████████| 100/100 [00:00<00:00, 130.28it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 38.62% +/- 1.09% (conf: 80.53%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-4.75, 6.37] mean=0.28
+Unknown scores: [-9.57, 16.73] mean=-0.02
+Mean separation: 0.30 (positive = known higher = good)
+
+Threshold (tau): -2.6113
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 39.65%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   45.87%
+  OSR Score (mean):         70.43%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-14.93, -1.76] mean=-4.04
+Unknown scores: [-29.33, -2.62] mean=-7.76
+Mean separation: 3.73 (positive = known higher = good)
+
+Threshold (tau): -7.2205
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.95%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.95%
+  OSR Score (mean):         69.97%
+
+============================================================
+Ablation: wo_ood_head
+  flow=True, ood=False, recip=True, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Real OOD exposure: 2000 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 15000 samples, dim=64
+  GMM train log-likelihood: mean=148.07, 10th percentile=107.46
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 39,363
+
+Resumed from episode 3000 (Val Acc: 54.44%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 54.44%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 54.44%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_ood_head/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 41.64it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:02, 43.91it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.41it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 44.90it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 45.02it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 45.21it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 45.35it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 45.46it/s]6w1s eval:  45%|████▌     | 45/100 [00:00<00:01, 45.55it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 45.16it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.79it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 44.59it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 43.85it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 43.78it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 41.91it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 42.53it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 43.05it/s]6w1s eval:  90%|█████████ | 90/100 [00:02<00:00, 43.50it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.25it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.97it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 44.31it/s]
+
+  6-way 1-shot: Acc = 28.66% +/- 1.67% (conf: 83.28%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 47.17it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:01, 46.80it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 46.90it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 47.06it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 47.05it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 47.01it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 46.65it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 46.81it/s]6w5s eval:  45%|████▌     | 45/100 [00:00<00:01, 46.95it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 46.82it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:00, 46.92it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 46.83it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 46.84it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 46.92it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 46.93it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 46.94it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 46.93it/s]6w5s eval:  90%|█████████ | 90/100 [00:01<00:00, 45.99it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 45.41it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 45.10it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 46.46it/s]
+
+  6-way 5-shot: Acc = 36.98% +/- 1.04% (conf: 85.57%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 44.16it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:02, 43.98it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 44.06it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 44.05it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.07it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 44.13it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.24it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 44.26it/s]6w10s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.16it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 44.20it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.11it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 44.18it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.15it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 44.24it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.27it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 44.02it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.10it/s]6w10s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.09it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.71it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 45.31it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.36it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 37.81% +/- 1.01% (conf: 86.70%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-4.78, 6.40] mean=0.27
+Unknown scores: [-9.52, 16.72] mean=-0.02
+Mean separation: 0.29 (positive = known higher = good)
+
+Threshold (tau): -2.6405
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 39.45%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   45.13%
+  OSR Score (mean):         70.06%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-14.93, -1.76] mean=-4.04
+Unknown scores: [-29.33, -2.62] mean=-7.76
+Mean separation: 3.73 (positive = known higher = good)
+
+Threshold (tau): -7.2205
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.95%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.95%
+  OSR Score (mean):         69.97%
+
+============================================================
+Ablation: wo_reciprocal
+  flow=True, ood=True, recip=False, thresh=True
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Real OOD exposure: 2000 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 15000 samples, dim=64
+  GMM train log-likelihood: mean=148.07, 10th percentile=107.46
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 38,820
+
+Resumed from episode 3000 (Val Acc: 54.00%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 54.00%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 54.00%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_reciprocal/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 45.73it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:01, 46.26it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 46.58it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 46.95it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 47.13it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 47.27it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 47.23it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 46.99it/s]6w1s eval:  45%|████▌     | 45/100 [00:00<00:01, 47.04it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 47.06it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:00, 47.01it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 46.77it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 46.76it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 47.02it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 47.23it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 47.26it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 47.33it/s]6w1s eval:  90%|█████████ | 90/100 [00:01<00:00, 47.35it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 47.38it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 47.37it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 47.09it/s]
+
+  6-way 1-shot: Acc = 29.57% +/- 1.40% (conf: 83.99%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 47.26it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:01, 47.27it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 47.27it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 47.29it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 47.26it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 47.17it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 47.11it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 47.17it/s]6w5s eval:  45%|████▌     | 45/100 [00:00<00:01, 47.18it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 47.15it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:00, 47.13it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 47.14it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 47.08it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 47.14it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 47.19it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 47.20it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 47.19it/s]6w5s eval:  90%|█████████ | 90/100 [00:01<00:00, 47.14it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 47.19it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 47.07it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 47.15it/s]
+
+  6-way 5-shot: Acc = 38.64% +/- 1.28% (conf: 86.26%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:01, 47.54it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:01, 47.44it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 47.47it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 47.51it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 47.48it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 47.44it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 47.44it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 47.29it/s]6w10s eval:  45%|████▌     | 45/100 [00:00<00:01, 46.97it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 46.90it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:00, 47.02it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 47.07it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 47.15it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 47.15it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 47.12it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 47.23it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 47.33it/s]6w10s eval:  90%|█████████ | 90/100 [00:01<00:00, 47.42it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 47.41it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 47.36it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 47.27it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 41.52% +/- 1.09% (conf: 86.29%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-4.20, 6.07] mean=0.29
+Unknown scores: [-10.21, 16.13] mean=0.01
+Mean separation: 0.28 (positive = known higher = good)
+
+Threshold (tau): -2.3999
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 38.85%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   46.74%
+  OSR Score (mean):         70.87%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-14.93, -1.76] mean=-4.04
+Unknown scores: [-29.33, -2.62] mean=-7.76
+Mean separation: 3.73 (positive = known higher = good)
+
+Threshold (tau): -7.2205
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.95%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.95%
+  OSR Score (mean):         69.97%
+
+============================================================
+Ablation: wo_threshold
+  flow=True, ood=True, recip=True, thresh=False
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Real OOD exposure: 2000 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 15000 samples, dim=64
+  GMM train log-likelihood: mean=148.07, 10th percentile=107.46
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 40,098
+
+Resumed from episode 3000 (Val Acc: 52.00%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 52.00%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 52.00%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/wo_threshold/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   5%|▌         | 5/100 [00:00<00:02, 43.55it/s]6w1s eval:  10%|█         | 10/100 [00:00<00:02, 43.33it/s]6w1s eval:  15%|█▌        | 15/100 [00:00<00:01, 43.46it/s]6w1s eval:  20%|██        | 20/100 [00:00<00:01, 43.59it/s]6w1s eval:  25%|██▌       | 25/100 [00:00<00:01, 43.48it/s]6w1s eval:  30%|███       | 30/100 [00:00<00:01, 43.46it/s]6w1s eval:  35%|███▌      | 35/100 [00:00<00:01, 43.45it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:01, 43.60it/s]6w1s eval:  45%|████▌     | 45/100 [00:01<00:01, 43.33it/s]6w1s eval:  50%|█████     | 50/100 [00:01<00:01, 43.35it/s]6w1s eval:  55%|█████▌    | 55/100 [00:01<00:01, 43.45it/s]6w1s eval:  60%|██████    | 60/100 [00:01<00:00, 43.54it/s]6w1s eval:  65%|██████▌   | 65/100 [00:01<00:00, 43.56it/s]6w1s eval:  70%|███████   | 70/100 [00:01<00:00, 43.56it/s]6w1s eval:  75%|███████▌  | 75/100 [00:01<00:00, 43.56it/s]6w1s eval:  80%|████████  | 80/100 [00:01<00:00, 43.71it/s]6w1s eval:  85%|████████▌ | 85/100 [00:01<00:00, 43.91it/s]6w1s eval:  90%|█████████ | 90/100 [00:02<00:00, 43.57it/s]6w1s eval:  95%|█████████▌| 95/100 [00:02<00:00, 43.64it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 43.65it/s]6w1s eval: 100%|██████████| 100/100 [00:02<00:00, 43.55it/s]
+
+  6-way 1-shot: Acc = 29.69% +/- 1.23% (conf: 87.13%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:   5%|▌         | 5/100 [00:00<00:02, 43.36it/s]6w5s eval:  10%|█         | 10/100 [00:00<00:02, 43.27it/s]6w5s eval:  15%|█▌        | 15/100 [00:00<00:01, 43.49it/s]6w5s eval:  20%|██        | 20/100 [00:00<00:01, 43.48it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.00it/s]6w5s eval:  30%|███       | 30/100 [00:00<00:01, 44.24it/s]6w5s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.37it/s]6w5s eval:  40%|████      | 40/100 [00:00<00:01, 44.51it/s]6w5s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.68it/s]6w5s eval:  50%|█████     | 50/100 [00:01<00:01, 44.74it/s]6w5s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.76it/s]6w5s eval:  60%|██████    | 60/100 [00:01<00:00, 44.74it/s]6w5s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.79it/s]6w5s eval:  70%|███████   | 70/100 [00:01<00:00, 44.89it/s]6w5s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.94it/s]6w5s eval:  80%|████████  | 80/100 [00:01<00:00, 45.00it/s]6w5s eval:  85%|████████▌ | 85/100 [00:01<00:00, 45.05it/s]6w5s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.97it/s]6w5s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.96it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 45.00it/s]6w5s eval: 100%|██████████| 100/100 [00:02<00:00, 44.61it/s]
+
+  6-way 5-shot: Acc = 36.38% +/- 1.11% (conf: 87.50%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:   5%|▌         | 5/100 [00:00<00:02, 44.96it/s]6w10s eval:  10%|█         | 10/100 [00:00<00:01, 45.11it/s]6w10s eval:  15%|█▌        | 15/100 [00:00<00:01, 45.03it/s]6w10s eval:  20%|██        | 20/100 [00:00<00:01, 44.98it/s]6w10s eval:  25%|██▌       | 25/100 [00:00<00:01, 44.99it/s]6w10s eval:  30%|███       | 30/100 [00:00<00:01, 44.96it/s]6w10s eval:  35%|███▌      | 35/100 [00:00<00:01, 44.95it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:01, 44.91it/s]6w10s eval:  45%|████▌     | 45/100 [00:01<00:01, 44.94it/s]6w10s eval:  50%|█████     | 50/100 [00:01<00:01, 44.91it/s]6w10s eval:  55%|█████▌    | 55/100 [00:01<00:01, 44.91it/s]6w10s eval:  60%|██████    | 60/100 [00:01<00:00, 44.82it/s]6w10s eval:  65%|██████▌   | 65/100 [00:01<00:00, 44.89it/s]6w10s eval:  70%|███████   | 70/100 [00:01<00:00, 44.93it/s]6w10s eval:  75%|███████▌  | 75/100 [00:01<00:00, 44.96it/s]6w10s eval:  80%|████████  | 80/100 [00:01<00:00, 44.95it/s]6w10s eval:  85%|████████▌ | 85/100 [00:01<00:00, 44.72it/s]6w10s eval:  90%|█████████ | 90/100 [00:02<00:00, 44.81it/s]6w10s eval:  95%|█████████▌| 95/100 [00:02<00:00, 44.80it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 45.14it/s]6w10s eval: 100%|██████████| 100/100 [00:02<00:00, 44.94it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 10-shot: Acc = 38.87% +/- 1.14% (conf: 86.50%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-4.70, 6.44] mean=0.27
+Unknown scores: [-9.62, 16.65] mean=-0.03
+Mean separation: 0.31 (positive = known higher = good)
+
+Threshold (tau): -2.5878
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 40.05%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   45.90%
+  OSR Score (mean):         70.45%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-14.93, -1.76] mean=-4.04
+Unknown scores: [-29.33, -2.62] mean=-7.76
+Mean separation: 3.73 (positive = known higher = good)
+
+Threshold (tau): -7.2205
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.95%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.95%
+  OSR Score (mean):         69.97%
+
+============================================================
+Ablation: only_distance_head
+  flow=False, ood=False, recip=False, thresh=False
+============================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_tau19_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 500 samples
+    Class 1: 500 samples
+    Class 2: 500 samples
+    Class 3: 500 samples
+    Class 4: 500 samples
+    Class 5: 500 samples
+    Class 6: 500 samples
+    Class 7: 500 samples
+    Class 8: 500 samples
+    Class 9: 500 samples
+Real OOD exposure: 2000 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 15000 samples, dim=64
+  GMM train log-likelihood: mean=148.07, 10th percentile=107.46
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 12,737
+
+Resumed from episode 3000 (Val Acc: 50.78%)
+Continuing from episode 3001 to 3000
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+
+Loaded best model (Val Acc: 50.78%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 50.78%
+======================================================================
+Episode history saved: experiment/episodic_exp/ablation/only_distance_head/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 129.19it/s]6w1s eval:  27%|██▋       | 27/100 [00:00<00:00, 130.22it/s]6w1s eval:  41%|████      | 41/100 [00:00<00:00, 129.90it/s]6w1s eval:  54%|█████▍    | 54/100 [00:00<00:00, 126.30it/s]6w1s eval:  67%|██████▋   | 67/100 [00:00<00:00, 126.51it/s]6w1s eval:  80%|████████  | 80/100 [00:00<00:00, 127.04it/s]6w1s eval:  93%|█████████▎| 93/100 [00:00<00:00, 127.00it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 126.91it/s]
+
+  6-way 1-shot: Acc = 31.07% +/- 1.31% (conf: 75.47%)
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  13%|█▎        | 13/100 [00:00<00:00, 128.37it/s]6w5s eval:  27%|██▋       | 27/100 [00:00<00:00, 130.54it/s]6w5s eval:  41%|████      | 41/100 [00:00<00:00, 130.69it/s]6w5s eval:  55%|█████▌    | 55/100 [00:00<00:00, 128.88it/s]6w5s eval:  68%|██████▊   | 68/100 [00:00<00:00, 128.70it/s]6w5s eval:  81%|████████  | 81/100 [00:00<00:00, 128.74it/s]6w5s eval:  94%|█████████▍| 94/100 [00:00<00:00, 128.87it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 129.04it/s]
+
+  6-way 5-shot: Acc = 36.33% +/- 1.05% (conf: 76.39%)
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:  13%|█▎        | 13/100 [00:00<00:00, 128.40it/s]6w10s eval:  26%|██▌       | 26/100 [00:00<00:00, 128.82it/s]6w10s eval:  40%|████      | 40/100 [00:00<00:00, 130.07it/s]6w10s eval:  54%|█████▍    | 54/100 [00:00<00:00, 129.45it/s]6w10s eval:  67%|██████▋   | 67/100 [00:00<00:00, 129.08it/s]6w10s eval:  80%|████████  | 80/100 [00:00<00:00, 128.70it/s]6w10s eval:  93%|█████████▎| 93/100 [00:00<00:00, 128.39it/s]6w10s eval: 100%|██████████| 100/100 [00:00<00:00, 128.83it/s]
+
+  6-way 10-shot: Acc = 38.18% +/- 1.02% (conf: 74.69%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-4.74, 6.29] mean=0.26
+Unknown scores: [-9.60, 16.35] mean=-0.03
+Mean separation: 0.29 (positive = known higher = good)
+
+Threshold (tau): -2.6501
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 39.50%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   45.64%
+  OSR Score (mean):         70.32%
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   3000
+Unknown samples: 2000
+Known scores:   [-14.93, -1.76] mean=-4.04
+Unknown scores: [-29.33, -2.62] mean=-7.76
+Mean separation: 3.73 (positive = known higher = good)
+
+Threshold (tau): -7.2205
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.95%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.95%
+  OSR Score (mean):         69.97%
+
+Results saved to experiment/episodic_exp/ablation/results.json
+
+================================================================================
+ABLATION SUMMARY
+================================================================================
+
+  Dataset: TAU22
+  Config                     BaseAcc      TNR      TPR      OSR
+  full_model                 50.50%  95.00%  37.75%  66.37%
+  wo_flow_transform          52.77%  95.00%  38.38%  66.69%
+  wo_ood_head                52.64%  95.00%  38.12%  66.56%
+  wo_reciprocal              52.88%  95.00%  38.36%  66.68%
+  wo_threshold               52.34%  95.00%  38.26%  66.63%
+  only_distance_head         50.39%  95.00%  37.83%  66.41%
+
+  Dataset: TAU19
+  Config                     BaseAcc      TNR      TPR      OSR
+  full_model                 40.26%  95.00%  45.91%  70.46%
+  wo_flow_transform          35.80%  95.00%  45.87%  70.43%
+  wo_ood_head                36.98%  95.00%  45.13%  70.06%
+  wo_reciprocal              38.64%  95.00%  46.74%  70.87%
+  wo_threshold               36.38%  95.00%  45.90%  70.45%
+  only_distance_head         36.33%  95.00%  45.64%  70.32%

@@ -25,14 +25,14 @@ train:
   test_times: 200
 
   # ========== Training hyper-parameters ==========
-  epoch: 80
-  epochs_pre: 80
+  epoch: 20
+  epochs_pre: 20
   batch_size: 256
   learning_rate: 0.05
   lr: 0.001
   gamma: 0.1
   weight_decay: 5.0e-4
-  lr_decay_epochs: '40,70'
+  lr_decay_epochs: '10,18'
   lr_decay_rate: 0.1
   nesterov: true
   seed: 42

@@ -23,11 +23,15 @@ class PrototypeDynamicAggregation(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x,labels=None):
-        x_mean = x.mean(3).mean(2)
-        x_mean_1 = x_mean.view(x_mean.size(0), -1, 1, 1).expand_as(x)
-        sim = torch.cosine_similarity(x, x_mean_1, dim=1).unsqueeze(1)
-        x_new = (x * sim.expand_as(x)).mean(3).mean(2)
-        x = self.alpha * x_new + x_mean
+        if x.dim() == 4:
+            x_mean = x.mean(3).mean(2)
+            x_mean_1 = x_mean.view(x_mean.size(0), -1, 1, 1).expand_as(x)
+            sim = torch.cosine_similarity(x, x_mean_1, dim=1).unsqueeze(1)
+            x_new = (x * sim.expand_as(x)).mean(3).mean(2)
+            x = self.alpha * x_new + x_mean
+        else:
+            # 2D input (B, C) — already pooled, use as-is
+            x = x
         if labels is None:
             return x
         

@@ -31,8 +31,11 @@ def load_config(config_path):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     cfg = cfg['train']
+    saved_argv = sys.argv
+    sys.argv = [sys.argv[0]]
     base_parser = trainer.train_parser()
-    merged = vars(base_parser.parse_args([]))
+    sys.argv = saved_argv
+    merged = vars(base_parser)
     merged.update(cfg)
     args = argparse.Namespace(**merged)
     for k, v in vars(args).items():
@@ -168,6 +171,7 @@ def analyze_model(args, name, use_ciam=True, use_pam=True, use_npm=True):
         ckpt = torch.load(args.pretrained_model_path, weights_only=False)
         state_dict = ckpt.get('feature_params', ckpt.get('params', ckpt))
         model.load_state_dict(state_dict, strict=False)
+        model.init_representation(ckpt)
 
     model.eval()
 

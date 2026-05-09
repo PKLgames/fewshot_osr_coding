@@ -35,15 +35,18 @@ def default_train(train_loader, model, optimizer, writer, iter_counter, args):
             loss_value = loss_total.item()
 
             ### Closed Set Accuracy
-            close_pred = np.argmax(probs[0][:,:args.n_ways].view(-1,args.n_ways).detach().cpu().numpy(),-1)
+            # Derive actual n_ways from episode data (may differ from args.n_ways
+            # when training with pseudo-open from base classes)
+            actual_n_ways = support_label.squeeze().max().item() + 1
+            close_pred = np.argmax(probs[0][:,:actual_n_ways].view(-1,actual_n_ways).detach().cpu().numpy(),-1)
             close_label = query_label.view(-1).cpu().numpy()
             acc = metrics.accuracy_score(close_label, close_pred)
 
             ### Open Set AUROC
             open_label_binary = np.concatenate((np.ones(close_pred.shape),np.zeros(openset_cls_probs.shape[0])))
-            query_cls_probs = query_cls_probs.view(-1, args.n_ways+1)
-            openset_cls_probs = openset_cls_probs.view(-1,args.n_ways+1)
-            open_scores = torch.cat([query_cls_probs,openset_cls_probs], dim=0).detach().cpu().numpy()[:,:args.n_ways]
+            query_cls_probs = query_cls_probs.view(-1, actual_n_ways+1)
+            openset_cls_probs = openset_cls_probs.view(-1, actual_n_ways+1)
+            open_scores = torch.cat([query_cls_probs,openset_cls_probs], dim=0).detach().cpu().numpy()[:,:actual_n_ways]
             open_scores = np.max(open_scores,axis=-1)
             auroc = metrics.roc_auc_score(open_label_binary,open_scores)
  

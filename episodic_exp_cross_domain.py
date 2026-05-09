@@ -167,6 +167,8 @@ def main():
     parser.add_argument('--source', choices=['TAU22', 'TAU19'], default=None)
     parser.add_argument('--target', choices=['TAU22', 'TAU19'], default=None)
     parser.add_argument('--all', action='store_true')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     if cl_args.all:
@@ -190,7 +192,8 @@ def main():
             all_results[key] = r
 
     # Save
-    save_path = 'episodic_exp_cross_domain_results.json'
+    os.makedirs(os.path.join(cl_args.output_dir, 'cross_domain'), exist_ok=True)
+    save_path = os.path.join(cl_args.output_dir, 'cross_domain', 'results.json')
     with open(save_path, 'w') as f:
         json.dump(all_results, f, indent=2, default=str)
     print(f"\nResults saved to {save_path}")

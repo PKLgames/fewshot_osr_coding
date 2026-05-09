@@ -32,6 +32,7 @@ merged.update(cfg)
 args = dict2namespace(merged)
 
 train_loader = dataloaders.meta_train_dataloader(args)
+calib_loader = dataloaders.meta_calib_dataloader(args)
 eval_loader = dataloaders.meta_test_dataloader(args)
 train_func = partial(C2_Net_train.default_train, train_loader=train_loader)
 tm = trainer.Train_Manager(args, train_func=train_func)
@@ -39,7 +40,7 @@ tm = trainer.Train_Manager(args, train_func=train_func)
 if not args.pretrain:
     model = My_Net(args=args,mode='train')
     model = model.to('cuda')
-    
+
     if args.test:
         model.eval()
         ckpt_names = [f'model_{args.dataset}_max_acc.pth', f'model_{args.dataset}_max_osr.pth',
@@ -80,7 +81,7 @@ if not args.pretrain:
 
     model.load_state_dict(state_dict,strict=False)
     model.init_representation(full_params)
-    tm.train(model,eval_loader)
+    tm.train(model, calib_loader)
 else:
     model = Backbone(args)#My_Net(args=args,mode='pretrain')
     model.to('cuda')

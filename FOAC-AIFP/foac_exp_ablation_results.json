@@ -1,0 +1,47 @@
+{
+  "TAU22": {
+    "wo_CIAM": {
+      "use_ciam": false,
+      "use_pam": true,
+      "use_npm": true,
+      "results": {
+        "model_TAU22_max_acc.pth": {
+          "acc": 42.091,
+          "auroc": 54.403,
+          "fscore": 43.913,
+          "tnr": 95.0,
+          "tpr": 6.49,
+          "osr": 50.745,
+          "loss": "1.69582"
+        },
+        "model_TAU22_max_osr.pth": {
+          "acc": 42.091,
+          "auroc": 54.403,
+          "fscore": 43.913,
+          "tnr": 95.0,
+          "tpr": 6.49,
+          "osr": 50.745,
+          "loss": "1.69582"
+        },
+        "model_TAU22_max_auroc.pth": {
+          "acc": 42.091,
+          "auroc": 54.403,
+          "fscore": 43.913,
+          "tnr": 95.0,
+          "tpr": 6.49,
+          "osr": 50.745,
+          "loss": "1.69582"
+        },
+        "model_TAU22_max_fscore.pth": {
+          "acc": 42.091,
+          "auroc": 54.403,
+          "fscore": 43.913,
+          "tnr": 95.0,
+          "tpr": 6.49,
+          "osr": 50.745,
+          "loss": "1.69582"
+        }
+      }
+    }
+  }
+}

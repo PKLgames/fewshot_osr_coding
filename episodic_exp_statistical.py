@@ -82,7 +82,7 @@ def friedman_nemenyi_test(results_matrix, method_names, dataset_names, alpha=0.0
     return {
         'friedman_stat': float(stat),
         'friedman_p': float(p_value),
-        'significant': p_value < alpha,
+        'significant': bool(p_value < alpha),
         'avg_ranks': {m: float(r) for m, r in zip(method_names, avg_ranks)},
         'critical_difference': float(cd),
         'significant_pairs': significant_pairs,
@@ -135,6 +135,8 @@ def main():
                         choices=['acc', 'osr_score', 'auroc'])
     parser.add_argument('--alpha', type=float, default=0.05)
     parser.add_argument('--manual', action='store_true')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     if cl_args.manual:
@@ -176,14 +178,17 @@ def main():
     test_results = friedman_nemenyi_test(
         results_matrix, method_names, dataset_names, cl_args.alpha)
 
-    save_path = 'episodic_exp_statistical_results.json'
+    save_dir = os.path.join(cl_args.output_dir, 'statistical')
+    os.makedirs(save_dir, exist_ok=True)
+
+    save_path = os.path.join(save_dir, 'results.json')
     with open(save_path, 'w') as f:
         json.dump(test_results, f, indent=2)
 
     plot_cd_diagram(
         test_results['avg_ranks'], len(method_names), len(dataset_names),
         test_results['critical_difference'], method_names,
-        'episodic_exp_cd_diagram.png')
+        os.path.join(save_dir, 'cd_diagram.png'))
 
 
 if __name__ == '__main__':

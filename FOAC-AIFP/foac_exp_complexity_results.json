@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Full_Model",
+    "total_params": 15983434,
+    "trainable_params": 14867146,
+    "macs": 14840512,
+    "ait_mean_ms": 56.94832341068832,
+    "ait_std_ms": 13.3955031231972,
+    "ait_median_ms": 53.60892100361525
+  }
+]

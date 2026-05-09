@@ -22,6 +22,8 @@ import sys
 import json
 import argparse
 from functools import partial
+import numpy as np
+import scipy.stats
 
 import torch
 import torch.nn as nn
@@ -40,8 +42,11 @@ def load_config(config_path):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     cfg = cfg['train']
+    saved_argv = sys.argv
+    sys.argv = [sys.argv[0]]
     base_parser = trainer.train_parser()
-    merged = vars(base_parser.parse_args([]))
+    sys.argv = saved_argv
+    merged = vars(base_parser)
     merged.update(cfg)
     args = argparse.Namespace(**merged)
     for k, v in vars(args).items():
@@ -200,6 +205,13 @@ def run_cross_domain(source, target):
     model = My_Net(args=src_args, mode='train')
     model = model.to('cuda')
 
+    # Initialize representation from pretrained backbone first
+    if os.path.exists(src_args.pretrained_model_path):
+        pretrain_ckpt = torch.load(src_args.pretrained_model_path, weights_only=False)
+        state_dict = pretrain_ckpt.get('feature_params', pretrain_ckpt.get('params', pretrain_ckpt))
+        model.load_state_dict(state_dict, strict=False)
+        model.init_representation(pretrain_ckpt)
+
     ckpt_path = os.path.join(src_args.save_folder, f'model_{source}_max_acc.pth')
     if not os.path.exists(ckpt_path):
         ckpt_path = os.path.join(src_args.save_folder, f'model_{source}_max_osr.pth')
@@ -208,9 +220,9 @@ def run_cross_domain(source, target):
         return None
 
     print(f"  Loading: {ckpt_path}")
-    state_dict = torch.load(ckpt_path, map_location='cuda')
-    model.weight_base = state_dict['weight_base'].to('cuda')
-    model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+    state_dict = torch.load(ckpt_path, map_location='cuda', weights_only=False)
+    model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
+    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
     model.load_state_dict(state_dict, strict=False)
 
     # Evaluate on target domain

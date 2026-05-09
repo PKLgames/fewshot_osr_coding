@@ -1,0 +1,134 @@
+{
+  "TAU22->TAU19": {
+    "source": "TAU22",
+    "target": "TAU19",
+    "fewshot": {
+      "base_1shot": {
+        "mean_acc": 0.39855556227266786,
+        "std_acc": 0.09044000732378574,
+        "ci95": 0.017726241435462003,
+        "mean_confidence": 0.8604802405834198,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5152222308516502,
+        "std_acc": 0.058238656341520305,
+        "ci95": 0.011414776642937979,
+        "mean_confidence": 0.8703186571598053,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "novel_1shot": {
+        "mean_acc": 0.38850002124905586,
+        "std_acc": 0.08818210682513476,
+        "ci95": 0.017283692937726414,
+        "mean_confidence": 0.7737274870276452,
+        "N_way": 4,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "novel_5shot": {
+        "mean_acc": 0.46766669034957886,
+        "std_acc": 0.06063643997028944,
+        "ci95": 0.01188474223417673,
+        "mean_confidence": 0.6677528777718544,
+        "N_way": 4,
+        "K_shot": 5,
+        "num_episodes": 100
+      }
+    },
+    "osr": {
+      "anti_prototype": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.3043333320179954,
+        "osr_score": 0.6271666600485333,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "anti_prototype",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "feature_mahalanobis": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.1690277736634016,
+        "osr_score": 0.5595138808712363,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "feature_mahalanobis",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      }
+    }
+  },
+  "TAU19->TAU22": {
+    "source": "TAU19",
+    "target": "TAU22",
+    "fewshot": {
+      "base_1shot": {
+        "mean_acc": 0.3854444515705109,
+        "std_acc": 0.09683503781754407,
+        "ci95": 0.018979667412238638,
+        "mean_confidence": 0.861224148273468,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5204444536566735,
+        "std_acc": 0.06284843854281122,
+        "ci95": 0.012318293954391,
+        "mean_confidence": 0.8773639273643493,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "novel_1shot": {
+        "mean_acc": 0.37983335331082346,
+        "std_acc": 0.098750390727425,
+        "ci95": 0.0193550765825753,
+        "mean_confidence": 0.7767767980694771,
+        "N_way": 4,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "novel_5shot": {
+        "mean_acc": 0.465166691839695,
+        "std_acc": 0.07230702518210924,
+        "ci95": 0.014172176935693412,
+        "mean_confidence": 0.6742236801981926,
+        "N_way": 4,
+        "K_shot": 5,
+        "num_episodes": 100
+      }
+    },
+    "osr": {
+      "anti_prototype": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.3043333320179954,
+        "osr_score": 0.6271666600485333,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "anti_prototype",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "feature_mahalanobis": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.1690277736634016,
+        "osr_score": 0.5595138808712363,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "feature_mahalanobis",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      }
+    }
+  }
+}

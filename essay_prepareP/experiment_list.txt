@@ -19,10 +19,20 @@
 二、已有实验结果
 ================================================================================
 
-【FOAC-AIFP 基线】
-  TAU22 v2:       ACC=69.95  AUROC=58.78  OSR=55.41
-  TAU19 aligned:  ACC=100.00 AUROC=86.75  OSR=73.37  (max_osr checkpoint)
-  TAU22 aligned:  训练中
+【FOAC-AIFP 基线】(ResNet18 backbone, 6-way 5-shot, 80 epochs)
+  TAU22 aligned (best@ep78, Q=100):
+    max_acc:    ACC=44.05  AUROC=47.30  OSR=50.08  F1=42.72  TPR@TNR95=5.16
+    max_osr:    ACC=36.49  AUROC=49.50  OSR=50.20  F1=42.86  TPR@TNR95=5.39
+    max_auroc:  ACC=42.08  AUROC=53.50  OSR=50.69  F1=43.75  TPR@TNR95=6.37
+    max_fscore: ACC=36.48  AUROC=49.51  OSR=50.20  F1=42.86  TPR@TNR95=5.40
+  TAU19 aligned (Q=15):
+    max_acc:    ACC=44.03  AUROC=40.52  OSR=48.87  F1=41.47  TPR@TNR95=2.19
+    max_osr:    ACC=32.91  AUROC=42.43  OSR=50.72  F1=42.96  TPR@TNR95=5.89
+    max_auroc:  ACC=43.34  AUROC=46.89  OSR=49.57  F1=46.01  TPR@TNR95=3.58
+    max_fscore: ACC=43.34  AUROC=46.89  OSR=49.57  F1=46.01  TPR@TNR95=3.58
+  Checkpoint 目录:
+    FOAC-AIFP/tau22_aligned/  (model_TAU22_max_{acc,osr,auroc,fscore}.pth)
+    FOAC-AIFP/tau19_aligned/  (model_TAU19_max_{acc,osr,auroc,fscore}.pth)
 
 【Episodic Trainer】
   TAU22: osr13 best_val_acc=74.0%, osr22_relabel=52.6%
@@ -88,24 +98,54 @@ G. 扩展实验 ── 脚本已创建
 四、执行计划
 ================================================================================
 
-  P0  ── TAU22 aligned 训练完成 → 确定最佳 checkpoint
+  P0  ── 已完成。TAU22 aligned best@ep78, TAU19 aligned 已完成
+        推荐 checkpoint: TAU22 max_auroc (AUROC=53.50), TAU19 max_auroc (AUROC=46.89)
 
-  P1  ── 运行消融实验 (最能体现论文贡献)
-        cd FOAC-AIFP && python foac_exp_ablation.py --all
-        cd /coding   && python episodic_exp_ablation.py --all
+  ── Episodic Trainer 执行顺序 ── (输出统一至 experiment/episodic_exp/)
+  所有脚本支持 --output_dir 自定义路径，默认 experiment/episodic_exp
 
-  P2  ── Way-Shot / Openness 扫描
-        foac_exp_way_shot.py --dataset all
-        foac_exp_openness.py --dataset all
-        (episodic 版本同上)
+  EP1 ── 消融实验 (最能体现论文贡献，优先跑)
+        cd /coding && python episodic_exp_ablation.py 2>&1 | tee experiment/episodic_exp/ablation/train.log
 
-  P3  ── 跨域 / 复杂度 / 统计检验
-        foac_exp_cross_domain.py --all
-        foac_exp_complexity.py --all_ablation
-        foac_exp_statistical.py --results xxx.json
+  EP2 ── Way-Shot / Openness 扫描
+        cd /coding && python episodic_exp_way_shot.py --quick 2>&1 | tee experiment/episodic_exp/wayshot/train.log
+        cd /coding && python episodic_exp_openness.py --quick 2>&1 | tee experiment/episodic_exp/openness/train.log
 
-  P4  ── t-SNE 可视化 + 论文制表
-        foac_exp_tsne.py --compare_ablation
+  EP3 ── 跨域 / 复杂度 / 统计检验 (依赖 EP1/EP2 结果)
+        cd /coding && python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
+        cd /coding && python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
+        cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json 2>&1 | tee experiment/episodic_exp/statistical/train.log
+
+  EP4 ── t-SNE 可视化 + 论文制表
+        cd /coding && python episodic_exp_tsne.py --compare_ablation 2>&1 | tee experiment/episodic_exp/tsne/train.log
+
+  ── FOAC-AIFP 执行顺序 ── (输出统一至 experiment/foac_exp/)
+  注: 脚本 results.json 硬编码在 FOAC-AIFP/ 根目录，通过 shell 移动到统一目录
+      checkpoint 仍在 save_folder 衍生路径 (tau22_aligned_ablation/ 等)
+
+  初始化:
+        mkdir -p experiment/foac_exp/{ablation,wayshot,openness,complexity,cross_domain,statistical,tsne}
+
+  FP1 ── 消融实验
+        cd /coding/FOAC-AIFP && python foac_exp_ablation.py 2>&1 | tee ../experiment/foac_exp/ablation/train.log && mv foac_exp_ablation_results.json ../experiment/foac_exp/ablation/results.json
+
+  FP2a ── Way-Shot 扫描
+        cd /coding/FOAC-AIFP && python foac_exp_way_shot.py --dataset all 2>&1 | tee ../experiment/foac_exp/wayshot/train.log && mv foac_exp_way_shot_results.json ../experiment/foac_exp/wayshot/results.json
+
+  FP2b ── Openness 扫描
+        cd /coding/FOAC-AIFP && python foac_exp_openness.py --dataset all 2>&1 | tee ../experiment/foac_exp/openness/train.log && mv foac_exp_openness_results.json ../experiment/foac_exp/openness/results.json
+
+  FP3a ── 跨域 (依赖 FP1/FP2 结果)
+        cd /coding/FOAC-AIFP && python foac_exp_cross_domain.py --all 2>&1 | tee ../experiment/foac_exp/cross_domain/train.log && mv foac_exp_cross_domain_results.json ../experiment/foac_exp/cross_domain/results.json
+
+  FP3b ── 复杂度
+        cd /coding/FOAC-AIFP && python foac_exp_complexity.py --all_ablation 2>&1 | tee ../experiment/foac_exp/complexity/train.log && mv foac_exp_complexity_results.json ../experiment/foac_exp/complexity/results.json
+
+  FP3c ── 统计检验 (依赖 FP1)
+        cd /coding/FOAC-AIFP && python foac_exp_statistical.py --results ../experiment/foac_exp/ablation/results.json 2>&1 | tee ../experiment/foac_exp/statistical/train.log
+
+  FP4 ── t-SNE 可视化
+        cd /coding/FOAC-AIFP && python foac_exp_tsne.py --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/train.log
 
 
 ================================================================================
@@ -113,34 +153,88 @@ G. 扩展实验 ── 脚本已创建
 ================================================================================
 
   FOAC-AIFP (位于 FOAC-AIFP/, 前缀 foac_exp_)
+  输出目录: experiment/foac_exp/ (通过 shell mv 统一)
   ─────────────────────────────────────────────
-  foac_exp_ablation.py      python foac_exp_ablation.py --all
-  foac_exp_way_shot.py      python foac_exp_way_shot.py --dataset TAU22 --quick
-  foac_exp_openness.py      python foac_exp_openness.py --dataset TAU22
-  foac_exp_statistical.py   python foac_exp_statistical.py --results xxx.json
-  foac_exp_complexity.py    python foac_exp_complexity.py --all_ablation
-  foac_exp_cross_domain.py  python foac_exp_cross_domain.py --all
+  foac_exp_ablation.py      python foac_exp_ablation.py && mv foac_exp_ablation_results.json ../experiment/foac_exp/ablation/results.json
+  foac_exp_way_shot.py      python foac_exp_way_shot.py --dataset all && mv foac_exp_way_shot_results.json ../experiment/foac_exp/wayshot/results.json
+  foac_exp_openness.py      python foac_exp_openness.py --dataset all && mv foac_exp_openness_results.json ../experiment/foac_exp/openness/results.json
+  foac_exp_complexity.py    python foac_exp_complexity.py --all_ablation && mv foac_exp_complexity_results.json ../experiment/foac_exp/complexity/results.json
+  foac_exp_cross_domain.py  python foac_exp_cross_domain.py --all && mv foac_exp_cross_domain_results.json ../experiment/foac_exp/cross_domain/results.json
+  foac_exp_statistical.py   python foac_exp_statistical.py --results ../experiment/foac_exp/ablation/results.json
   foac_exp_tsne.py          python foac_exp_tsne.py --compare_ablation
 
   Episodic Trainer (位于 /coding/, 前缀 episodic_exp_)
+  输出统一目录: experiment/episodic_exp/ (可通过 --output_dir 自定义)
   ─────────────────────────────────────────────────────
-  episodic_exp_ablation.py      python episodic_exp_ablation.py --all
-  episodic_exp_way_shot.py      python episodic_exp_way_shot.py --quick
-  episodic_exp_openness.py      python episodic_exp_openness.py --quick
-  episodic_exp_statistical.py   python episodic_exp_statistical.py --results xxx.json
-  episodic_exp_complexity.py    python episodic_exp_complexity.py --all_ablation
-  episodic_exp_cross_domain.py  python episodic_exp_cross_domain.py --all
-  episodic_exp_tsne.py          python episodic_exp_tsne.py --compare_ablation
+  episodic_exp_ablation.py      python episodic_exp_ablation.py 2>&1 | tee experiment/episodic_exp/ablation/train.log
+  episodic_exp_way_shot.py      python episodic_exp_way_shot.py --quick 2>&1 | tee experiment/episodic_exp/wayshot/train.log
+  episodic_exp_openness.py      python episodic_exp_openness.py --quick 2>&1 | tee experiment/episodic_exp/openness/train.log
+  episodic_exp_statistical.py   python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json 2>&1 | tee experiment/episodic_exp/statistical/train.log
+  episodic_exp_complexity.py    python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
+  episodic_exp_cross_domain.py  python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
+  episodic_exp_tsne.py          python episodic_exp_tsne.py --compare_ablation 2>&1 | tee experiment/episodic_exp/tsne/train.log
 
-  所有脚本均支持 --quick 参数用于调试。
+  带 --quick 的脚本: ablation / way_shot / openness (减少 episodes 用于调试)
+
+  FOAC-AIFP 统一输出目录结构:
+  ─────────────────────────────────────────────
+  experiment/foac_exp/
+  ├── ablation/
+  │   ├── train.log
+  │   └── results.json
+  ├── wayshot/
+  │   ├── train.log
+  │   └── results.json
+  ├── openness/
+  │   ├── train.log
+  │   └── results.json
+  ├── complexity/
+  │   ├── train.log
+  │   └── results.json
+  ├── cross_domain/
+  │   ├── train.log
+  │   └── results.json
+  ├── statistical/
+  │   ├── train.log
+  │   └── cd_diagram.png
+  └── tsne/
+      ├── train.log
+      └── *.png
+  (checkpoint 仍在 FOAC-AIFP/tau{22,19}_aligned_{ablation,wayshot,openness}/ 下)
 
 
 ================================================================================
-六、注意事项
+六、Episodic 输出目录结构 (experiment/episodic_exp/)
 ================================================================================
 
-  1. TAU22 aligned 正在训练中
-  2. TAU19 aligned ACC=100% 需排查是否数据泄露
-  3. 两套系统 backbone 不同 (ResNet18 vs YAMNet)，论文中不能直接对比
-  4. 参考论文用了 3 个数据集，目前仅 2 个同域数据集
-  5. SOTA 对比方法 (FEAT, MET 等) 需引入外部代码
+  episodic_exp/
+  ├── ablation/
+  │   ├── {config_name}/          ← 训练 checkpoint
+  │   └── results.json            ← 消融实验结果
+  ├── wayshot/
+  │   ├── way{n}_shot{k}/         ← 训练 checkpoint
+  │   └── results.json
+  ├── openness/
+  │   ├── open{n}/                ← 训练 checkpoint
+  │   └── results.json
+  ├── complexity/
+  │   └── results.json
+  ├── statistical/
+  │   ├── results.json
+  │   └── cd_diagram.png
+  ├── cross_domain/
+  │   └── results.json
+  └── tsne/
+      ├── {dataset}_full_model.png
+      └── {dataset}_baseline.png
+
+
+================================================================================
+七、注意事项
+================================================================================
+
+  1. FOAC-AIFP 基线已完成 (TAU22 best@ep78, TAU19 已完成)
+  2. 两套系统 backbone 不同 (ResNet18 vs YAMNet)，论文中不能直接对比
+  3. 参考论文用了 3 个数据集，目前仅 2 个同域数据集
+  4. SOTA 对比方法 (FEAT, MET 等) 需引入外部代码
+  5. FOAC-AIFP 实验脚本暂未统一 output_dir，results.json 散落在 FOAC-AIFP/ 根目录

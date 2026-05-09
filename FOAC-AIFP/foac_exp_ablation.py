@@ -44,8 +44,11 @@ def load_config(config_path):
         cfg = yaml.safe_load(f)
     cfg = cfg['train']
     # Create base args from parser defaults
+    saved_argv = sys.argv
+    sys.argv = [sys.argv[0]]
     base_parser = trainer.train_parser()
-    merged = vars(base_parser.parse_args([]))
+    sys.argv = saved_argv
+    merged = vars(base_parser)
     merged.update(cfg)
     args = argparse.Namespace(**merged)
     # Convert nested dicts to namespaces
@@ -103,9 +106,9 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm):
             ckpt_path = os.path.join(args.save_folder, ckpt_name)
             if not os.path.exists(ckpt_path):
                 continue
-            state_dict = torch.load(ckpt_path)
-            model.weight_base = state_dict['weight_base'].to('cuda')
-            model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+            state_dict = torch.load(ckpt_path, weights_only=False)
+            model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
+            model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
             model.load_state_dict(state_dict, strict=False)
             result, loss = tm.run_test_fsl(model, eval_loader)
             acc, auroc, fscore, tnr, tpr, osr_score = result
@@ -186,11 +189,10 @@ def main():
             if not r:
                 key = f'model_{dataset}_max_osr.pth'
                 r = data['results'].get(key, {})
-            acc = r.get('acc', [0, 0])
-            auroc = r.get('auroc', [0, 0])
-            osr = r.get('osr', [0, 0])
-            f1 = r.get('fscore', [0, 0])
-            print(f"  {name:<25s} {acc[0]:>7.1f} {auroc[0]:>7.1f} {osr[0]:>7.1f} {f1[0]:>7.1f}")
+            def _v(d, k):
+                val = d.get(k, 0)
+                return val[0] if isinstance(val, (list, tuple)) else val
+            print(f"  {name:<25s} {_v(r,'acc'):>7.1f} {_v(r,'auroc'):>7.1f} {_v(r,'osr'):>7.1f} {_v(r,'fscore'):>7.1f}")
 
 
 if __name__ == '__main__':

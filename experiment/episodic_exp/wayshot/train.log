@@ -1,0 +1,340 @@
+Using backbone: experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Extracting features...
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Extracting features for 'train' split...
+Extracting train:   0%|          | 0/469 [00:00<?, ?it/s]Extracting train:   0%|          | 1/469 [00:01<08:15,  1.06s/it]Extracting train:   4%|▍         | 18/469 [00:01<00:21, 20.94it/s]Extracting train:   6%|▋         | 30/469 [00:01<00:12, 34.91it/s]Extracting train:   9%|▉         | 42/469 [00:01<00:09, 47.27it/s]Extracting train:  11%|█▏        | 53/469 [00:01<00:07, 58.99it/s]Extracting train:  14%|█▍        | 66/469 [00:01<00:05, 69.80it/s]Extracting train:  16%|█▋        | 77/469 [00:01<00:05, 74.28it/s]Extracting train:  19%|█▉        | 90/469 [00:01<00:04, 84.85it/s]Extracting train:  22%|██▏       | 101/469 [00:01<00:04, 88.52it/s]Extracting train:  24%|██▍       | 112/469 [00:02<00:03, 92.81it/s]Extracting train:  26%|██▋       | 124/469 [00:02<00:03, 90.81it/s]Extracting train:  29%|██▉       | 136/469 [00:02<00:03, 97.98it/s]Extracting train:  31%|███▏      | 147/469 [00:02<00:03, 98.77it/s]Extracting train:  34%|███▎      | 158/469 [00:02<00:03, 98.17it/s]Extracting train:  36%|███▌      | 170/469 [00:02<00:02, 102.79it/s]Extracting train:  39%|███▊      | 181/469 [00:02<00:02, 98.26it/s] Extracting train:  41%|████      | 193/469 [00:02<00:02, 103.60it/s]Extracting train:  43%|████▎     | 204/469 [00:03<00:02, 97.00it/s] Extracting train:  46%|████▌     | 215/469 [00:03<00:02, 100.46it/s]Extracting train:  48%|████▊     | 227/469 [00:03<00:02, 104.81it/s]Extracting train:  51%|█████     | 238/469 [00:03<00:02, 98.86it/s] Extracting train:  53%|█████▎    | 249/469 [00:03<00:02, 100.28it/s]Extracting train:  55%|█████▌    | 260/469 [00:03<00:02, 97.93it/s] Extracting train:  58%|█████▊    | 272/469 [00:03<00:01, 99.93it/s]Extracting train:  61%|██████    | 284/469 [00:03<00:01, 99.35it/s]Extracting train:  63%|██████▎   | 296/469 [00:03<00:01, 100.82it/s]Extracting train:  66%|██████▌   | 308/469 [00:04<00:01, 100.16it/s]Extracting train:  68%|██████▊   | 320/469 [00:04<00:01, 100.74it/s]Extracting train:  71%|███████   | 332/469 [00:04<00:01, 102.76it/s]Extracting train:  73%|███████▎  | 343/469 [00:04<00:01, 103.87it/s]Extracting train:  75%|███████▌  | 354/469 [00:04<00:01, 102.97it/s]Extracting train:  78%|███████▊  | 365/469 [00:04<00:01, 98.65it/s] Extracting train:  80%|████████  | 377/469 [00:04<00:00, 103.48it/s]Extracting train:  83%|████████▎ | 388/469 [00:04<00:00, 99.74it/s] Extracting train:  85%|████████▌ | 400/469 [00:04<00:00, 100.72it/s]Extracting train:  88%|████████▊ | 412/469 [00:05<00:00, 100.91it/s]Extracting train:  90%|█████████ | 424/469 [00:05<00:00, 102.83it/s]Extracting train:  93%|█████████▎| 436/469 [00:05<00:00, 99.31it/s] Extracting train:  96%|█████████▌| 448/469 [00:05<00:00, 100.68it/s]Extracting train:  98%|█████████▊| 460/469 [00:05<00:00, 100.57it/s]Extracting train: 100%|██████████| 469/469 [00:06<00:00, 77.67it/s] 
+  Feature normalization: mean_range=[-0.6490, 0.6374] std_range=[0.4744, 1.3427]
+Cached 30000 features -> experiment/fewshot_cache/train_features.pt
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Extracting features for 'calib' split...
+Extracting calib:   0%|          | 0/282 [00:00<?, ?it/s]Extracting calib:   0%|          | 1/282 [00:00<01:09,  4.06it/s]Extracting calib:   4%|▎         | 10/282 [00:00<00:07, 35.56it/s]Extracting calib:   7%|▋         | 19/282 [00:00<00:04, 53.09it/s]Extracting calib:  11%|█         | 31/282 [00:00<00:03, 73.12it/s]Extracting calib:  15%|█▍        | 42/282 [00:00<00:02, 83.96it/s]Extracting calib:  18%|█▊        | 52/282 [00:00<00:02, 82.88it/s]Extracting calib:  22%|██▏       | 63/282 [00:00<00:02, 89.68it/s]Extracting calib:  27%|██▋       | 75/282 [00:01<00:02, 89.73it/s]Extracting calib:  31%|███       | 87/282 [00:01<00:02, 96.06it/s]Extracting calib:  35%|███▌      | 99/282 [00:01<00:01, 93.52it/s]Extracting calib:  39%|███▉      | 111/282 [00:01<00:01, 100.06it/s]Extracting calib:  44%|████▎     | 123/282 [00:01<00:01, 97.05it/s] Extracting calib:  48%|████▊     | 134/282 [00:01<00:01, 100.29it/s]Extracting calib:  51%|█████▏    | 145/282 [00:01<00:01, 102.13it/s]Extracting calib:  55%|█████▌    | 156/282 [00:01<00:01, 93.88it/s] Extracting calib:  59%|█████▉    | 166/282 [00:01<00:01, 88.42it/s]Extracting calib:  62%|██████▏   | 176/282 [00:02<00:01, 85.36it/s]Extracting calib:  66%|██████▌   | 186/282 [00:02<00:01, 88.44it/s]Extracting calib:  70%|███████   | 198/282 [00:02<00:00, 95.56it/s]Extracting calib:  74%|███████▍  | 208/282 [00:02<00:00, 87.58it/s]Extracting calib:  77%|███████▋  | 217/282 [00:02<00:00, 82.59it/s]Extracting calib:  81%|████████  | 229/282 [00:02<00:00, 90.74it/s]Extracting calib:  85%|████████▌ | 241/282 [00:02<00:00, 93.43it/s]Extracting calib:  90%|████████▉ | 253/282 [00:02<00:00, 99.14it/s]Extracting calib:  94%|█████████▍| 265/282 [00:03<00:00, 95.71it/s]Extracting calib:  99%|█████████▉| 279/282 [00:03<00:00, 106.61it/s]Extracting calib: 100%|██████████| 282/282 [00:03<00:00, 77.71it/s] 
+Cached 18000 features -> experiment/fewshot_cache/calib_features.pt
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+Extracting features for 'test' split...
+Extracting test:   0%|          | 0/282 [00:00<?, ?it/s]Extracting test:   0%|          | 1/282 [00:00<01:08,  4.11it/s]Extracting test:   4%|▍         | 11/282 [00:00<00:07, 36.36it/s]Extracting test:   9%|▊         | 24/282 [00:00<00:03, 64.94it/s]Extracting test:  12%|█▏        | 35/282 [00:00<00:03, 71.94it/s]Extracting test:  16%|█▌        | 44/282 [00:00<00:03, 76.68it/s]Extracting test:  20%|█▉        | 56/282 [00:00<00:02, 87.91it/s]Extracting test:  24%|██▍       | 67/282 [00:00<00:02, 86.98it/s]Extracting test:  28%|██▊       | 78/282 [00:01<00:02, 91.85it/s]Extracting test:  32%|███▏      | 91/282 [00:01<00:02, 93.52it/s]Extracting test:  37%|███▋      | 104/282 [00:01<00:01, 101.97it/s]Extracting test:  41%|████      | 115/282 [00:01<00:01, 96.41it/s] Extracting test:  45%|████▌     | 128/282 [00:01<00:01, 104.20it/s]Extracting test:  49%|████▉     | 139/282 [00:01<00:01, 99.65it/s] Extracting test:  54%|█████▍    | 152/282 [00:01<00:01, 107.40it/s]Extracting test:  58%|█████▊    | 163/282 [00:01<00:01, 99.96it/s] Extracting test:  62%|██████▏   | 174/282 [00:01<00:01, 102.52it/s]Extracting test:  66%|██████▌   | 186/282 [00:02<00:00, 106.41it/s]Extracting test:  70%|██████▉   | 197/282 [00:02<00:00, 99.30it/s] Extracting test:  74%|███████▍  | 209/282 [00:02<00:00, 103.14it/s]Extracting test:  78%|███████▊  | 220/282 [00:02<00:00, 92.98it/s] Extracting test:  82%|████████▏ | 230/282 [00:02<00:00, 94.52it/s]Extracting test:  86%|████████▌ | 243/282 [00:02<00:00, 98.01it/s]Extracting test:  90%|████████▉ | 253/282 [00:02<00:00, 96.86it/s]Extracting test:  94%|█████████▎| 264/282 [00:02<00:00, 100.03it/s]Extracting test:  98%|█████████▊| 275/282 [00:03<00:00, 99.87it/s] Extracting test: 100%|██████████| 282/282 [00:03<00:00, 91.00it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+Cached 18000 features -> experiment/fewshot_cache/test_features.pt
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+
+--- 5w1s ---
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/wayshot/way5_shot1/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 5-way 1-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         500
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/500 | CE: 1.5937 Total: 1.5937 Acc: 32.26% | Val Loss: 2.0267 Acc: 39.60% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 39.60%)
+
+Loaded best model (Val Acc: 39.60%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 39.60%
+======================================================================
+Episode history saved: experiment/episodic_exp/wayshot/way5_shot1/episodic_history.json
+5w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 126.47it/s]5w1s eval:  28%|██▊       | 28/100 [00:00<00:00, 137.92it/s]5w1s eval:  43%|████▎     | 43/100 [00:00<00:00, 140.13it/s]5w1s eval:  58%|█████▊    | 58/100 [00:00<00:00, 141.17it/s]5w1s eval:  73%|███████▎  | 73/100 [00:00<00:00, 140.17it/s]5w1s eval:  88%|████████▊ | 88/100 [00:00<00:00, 128.63it/s]5w1s eval: 100%|██████████| 100/100 [00:00<00:00, 133.79it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  5-way 1-shot: Acc = 42.53% +/- 2.19% (conf: 61.06%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-5.22, 10.61] mean=0.60
+Unknown scores: [-8.59, 19.23] mean=0.04
+Mean separation: 0.56 (positive = known higher = good)
+
+Threshold (tau): -2.4150
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 32.82%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   30.44%
+  OSR Score (mean):         62.72%
+
+--- 5w5s ---
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/wayshot/way5_shot5/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 5-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         500
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/500 | CE: 1.5791 Total: 1.5791 Acc: 37.61% | Val Loss: 1.8464 Acc: 48.40% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 48.40%)
+
+Loaded best model (Val Acc: 48.40%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 48.40%
+======================================================================
+Episode history saved: experiment/episodic_exp/wayshot/way5_shot5/episodic_history.json
+5w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w5s eval:  13%|█▎        | 13/100 [00:00<00:00, 129.43it/s]5w5s eval:  26%|██▌       | 26/100 [00:00<00:00, 129.63it/s]5w5s eval:  39%|███▉      | 39/100 [00:00<00:00, 129.32it/s]5w5s eval:  53%|█████▎    | 53/100 [00:00<00:00, 130.13it/s]5w5s eval:  67%|██████▋   | 67/100 [00:00<00:00, 130.05it/s]5w5s eval:  81%|████████  | 81/100 [00:00<00:00, 130.01it/s]5w5s eval:  94%|█████████▍| 94/100 [00:00<00:00, 129.59it/s]5w5s eval: 100%|██████████| 100/100 [00:00<00:00, 129.64it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  5-way 5-shot: Acc = 53.64% +/- 1.49% (conf: 70.21%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-5.21, 10.44] mean=0.60
+Unknown scores: [-8.59, 19.24] mean=0.05
+Mean separation: 0.56 (positive = known higher = good)
+
+Threshold (tau): -2.4423
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 32.53%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   32.01%
+  OSR Score (mean):         63.50%
+
+--- 6w1s ---
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/wayshot/way6_shot1/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 1-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         500
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/500 | CE: 1.7660 Total: 1.7660 Acc: 29.03% | Val Loss: 2.0671 Acc: 38.67% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 38.67%)
+
+Loaded best model (Val Acc: 38.67%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 38.67%
+======================================================================
+Episode history saved: experiment/episodic_exp/wayshot/way6_shot1/episodic_history.json
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 127.25it/s]6w1s eval:  26%|██▌       | 26/100 [00:00<00:00, 125.67it/s]6w1s eval:  39%|███▉      | 39/100 [00:00<00:00, 126.26it/s]6w1s eval:  52%|█████▏    | 52/100 [00:00<00:00, 125.54it/s]6w1s eval:  65%|██████▌   | 65/100 [00:00<00:00, 125.48it/s]6w1s eval:  78%|███████▊  | 78/100 [00:00<00:00, 124.91it/s]6w1s eval:  91%|█████████ | 91/100 [00:00<00:00, 124.64it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 125.24it/s]
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  6-way 1-shot: Acc = 38.69% +/- 1.73% (conf: 56.31%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-5.21, 10.53] mean=0.60
+Unknown scores: [-8.59, 19.21] mean=0.04
+Mean separation: 0.55 (positive = known higher = good)
+
+Threshold (tau): -2.4740
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 32.18%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   30.97%
+  OSR Score (mean):         62.98%
+
+--- 6w5s ---
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=126.13, 10th percentile=61.60
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/wayshot/way6_shot5/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         500
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/500 | CE: 1.7707 Total: 1.7707 Acc: 33.41% | Val Loss: 1.9628 Acc: 46.11% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 46.11%)
+
+Loaded best model (Val Acc: 46.11%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 46.11%
+======================================================================
+Episode history saved: experiment/episodic_exp/wayshot/way6_shot5/episodic_history.json
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  14%|█▍        | 14/100 [00:00<00:00, 132.08it/s]6w5s eval:  28%|██▊       | 28/100 [00:00<00:00, 131.16it/s]6w5s eval:  42%|████▏     | 42/100 [00:00<00:00, 131.44it/s]6w5s eval:  56%|█████▌    | 56/100 [00:00<00:00, 130.60it/s]6w5s eval:  70%|███████   | 70/100 [00:00<00:00, 130.62it/s]6w5s eval:  84%|████████▍ | 84/100 [00:00<00:00, 130.09it/s]6w5s eval:  98%|█████████▊| 98/100 [00:00<00:00, 127.80it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 129.28it/s]
+
+  6-way 5-shot: Acc = 47.79% +/- 1.16% (conf: 63.61%)
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Computing feature-space statistics...
+Known samples:   10800
+Unknown samples: 7200
+Known scores:   [-5.19, 10.56] mean=0.61
+Unknown scores: [-8.59, 19.24] mean=0.04
+Mean separation: 0.57 (positive = known higher = good)
+
+Threshold (tau): -2.3677
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 33.31%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   31.37%
+  OSR Score (mean):         63.19%
+
+Results saved to experiment/episodic_exp/wayshot/results.json
+
+============================================================
+WAY-SHOT SWEEP SUMMARY
+============================================================
+  Config          Acc     CI95      OSR
+  5w1s        42.53%   2.19%  62.72%
+  5w5s        53.64%   1.49%  63.50%
+  6w1s        38.69%   1.73%  62.98%
+  6w5s        47.79%   1.16%  63.19%

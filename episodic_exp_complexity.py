@@ -114,6 +114,8 @@ def analyze_config(name, use_flow=True, use_ood=True, use_recip=True,
 def main():
     parser = argparse.ArgumentParser(description='Episodic Complexity Analysis')
     parser.add_argument('--all_ablation', action='store_true')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -135,7 +137,8 @@ def main():
                 name, flow, ood, recip, thresh, device=device))
 
     # Save
-    save_path = 'episodic_exp_complexity_results.json'
+    os.makedirs(os.path.join(cl_args.output_dir, 'complexity'), exist_ok=True)
+    save_path = os.path.join(cl_args.output_dir, 'complexity', 'results.json')
     with open(save_path, 'w') as f:
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved to {save_path}")

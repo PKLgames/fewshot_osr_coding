@@ -1,0 +1,726 @@
+{
+  "TAU22": {
+    "full_model": {
+      "base_1shot": {
+        "mean_acc": 0.3770000071823597,
+        "std_acc": 0.08713909442430613,
+        "ci95": 0.017079262507164,
+        "mean_confidence": 0.6602527117729187,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5050000083446503,
+        "std_acc": 0.053295706481705035,
+        "ci95": 0.010445958470414187,
+        "mean_confidence": 0.7049728471040726,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.4987777844071388,
+        "std_acc": 0.05521887007773296,
+        "ci95": 0.01082289853523566,
+        "mean_confidence": 0.7010092902183532,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.37745833305525595,
+          "osr_score": 0.6637291605671635,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.16305555403232574,
+          "osr_score": 0.5565277710556984,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "full_model",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_flow_transform": {
+      "base_1shot": {
+        "mean_acc": 0.3793333418667316,
+        "std_acc": 0.10117848922587139,
+        "ci95": 0.019830983888270794,
+        "mean_confidence": 0.8089167791604995,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5276666763424873,
+        "std_acc": 0.06385738519463187,
+        "ci95": 0.012516047498147845,
+        "mean_confidence": 0.8427751260995865,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5366666769981384,
+        "std_acc": 0.053391173711014685,
+        "ci95": 0.010464670047358878,
+        "mean_confidence": 0.8504766005277634,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.38384722569026053,
+          "osr_score": 0.6669236068846658,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.16305555403232574,
+          "osr_score": 0.5565277710556984,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_flow_transform",
+        "use_flow": false,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_ood_head": {
+      "base_1shot": {
+        "mean_acc": 0.39344445154070856,
+        "std_acc": 0.10086165717312032,
+        "ci95": 0.019768884805931582,
+        "mean_confidence": 0.8411114549636841,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5264444541931153,
+        "std_acc": 0.0589994792836445,
+        "ci95": 0.01156389793959432,
+        "mean_confidence": 0.8644609254598618,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.532444454729557,
+        "std_acc": 0.06217617629617343,
+        "ci95": 0.012186530554049993,
+        "mean_confidence": 0.8659353613853454,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.38120833159191536,
+          "osr_score": 0.6656041598354931,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.16305555403232574,
+          "osr_score": 0.5565277710556984,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_ood_head",
+        "use_flow": true,
+        "use_ood": false,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_reciprocal": {
+      "base_1shot": {
+        "mean_acc": 0.4110000082850456,
+        "std_acc": 0.0968197396324169,
+        "ci95": 0.018976668967953712,
+        "mean_confidence": 0.8603100073337555,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5287777855992317,
+        "std_acc": 0.05438988316646833,
+        "ci95": 0.010660417100627793,
+        "mean_confidence": 0.8842089873552322,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5566666769981384,
+        "std_acc": 0.04880042640662661,
+        "ci95": 0.009564883575698815,
+        "mean_confidence": 0.8872310423851013,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.38358333259820937,
+          "osr_score": 0.6667916603386402,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.16305555403232574,
+          "osr_score": 0.5565277710556984,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_reciprocal",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": false,
+        "use_threshold": true
+      }
+    },
+    "wo_threshold": {
+      "base_1shot": {
+        "mean_acc": 0.3910000076889992,
+        "std_acc": 0.09825257177976451,
+        "ci95": 0.019257504068833843,
+        "mean_confidence": 0.880837641954422,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5234444531798362,
+        "std_acc": 0.06168208207639772,
+        "ci95": 0.012089688086973954,
+        "mean_confidence": 0.8939053219556808,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5306666755676269,
+        "std_acc": 0.0492692303704534,
+        "ci95": 0.009656769152608867,
+        "mean_confidence": 0.8879105937480927,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.38256944592576475,
+          "osr_score": 0.6662847170024179,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.16305555403232574,
+          "osr_score": 0.5565277710556984,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_threshold",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": false
+      }
+    },
+    "only_distance_head": {
+      "base_1shot": {
+        "mean_acc": 0.36133334040641785,
+        "std_acc": 0.08260391726499626,
+        "ci95": 0.016190367783939265,
+        "mean_confidence": 0.7894042927026749,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5038888961076736,
+        "std_acc": 0.05350378096391824,
+        "ci95": 0.010486741068927974,
+        "mean_confidence": 0.8021679294109344,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5240000104904174,
+        "std_acc": 0.05098342009117523,
+        "ci95": 0.009992750337870344,
+        "mean_confidence": 0.8048873406648636,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.3782638883101754,
+          "osr_score": 0.6641319381946232,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.16305555403232574,
+          "osr_score": 0.5565277710556984,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "only_distance_head",
+        "use_flow": false,
+        "use_ood": false,
+        "use_reciprocal": false,
+        "use_threshold": false
+      }
+    }
+  },
+  "TAU19": {
+    "full_model": {
+      "base_1shot": {
+        "mean_acc": 0.300888896510005,
+        "std_acc": 0.07991785995278289,
+        "ci95": 0.015663900550745447,
+        "mean_confidence": 0.6327014857530594,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.4025555616617203,
+        "std_acc": 0.055574551007325765,
+        "ci95": 0.01089261199743585,
+        "mean_confidence": 0.6590515071153641,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.4074444504082203,
+        "std_acc": 0.05646051643051715,
+        "ci95": 0.011066261220381362,
+        "mean_confidence": 0.6524373942613602,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.45914999917149546,
+          "osr_score": 0.7045749936252832,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "full_model",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_flow_transform": {
+      "base_1shot": {
+        "mean_acc": 0.2985555636137724,
+        "std_acc": 0.07452988504786337,
+        "ci95": 0.01460785746938122,
+        "mean_confidence": 0.8086368703842163,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3580000078678131,
+        "std_acc": 0.060544441098167916,
+        "ci95": 0.011866710455240912,
+        "mean_confidence": 0.8128089314699173,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.38622222900390624,
+        "std_acc": 0.05544700175732565,
+        "ci95": 0.010867612344435828,
+        "mean_confidence": 0.8053245341777802,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.45869999900460245,
+          "osr_score": 0.7043499935418367,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_flow_transform",
+        "use_flow": false,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_ood_head": {
+      "base_1shot": {
+        "mean_acc": 0.2865555628016591,
+        "std_acc": 0.08536479563749398,
+        "ci95": 0.016731499944948817,
+        "mean_confidence": 0.8328211650252342,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.36977778539061545,
+        "std_acc": 0.05328886752912748,
+        "ci95": 0.010444618035708985,
+        "mean_confidence": 0.8557485800981521,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.37811111837625505,
+        "std_acc": 0.051314928708102885,
+        "ci95": 0.010057726026788165,
+        "mean_confidence": 0.8669951528310775,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.451299998909235,
+          "osr_score": 0.700649993494153,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_ood_head",
+        "use_flow": true,
+        "use_ood": false,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_reciprocal": {
+      "base_1shot": {
+        "mean_acc": 0.2956666752696037,
+        "std_acc": 0.07149022292041998,
+        "ci95": 0.014012083692402316,
+        "mean_confidence": 0.83987271130085,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3864444513618946,
+        "std_acc": 0.06534958072420248,
+        "ci95": 0.012808517821943685,
+        "mean_confidence": 0.8626409888267517,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.4152222281694412,
+        "std_acc": 0.05579182934757796,
+        "ci95": 0.01093519855212528,
+        "mean_confidence": 0.8628656333684921,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.46739999800920484,
+          "osr_score": 0.708699993044138,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_reciprocal",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": false,
+        "use_threshold": true
+      }
+    },
+    "wo_threshold": {
+      "base_1shot": {
+        "mean_acc": 0.29688889779150485,
+        "std_acc": 0.06287514664313114,
+        "ci95": 0.012323528742053703,
+        "mean_confidence": 0.8713281095027924,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3637777857482433,
+        "std_acc": 0.05673459831073312,
+        "ci95": 0.01111998126890369,
+        "mean_confidence": 0.8750428050756455,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.38866667315363884,
+        "std_acc": 0.05835142271272248,
+        "ci95": 0.011436878851693606,
+        "mean_confidence": 0.864978409409523,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4590000011026859,
+          "osr_score": 0.7044999945908785,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_threshold",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": false
+      }
+    },
+    "only_distance_head": {
+      "base_1shot": {
+        "mean_acc": 0.31066667526960373,
+        "std_acc": 0.06703454078165366,
+        "ci95": 0.013138769993204116,
+        "mean_confidence": 0.7547028002142906,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.36333334088325503,
+        "std_acc": 0.05332175637122593,
+        "ci95": 0.010451064248760283,
+        "mean_confidence": 0.7639184308052063,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.3817777851223946,
+        "std_acc": 0.05219904685925808,
+        "ci95": 0.010231013184414583,
+        "mean_confidence": 0.7468830162286758,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4563999980688095,
+          "osr_score": 0.7031999930739403,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "only_distance_head",
+        "use_flow": false,
+        "use_ood": false,
+        "use_reciprocal": false,
+        "use_threshold": false
+      }
+    }
+  }
+}

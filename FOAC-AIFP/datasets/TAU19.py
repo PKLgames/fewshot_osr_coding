@@ -102,7 +102,7 @@ class OpenTAU19(Dataset):
             self.n_open_ways = args.n_open_ways
         self.n_shots = args.n_shots
         self.n_queries = args.n_queries
-        self.n_episodes = (args.n_test_runs if partition == 'test'
+        self.n_episodes = (args.n_test_runs if partition in ('test', 'calib')
                            else args.n_train_runs)
         self.index = index
         self.root = root
@@ -112,22 +112,25 @@ class OpenTAU19(Dataset):
         csv_dir = os.path.join(root, 'sampled_setup')
         self.all_train_df = pd.read_csv(
             os.path.join(csv_dir, 'sampled_fold1_train.csv'), sep='\t')
+        self.all_calib_df = pd.read_csv(
+            os.path.join(csv_dir, 'sampled_fold1_calib.csv'), sep='\t')
         self.all_test_df = pd.read_csv(
             os.path.join(csv_dir, 'sampled_fold1_evaluate.csv'), sep='\t')
 
-        # Build per-class file list: for train partition, load base from train CSV, novel from eval CSV
+        # Build per-class file list
+        # Train: only base classes from train CSV (no data leakage)
+        # Calib: all classes from calib CSV
+        # Test:  all classes from eval CSV
         self.data = {}
         for class_id in index:
             label_name = [k for k, v in LABEL_TO_IX.items() if v == class_id][0]
 
-            # For train partition, try train CSV first, then eval CSV for novel classes
             if self.partition == 'train':
-                # Check if class exists in train CSV (base classes)
-                if label_name in self.all_train_df['scene_label'].values:
-                    df = self.all_train_df
-                else:
-                    # Novel classes not in train CSV, load from eval CSV
-                    df = self.all_test_df
+                df = self.all_train_df
+                if label_name not in df['scene_label'].values:
+                    continue
+            elif self.partition == 'calib':
+                df = self.all_calib_df
             else:
                 df = self.all_test_df
 
@@ -179,38 +182,29 @@ class OpenTAU19(Dataset):
         # Available classes from the data we loaded
         available_classes = np.array(sorted(self.data.keys()))
 
-        if self.partition == 'test':
-            # Test partition: all classes are novel, split into known and open
-            n_total_needed = self.n_ways + self.n_open_ways
-            n_available = len(available_classes)
-            if n_available >= n_total_needed:
-                # Sample all at once then split
-                sampled = np.random.choice(available_classes, n_total_needed, False)
-                cls_sampled = sampled[:self.n_ways]
-                cls_open_ids = sampled[self.n_ways:]
-            else:
-                # Not enough classes - split available classes
-                n_known = min(self.n_ways, max(1, n_available - self.n_open_ways))
-                n_open = min(self.n_open_ways, n_available - n_known)
-                perm = np.random.permutation(available_classes)
-                cls_sampled = perm[:n_known]
-                cls_open_ids = perm[n_known:n_known + n_open]
+        if self.partition in ('test', 'calib'):
+            # Test/Calib partition: proper OSR — base classes → known, novel classes → unknown
+            base_class_index = np.arange(self.train_classes)
+            available_base = np.intersect1d(available_classes, base_class_index)
+            available_novel = np.setxor1d(available_classes, available_base)
+
+            cls_sampled = np.random.choice(available_base,
+                min(self.n_ways, len(available_base)), False)
+            cls_open_ids = np.random.choice(available_novel,
+                min(self.n_open_ways, len(available_novel)), False)
         else:
-            # Train partition: base classes [0-5] for known, novel [6-9] for open
-            base_classes = np.intersect1d(np.arange(self.train_classes), available_classes)
-            novel_classes = np.setxor1d(available_classes, base_classes)
+            # Train partition: only base classes available
+            # Use pseudo-open from remaining base classes (no data leakage)
+            base_classes = available_classes  # All loaded classes are base
 
-            cls_sampled = np.random.choice(base_classes,
-                min(self.n_ways, len(base_classes)), False)
+            # Ensure at least 1 pseudo-open class for training
+            max_closed = max(1, len(base_classes) - 1)
+            n_ways_eff = min(self.n_ways, max_closed)
+            n_open_eff = min(self.n_open_ways, len(base_classes) - n_ways_eff)
 
-            if len(novel_classes) >= self.n_open_ways:
-                cls_open_ids = np.random.choice(novel_classes, self.n_open_ways, False)
-            else:
-                remaining_base = np.setxor1d(base_classes, cls_sampled)
-                if len(remaining_base) >= self.n_open_ways:
-                    cls_open_ids = np.random.choice(remaining_base, self.n_open_ways, False)
-                else:
-                    cls_open_ids = np.random.choice(available_classes, self.n_open_ways, False)
+            perm = np.random.permutation(base_classes)
+            cls_sampled = perm[:n_ways_eff]
+            cls_open_ids = perm[n_ways_eff:n_ways_eff + n_open_eff]
 
         support_xs, support_ys = [], []
         query_xs, query_ys = [], []
@@ -247,8 +241,8 @@ class OpenTAU19(Dataset):
             openset_xs.extend([audio[i].view(1, -1) for i in openset_ids])
             openset_ys.extend([the_cls] * self.n_queries)
 
-        suppopen_xs = torch.cat(suppopen_xs, dim=0)
-        openset_xs = torch.cat(openset_xs, dim=0)
+        suppopen_xs = torch.cat(suppopen_xs, dim=0) if suppopen_xs else torch.empty(0)
+        openset_xs = torch.cat(openset_xs, dim=0) if openset_xs else torch.empty(0)
 
         support_ys = np.array(support_ys)
         query_ys = np.array(query_ys)

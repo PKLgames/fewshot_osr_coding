@@ -126,6 +126,8 @@ def main():
     parser.add_argument('--dataset', choices=['TAU22', 'TAU19'], default='TAU22')
     parser.add_argument('--compare_ablation', action='store_true',
                         help='Compare full model vs baseline (no extras)')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -157,7 +159,7 @@ def main():
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test',
                                   device, batch_size=64)
 
-    save_dir = os.path.join(cl_args.experiment_dir, 'tsne')
+    save_dir = os.path.join(cl_args.output_dir, 'tsne')
     os.makedirs(save_dir, exist_ok=True)
 
     # --- Full model ---

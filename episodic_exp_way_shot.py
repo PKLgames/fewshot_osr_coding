@@ -61,7 +61,7 @@ def get_features(feature_extractor, device):
 
 def run_way_shot(train_cache, calib_cache, test_cache, feature_extractor,
                  base_classes, unknown_classes, n_way, k_shot,
-                 num_episodes=3000, device='cuda'):
+                 num_episodes=3000, device='cuda', output_root='experiment/episodic_exp'):
     """Run episodic training + evaluation for a specific N-way K-shot."""
     # Adjust Q_query based on available samples per class
     min_class_samples = min(
@@ -71,7 +71,7 @@ def run_way_shot(train_cache, calib_cache, test_cache, feature_extractor,
         print(f"    SKIP: not enough samples for {n_way}w{k_shot}s (need {k_shot + 5}, have {min_class_samples})")
         return None
 
-    experiment_dir = f'experiment/episodic_wayshot/way{n_way}_shot{k_shot}'
+    experiment_dir = f'{output_root}/wayshot/way{n_way}_shot{k_shot}'
 
     flow_classifier = EpisodicFlowClassifier(
         input_dim=64, condition_dim=64, use_flow_transform=False)
@@ -136,6 +136,8 @@ def main():
     parser.add_argument('--shots', type=int, nargs='*', default=SHOT_VALUES)
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     if cl_args.quick:
@@ -170,12 +172,14 @@ def main():
             result = run_way_shot(
                 train_cache, calib_cache, test_cache, feature_extractor,
                 base_classes, unknown_classes, n_way, k_shot,
-                num_episodes=cl_args.num_episodes, device=device)
+                num_episodes=cl_args.num_episodes, device=device,
+                output_root=cl_args.output_dir)
             if result:
                 all_results[key] = result
 
     # Save
-    save_path = 'episodic_exp_way_shot_results.json'
+    os.makedirs(os.path.join(cl_args.output_dir, 'wayshot'), exist_ok=True)
+    save_path = os.path.join(cl_args.output_dir, 'wayshot', 'results.json')
     with open(save_path, 'w') as f:
         json.dump(all_results, f, indent=2, default=str)
     print(f"\nResults saved to {save_path}")

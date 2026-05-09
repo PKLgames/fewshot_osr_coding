@@ -37,10 +37,10 @@ def find_pretrained():
 
 def run_openness(train_cache, calib_cache, test_cache, feature_extractor,
                  base_classes, all_unknown, n_open, N_way=6, K_shot=5,
-                 num_episodes=3000, device='cuda'):
+                 num_episodes=3000, device='cuda', output_root='experiment/episodic_exp'):
     """Run with a subset of unknown classes."""
     unknown_classes = all_unknown[:n_open]
-    experiment_dir = f'experiment/episodic_openness/open{n_open}'
+    experiment_dir = f'{output_root}/openness/open{n_open}'
 
     print(f"\n  n_open={n_open}, unknown={unknown_classes}")
 
@@ -94,6 +94,8 @@ def main():
     parser.add_argument('--open_ways', type=int, nargs='*', default=OPEN_WAY_VALUES)
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
+                        help='Root output directory for all results')
     cl_args = parser.parse_args()
 
     if cl_args.quick:
@@ -131,12 +133,14 @@ def main():
         r = run_openness(
             train_cache, calib_cache, test_cache, feature_extractor,
             base_classes, all_unknown, n_open,
-            num_episodes=cl_args.num_episodes, device=device)
+            num_episodes=cl_args.num_episodes, device=device,
+            output_root=cl_args.output_dir)
         if r:
             all_results[f'open{n_open}'] = r
 
     # Save
-    save_path = 'episodic_exp_openness_results.json'
+    os.makedirs(os.path.join(cl_args.output_dir, 'openness'), exist_ok=True)
+    save_path = os.path.join(cl_args.output_dir, 'openness', 'results.json')
     with open(save_path, 'w') as f:
         json.dump(all_results, f, indent=2, default=str)
     print(f"\nResults saved to {save_path}")

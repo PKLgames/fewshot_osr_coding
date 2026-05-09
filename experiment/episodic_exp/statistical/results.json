@@ -1,0 +1,15 @@
+{
+  "friedman_stat": 5.142857142857139,
+  "friedman_p": 0.3986958262978914,
+  "significant": false,
+  "avg_ranks": {
+    "full_model": 3.0,
+    "wo_flow_transform": 4.0,
+    "wo_ood_head": 3.0,
+    "wo_reciprocal": 1.5,
+    "wo_threshold": 4.0,
+    "only_distance_head": 5.5
+  },
+  "critical_difference": 7.539439634349492,
+  "significant_pairs": []
+}

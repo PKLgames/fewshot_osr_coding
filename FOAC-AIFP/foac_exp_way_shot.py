@@ -36,8 +36,12 @@ def load_config(config_path):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     cfg = cfg['train']
+    # Prevent train_parser()'s internal parse_args() from consuming sys.argv
+    saved_argv = sys.argv
+    sys.argv = [sys.argv[0]]
     base_parser = trainer.train_parser()
-    merged = vars(base_parser.parse_args([]))
+    sys.argv = saved_argv
+    merged = vars(base_parser)
     merged.update(cfg)
     args = argparse.Namespace(**merged)
     for k, v in vars(args).items():
@@ -94,9 +98,9 @@ def run_way_shot_config(args, n_way, k_shot):
     best_result = None
     ckpt_path = os.path.join(save_dir, f'model_{args.dataset}_max_acc.pth')
     if os.path.exists(ckpt_path):
-        state_dict = torch.load(ckpt_path)
-        model.weight_base = state_dict['weight_base'].to('cuda')
-        model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+        state_dict = torch.load(ckpt_path, weights_only=False)
+        model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
+        model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
         model.load_state_dict(state_dict, strict=False)
         result, loss = tm.run_test_fsl(model, eval_loader)
         best_result = {

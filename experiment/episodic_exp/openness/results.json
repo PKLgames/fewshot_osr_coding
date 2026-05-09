@@ -1,0 +1,66 @@
+{
+  "open2": {
+    "osr": {
+      "anti_prototype": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.42286111116409303,
+        "osr_score": 0.686430549621582,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "anti_prototype",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "feature_mahalanobis": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.22555554658174515,
+        "osr_score": 0.5877777673304081,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "feature_mahalanobis",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      }
+    },
+    "n_open": 2,
+    "unknown_classes": [
+      6,
+      7
+    ]
+  },
+  "open4": {
+    "osr": {
+      "anti_prototype": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.316527775733266,
+        "osr_score": 0.6332638819061686,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "anti_prototype",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "feature_mahalanobis": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.1690277736634016,
+        "osr_score": 0.5595138808712363,
+        "threshold": "per-round",
+        "num_rounds": 10,
+        "method": "feature_mahalanobis",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      }
+    },
+    "n_open": 4,
+    "unknown_classes": [
+      6,
+      7,
+      8,
+      9
+    ]
+  }
+}

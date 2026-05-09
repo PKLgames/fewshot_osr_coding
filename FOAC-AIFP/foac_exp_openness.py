@@ -33,8 +33,11 @@ def load_config(config_path):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     cfg = cfg['train']
+    saved_argv = sys.argv
+    sys.argv = [sys.argv[0]]
     base_parser = trainer.train_parser()
-    merged = vars(base_parser.parse_args([]))
+    sys.argv = saved_argv
+    merged = vars(base_parser)
     merged.update(cfg)
     args = argparse.Namespace(**merged)
     for k, v in vars(args).items():
@@ -81,9 +84,9 @@ def run_openness_config(args, n_open_ways):
     for ckpt_suffix in ['max_auroc', 'max_osr', 'max_acc']:
         ckpt_path = os.path.join(save_dir, f'model_{args.dataset}_{ckpt_suffix}.pth')
         if os.path.exists(ckpt_path):
-            state_dict = torch.load(ckpt_path)
-            model.weight_base = state_dict['weight_base'].to('cuda')
-            model.weight_base_open = state_dict['weight_base_open'].to('cuda')
+            state_dict = torch.load(ckpt_path, weights_only=False)
+            model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
+            model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
             model.load_state_dict(state_dict, strict=False)
             result, loss = tm.run_test_fsl(model, eval_loader)
             best_result = {
