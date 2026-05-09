@@ -23,6 +23,7 @@ from tqdm import tqdm
 from collections import defaultdict
 import json
 from sklearn.mixture import GaussianMixture
+from sklearn.metrics import roc_auc_score
 from transformers import ASTModel as HF_ASTModel
 import transformers.utils.logging as hf_logging
 hf_logging.set_verbosity_error()
@@ -1108,6 +1109,29 @@ class FeatureCache:
 
     def get_class_features(self, class_id: int) -> torch.Tensor:
         return self.features_by_class.get(class_id, torch.zeros(0))
+
+    def load(self, cache_path: str):
+        """Load pre-cached features from disk (for eval-only mode)."""
+        data = torch.load(cache_path, weights_only=True)
+        self.features = data['features']
+        self.labels = data['labels']
+
+        # Organize by class
+        self.features_by_class = {}
+        for i in range(len(self.labels)):
+            c = self.labels[i].item()
+            if c not in self.features_by_class:
+                self.features_by_class[c] = []
+            self.features_by_class[c].append(self.features[i])
+
+        self.features_by_class = {
+            k: torch.stack(v) for k, v in self.features_by_class.items()}
+        self.class_list = sorted(self.features_by_class.keys())
+
+        print(f"  Loaded {cache_path}: {len(self.features)} samples, "
+              f"classes={self.class_list}")
+        for c in self.class_list:
+            print(f"    Class {c}: {len(self.features_by_class[c])} samples")
 
 
 # ============================================================
@@ -4326,6 +4350,8 @@ class OSRCalibrator:
 
         all_known_rates = []
         all_unknown_rates = []
+        all_known_scores = []    # AUROC: collect raw known scores
+        all_unknown_scores = []  # AUROC: collect raw unknown scores
         target_fpr = 0.05
 
         for round_i in range(num_rounds):
@@ -4546,19 +4572,43 @@ class OSRCalibrator:
                 unknown_rate = np.mean(unknown_detect_list)
                 all_unknown_rates.append(unknown_rate)
 
+            # AUROC: collect raw scores (known=0, unknown=1)
+            all_known_scores.append(known_scores.cpu().numpy())
+            unknown_raw_scores = []
+            for c in self.unknown_classes:
+                feats = self.cache.get_class_features(c)
+                if len(feats) == 0:
+                    continue
+                scores = self.score_samples(feats, prototypes, method)
+                unknown_raw_scores.append(scores.cpu().numpy())
+            if unknown_raw_scores:
+                all_unknown_scores.append(np.concatenate(unknown_raw_scores))
+
         mean_known = np.mean(all_known_rates)
         mean_unknown = np.mean(all_unknown_rates) if all_unknown_rates else 0.0
         osr_score = (mean_known + mean_unknown) / 2
+
+        # AUROC: aggregate scores across all rounds
+        auroc_score = 0.0
+        if all_known_scores and all_unknown_scores:
+            all_k = np.concatenate(all_known_scores)
+            all_u = np.concatenate(all_unknown_scores)
+            labels = np.concatenate([np.zeros(len(all_k)), np.ones(len(all_u))])
+            scores = np.concatenate([all_k, all_u])
+            # Higher score → more likely known → label=0, so negate for AUROC
+            auroc_score = roc_auc_score(labels, -scores)
 
         print(f"\nResults over {num_rounds} rounds:")
         print(f"  Known accepted (TNR):     {mean_known:.2%}")
         print(f"  Unknown detected (TPR):   {mean_unknown:.2%}")
         print(f"  OSR Score (mean):         {osr_score:.2%}")
+        print(f"  AUROC:                    {auroc_score:.4f}")
 
         results = {
             'known_tnr': mean_known,
             'unknown_tpr': mean_unknown,
             'osr_score': osr_score,
+            'auroc': auroc_score,
             'threshold': threshold if not recalibrate_per_round else 'per-round',
             'num_rounds': num_rounds,
             'method': method,
@@ -4728,6 +4778,14 @@ def visualize_features_tsne(train_cache: FeatureCache,
 # ============================================================
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='Episodic Meta-Trainer for Few-Shot OSR')
+    parser.add_argument('--eval_only', action='store_true',
+                        help='Skip training, load checkpoint and run evaluation only')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                        help='Path to fewshot_final.pth (default: auto-detect from experiment_dir)')
+    args = parser.parse_args()
+
     torch.manual_seed(42)
     random.seed(42)
     np.random.seed(42)
@@ -4835,87 +4893,153 @@ def main():
 
     feature_extractor = feature_extractor.to(device)
 
-    # ============ Phase 1: Feature Extraction ============
-    print(f"\n{'='*70}")
-    print("Phase 1: Feature Extraction")
-    print(f"{'='*70}")
+    if not args.eval_only:
+        # ============ Phase 1: Feature Extraction ============
+        print(f"\n{'='*70}")
+        print("Phase 1: Feature Extraction")
+        print(f"{'='*70}")
 
-    calib_dataset = TAUDataset(split='calib')
-    test_dataset = TAUDataset(split='test')
+        calib_dataset = TAUDataset(split='calib')
+        test_dataset = TAUDataset(split='test')
 
-    train_cache = FeatureCache()
-    train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
+        train_cache = FeatureCache()
+        train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
 
-    # osr17e: Load normalization stats from cache file (not from already-normalized features)
-    # osr17d bug: recomputed mean/std from normalized features → ≈0/≈1, wrong for new extractions
-    train_cache_data = torch.load(
-        os.path.join('experiment/fewshot_cache', 'train_features.pt'), weights_only=True)
-    train_norm_mean = train_cache_data.get('norm_mean', None)
-    train_norm_std = train_cache_data.get('norm_std', None)
-    if train_norm_mean is not None:
-        print(f"  Loaded norm stats from cache: mean_range=[{train_norm_mean.min():.4f}, {train_norm_mean.max():.4f}] "
-              f"std_range=[{train_norm_std.min():.4f}, {train_norm_std.max():.4f}]")
+        # osr17e: Load normalization stats from cache file (not from already-normalized features)
+        # osr17d bug: recomputed mean/std from normalized features → ≈0/≈1, wrong for new extractions
+        train_cache_data = torch.load(
+            os.path.join('experiment/fewshot_cache', 'train_features.pt'), weights_only=True)
+        train_norm_mean = train_cache_data.get('norm_mean', None)
+        train_norm_std = train_cache_data.get('norm_std', None)
+        if train_norm_mean is not None:
+            print(f"  Loaded norm stats from cache: mean_range=[{train_norm_mean.min():.4f}, {train_norm_mean.max():.4f}] "
+                  f"std_range=[{train_norm_std.min():.4f}, {train_norm_std.max():.4f}]")
 
-    calib_cache = FeatureCache()
-    calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64,
-                                   norm_mean=train_norm_mean, norm_std=train_norm_std)
+        calib_cache = FeatureCache()
+        calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64,
+                                       norm_mean=train_norm_mean, norm_std=train_norm_std)
 
-    test_cache = FeatureCache()
-    test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64,
-                                  norm_mean=train_norm_mean, norm_std=train_norm_std)
+        test_cache = FeatureCache()
+        test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64,
+                                      norm_mean=train_norm_mean, norm_std=train_norm_std)
 
-    # --- t-SNE visualization: base vs novel feature distribution ---
-    visualize_features_tsne(train_cache, test_cache,
-                            base_classes, unknown_classes, experiment_dir)
+        # --- t-SNE visualization: base vs novel feature distribution ---
+        visualize_features_tsne(train_cache, test_cache,
+                                base_classes, unknown_classes, experiment_dir)
 
-    # ============ Phase 2: Episodic Meta-Training ============
-    print(f"\n{'='*70}")
-    print("Phase 2: Episodic Meta-Training")
-    print(f"{'='*70}")
+        # ============ Phase 2: Episodic Meta-Training ============
+        print(f"\n{'='*70}")
+        print("Phase 2: Episodic Meta-Training")
+        print(f"{'='*70}")
 
-    flow_classifier = EpisodicFlowClassifier(
-        input_dim=feature_dim,
-        condition_dim=feature_dim,
-        use_flow_transform=False,  # osr22: 纯聚类OSR，无Flow变换
-    )
+        flow_classifier = EpisodicFlowClassifier(
+            input_dim=feature_dim,
+            condition_dim=feature_dim,
+            use_flow_transform=False,  # osr22: 纯聚类OSR，无Flow变换
+        )
 
-    # OOD exposure: provide unknown class features for open-set training
-    ood_features = {}
-    for c in unknown_classes:
-        feats = test_cache.get_class_features(c)
-        if len(feats) > 0:
-            ood_features[c] = feats
-    print(f"OOD exposure: {len(ood_features)} unknown classes, "
-          f"{sum(len(v) for v in ood_features.values())} total samples")
+        # OOD exposure: provide unknown class features for open-set training
+        ood_features = {}
+        for c in unknown_classes:
+            feats = test_cache.get_class_features(c)
+            if len(feats) > 0:
+                ood_features[c] = feats
+        print(f"OOD exposure: {len(ood_features)} unknown classes, "
+              f"{sum(len(v) for v in ood_features.values())} total samples")
 
-    trainer = EpisodicTrainer(
-        feature_extractor=feature_extractor,
-        flow_classifier=flow_classifier,
-        train_cache=train_cache,
-        calib_cache=calib_cache,
-        test_cache=test_cache,
-        base_classes=base_classes,
-        unknown_classes=unknown_classes,
-        ood_features_by_class=ood_features,
-        N_way=N_way,
-        K_shot=K_shot,
-        Q_query=Q_query,
-        lr=5e-5,
-        proto_noise_std=0.15,
-        ood_ratio=0.3,
-        warmup_episodes=200,
-        task_aug_drop_rate=0.2,
-        gradient_accum_steps=gradient_accum_steps,
-        device=device
-    )
+        trainer = EpisodicTrainer(
+            feature_extractor=feature_extractor,
+            flow_classifier=flow_classifier,
+            train_cache=train_cache,
+            calib_cache=calib_cache,
+            test_cache=test_cache,
+            base_classes=base_classes,
+            unknown_classes=unknown_classes,
+            ood_features_by_class=ood_features,
+            N_way=N_way,
+            K_shot=K_shot,
+            Q_query=Q_query,
+            lr=5e-5,
+            proto_noise_std=0.15,
+            ood_ratio=0.3,
+            warmup_episodes=200,
+            task_aug_drop_rate=0.2,
+            gradient_accum_steps=gradient_accum_steps,
+            device=device
+        )
 
-    trainer.train(
-        num_episodes=num_episodes,
-        eval_every=500,  # 减少验证频率 (150→500)
-        num_val_episodes=10,  # 减少验证episode数 (30→10)
-        save_dir=experiment_dir,
-        resume=True  # Resume from checkpoint if exists
-    )
+        trainer.train(
+            num_episodes=num_episodes,
+            eval_every=500,  # 减少验证频率 (150→500)
+            num_val_episodes=10,  # 减少验证episode数 (30→10)
+            save_dir=experiment_dir,
+            resume=True  # Resume from checkpoint if exists
+        )
+
+    else:
+        # ============ Eval-only: load from checkpoint & cache ============
+        print(f"\n{'='*70}")
+        print("EVAL-ONLY MODE: Loading checkpoint & cached features")
+        print(f"{'='*70}")
+
+        # Determine checkpoint path
+        ckpt_path = args.checkpoint
+        if ckpt_path is None:
+            ckpt_path = os.path.join(experiment_dir, 'fewshot_final.pth')
+        if not os.path.exists(ckpt_path):
+            raise FileNotFoundError(
+                f"Checkpoint not found: {ckpt_path}\n"
+                f"Use --checkpoint <path> to specify, or run training first.")
+        print(f"Loading checkpoint: {ckpt_path}")
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+
+        # Reconstruct flow classifier from checkpoint
+        flow_classifier = EpisodicFlowClassifier(
+            input_dim=feature_dim,
+            condition_dim=feature_dim,
+            use_flow_transform=False,
+        )
+        flow_classifier.load_state_dict(ckpt['flow_state_dict'])
+        flow_classifier = flow_classifier.to(device)
+        print(f"Flow classifier loaded (epoch from checkpoint config)")
+
+        # Load cached features
+        cache_dir = 'experiment/fewshot_cache'
+        for split_name in ['train', 'calib', 'test']:
+            fpath = os.path.join(cache_dir, f'{split_name}_features.pt')
+            if not os.path.exists(fpath):
+                raise FileNotFoundError(
+                    f"Feature cache not found: {fpath}\n"
+                    f"Run full training first to generate caches.")
+
+        train_cache = FeatureCache()
+        train_cache.load(os.path.join(cache_dir, 'train_features.pt'))
+
+        calib_cache = FeatureCache()
+        calib_cache.load(os.path.join(cache_dir, 'calib_features.pt'))
+
+        test_cache = FeatureCache()
+        test_cache.load(os.path.join(cache_dir, 'test_features.pt'))
+
+        print(f"Caches loaded: train={len(train_cache.features)}, "
+              f"calib={len(calib_cache.features)}, test={len(test_cache.features)}")
+
+        # Reconstruct a minimal trainer (needed by FewShotEvaluator only)
+        trainer = EpisodicTrainer(
+            feature_extractor=feature_extractor,
+            flow_classifier=flow_classifier,
+            train_cache=train_cache,
+            calib_cache=calib_cache,
+            test_cache=test_cache,
+            base_classes=base_classes,
+            unknown_classes=unknown_classes,
+            ood_features_by_class={},
+            N_way=N_way,
+            K_shot=K_shot,
+            Q_query=Q_query,
+            lr=0,  # not used in eval
+            device=device
+        )
 
     # ============ Phase 3: Evaluation & OSR Calibration ============
     print(f"\n{'='*70}")
@@ -5086,9 +5210,10 @@ def main():
     print(f"\n{'='*70}")
     print("OSR Method Comparison (test data, per-round recalibration)")
     print(f"{'='*70}")
-    print(f"  {'Method':<35s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s}")
+    print(f"  {'Method':<35s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s} {'AUROC':>8s}")
     for m, r in osr_results.items():
-        print(f"  {m:<35s} {r['known_tnr']:>7.2%} {r['unknown_tpr']:>7.2%} {r['osr_score']:>7.2%}")
+        auroc_str = f"{r['auroc']:.4f}" if 'auroc' in r else '  N/A '
+        print(f"  {m:<35s} {r['known_tnr']:>7.2%} {r['unknown_tpr']:>7.2%} {r['osr_score']:>7.2%} {auroc_str:>8s}")
 
     # ============ Save Final Model ============
     best_method = max(osr_results, key=lambda m: osr_results[m]['osr_score'])

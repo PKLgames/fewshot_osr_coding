@@ -1,6 +1,6 @@
 # Large data directories
-TAU-urban-acoustic-scenes-2019-development/
-TAU-urban-acoustic-scenes-2022-mobile-development/
+TAU-urban-acoustic-scenes-2019-development/audio/
+TAU-urban-acoustic-scenes-2022-mobile-development/audio/
 TAU19zips/
 TAU22zips/
 audio_classifying/
