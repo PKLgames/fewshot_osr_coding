@@ -19,25 +19,36 @@
 二、已有实验结果
 ================================================================================
 
-【FOAC-AIFP 基线】(ResNet18 backbone, 6-way 5-shot, 80 epochs)
-  TAU22 aligned (best@ep78, Q=100):
-    max_acc:    ACC=44.05  AUROC=47.30  OSR=50.08  F1=42.72  TPR@TNR95=5.16
-    max_osr:    ACC=36.49  AUROC=49.50  OSR=50.20  F1=42.86  TPR@TNR95=5.39
-    max_auroc:  ACC=42.08  AUROC=53.50  OSR=50.69  F1=43.75  TPR@TNR95=6.37
-    max_fscore: ACC=36.48  AUROC=49.51  OSR=50.20  F1=42.86  TPR@TNR95=5.40
-  TAU19 aligned (Q=15):
-    max_acc:    ACC=44.03  AUROC=40.52  OSR=48.87  F1=41.47  TPR@TNR95=2.19
-    max_osr:    ACC=32.91  AUROC=42.43  OSR=50.72  F1=42.96  TPR@TNR95=5.89
-    max_auroc:  ACC=43.34  AUROC=46.89  OSR=49.57  F1=46.01  TPR@TNR95=3.58
-    max_fscore: ACC=43.34  AUROC=46.89  OSR=49.57  F1=46.01  TPR@TNR95=3.58
+【FOAC-AIFP 基线】(ResNet18 backbone, 6-way 5-shot, 80 epochs, Q=15 fewshot)
+  TAU22 aligned (Q=15, osr_k_shot=5):
+    max_acc:    ACC=44.16±0.79  AUROC=46.15±0.87  OSR=50.42±0.26  F1=45.43±0.70  TPR@TNR95=5.28±0.52
+    max_osr:    ACC=43.00±0.78  AUROC=49.09±0.78  OSR=50.69±0.28  F1=47.17±0.67  TPR@TNR95=5.83±0.56
+    max_auroc:  ACC=41.94±0.72  AUROC=52.52±0.76  OSR=50.92±0.29  F1=50.16±0.64  TPR@TNR95=6.29±0.58
+    max_fscore: ACC=41.94±0.72  AUROC=52.52±0.76  OSR=50.92±0.29  F1=50.16±0.64  TPR@TNR95=6.29±0.58
+  TAU19 aligned (Q=15, osr_k_shot=5):
+    max_acc:    ACC=41.66±0.74  AUROC=44.88±1.16  OSR=49.14±0.20  F1=45.33±0.88  TPR@TNR95=2.72±0.40
+    max_osr:    ACC=45.23±0.75  AUROC=43.42±0.93  OSR=48.92±0.20  F1=43.93±0.77  TPR@TNR95=2.28±0.40
+    max_auroc:  ACC=38.88±0.88  AUROC=44.21±1.09  OSR=50.59±0.30  F1=44.32±0.86  TPR@TNR95=5.63±0.61
+    max_fscore: ACC=39.98±0.79  AUROC=45.67±1.32  OSR=49.72±0.27  F1=46.07±1.01  TPR@TNR95=3.88±0.53
   Checkpoint 目录:
     FOAC-AIFP/tau22_aligned/  (model_TAU22_max_{acc,osr,auroc,fscore}.pth)
     FOAC-AIFP/tau19_aligned/  (model_TAU19_max_{acc,osr,auroc,fscore}.pth)
 
-【Episodic Trainer】
-  TAU22: osr13 best_val_acc=74.0%, osr22_relabel=52.6%
-  TAU19: osr22_tau19 best_val_acc=43.0%
-  其他 backbone: pann (4组), ast (1组)
+【Episodic Trainer】(YAMNet backbone, 6-way 5-shot, Q=15 fewshot)
+  TAU22 fewshot (best@ep2500, early_stop@5000, val_acc=53.0%):
+    Few-shot ACC: 6w1s=38.63±1.80%  6w5s=50.97±1.27%  6w10s=50.26±1.03%
+    Novel ACC:    4w1s=36.95±1.91%  4w5s=44.25±1.41%  4w10s=47.85±1.22%
+    OSR Best:     ood_head_extended_v2: TPR=49.34% OSR=72.17% AUROC=0.8328
+                  ensemble_anti_oodext: TPR=49.94% OSR=72.47% AUROC=0.7327
+                  ood_head_extended:    TPR=49.01% OSR=72.00% AUROC=0.8328
+    Checkpoint: experiment/yamnet_fewshot_osr22_fewshot/
+  TAU19 fewshot (best@ep1500, early_stop@4500, val_acc=42.0%):
+    Few-shot ACC: 6w1s=31.42±1.43%  6w5s=38.81±1.13%  6w10s=40.32±1.09%
+    Novel ACC:    4w1s=40.95±2.23%  4w5s=47.57±1.35%  4w10s=48.28±1.39%
+    OSR Best:     ood_head_extended_v2: TPR=80.89% OSR=87.94%
+                  ood_head_extended:    TPR=68.45% OSR=81.72%
+                  ensemble_anti_oodext: TPR=61.97% OSR=78.48%
+    Checkpoint: experiment/yamnet_fewshot_osr22_fewshot_tau19/
 
 
 ================================================================================
@@ -103,6 +114,9 @@ G. 扩展实验 ── 脚本已创建
 
   ── Episodic Trainer 执行顺序 ── (输出统一至 experiment/episodic_exp/)
   所有脚本支持 --output_dir 自定义路径，默认 experiment/episodic_exp
+
+  初始化:
+        mkdir -p experiment/episodic_exp/{ablation,wayshot,openness,complexity,cross_domain,statistical,tsne}
 
   EP1 ── 消融实验 (最能体现论文贡献，优先跑)
         cd /coding && python episodic_exp_ablation.py 2>&1 | tee experiment/episodic_exp/ablation/train.log

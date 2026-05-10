@@ -151,7 +151,7 @@ def baseline_classify(features, labels, name):
     knn_acc = accuracy_score(y_test, knn.predict(X_test_s))
 
     # 线性探测 (Logistic Regression)
-    lr = LogisticRegression(max_iter=500, C=1.0)
+    lr = LogisticRegression(max_iter=5000, C=1.0, l1_ratio=0)
     lr.fit(X_train_s, y_train)
     lr_acc = accuracy_score(y_test, lr.predict(X_test_s))
 

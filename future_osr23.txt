@@ -1,0 +1,359 @@
+OSR23 改进计划: fewshot场景下的OSR方法优化
+============================================
+
+══════════════════════════════════════════════════════════════════════
+一、OSR22→Fewshot 性能对比 (核心数据)
+══════════════════════════════════════════════════════════════════════
+
+  ── 校准集差异 (关键约束) ──
+    TAU22 calib: known=100/类(6类), unknown=5/类(4类) → 共20个unknown样本
+    TAU19 calib: known=500/类(6类), unknown=500/类(4类) → 共2000个unknown样本
+    差距: 100倍 (20 vs 2000)
+
+  ── OSR方法性能对比 (TNR=95%) ──
+
+    方法                         osr22(Q=100)  fewshot-TAU22  fewshot-TAU19
+    ─────────────────────────    ───────────   ────────────   ────────────
+    feature_mahalanobis             12.54%        18.58%         43.35%
+    anti_prototype                  18.92%        37.65%         49.45%
+    ood_head                          —           41.34%         62.61%
+    ood_head_extended               16.33%        49.01%         68.45%
+    ood_head_extended_v2            21.76%        49.34%         80.89%
+    ensemble_anti_oodext            22.91%        49.94%         61.97%
+    ensemble_cluster (osr22最优)    24.94%        43.09%         61.38%
+    anti_prototype_multi            16.10%        19.69%           —
+    ensemble_adaptive               20.11%        37.02%         50.90%
+    cluster_boundary                10.40%        15.17%         28.60%
+
+  ── AUROC对比 (fewshot新增指标) ──
+
+    方法                         fewshot-TAU22  fewshot-TAU19
+    ─────────────────────────    ────────────   ────────────
+    ood_head_extended              0.8328          —
+    ood_head_extended_v2           0.8295          —
+    ood_head                       0.7797          —
+    cluster_boundary               0.7160          —
+    feature_mahalanobis            0.7053          —
+    ensemble_anti_oodext           0.7327          —
+    anti_prototype                 0.5886          —
+
+
+══════════════════════════════════════════════════════════════════════
+二、关键发现
+══════════════════════════════════════════════════════════════════════
+
+  ★ 发现1: 校准数据量是OSR性能的决定性因素
+    TAU19 (2000 unknown calib) 的OSR远超 TAU22 (20 unknown calib):
+      ood_head_extended_v2: 80.89% vs 49.34% (+31.55% TPR)
+      anti_prototype:       49.45% vs 37.65% (+11.80% TPR)
+    → 校准集unknown样本数直接决定TPR天花板
+
+  ★ 发现2: GMM特征(ood_head_extended_v2)是数据饥渴型的
+    TAU22 (20 unknown): v2 vs v1 = 49.34% vs 49.01% (+0.33%, 几乎无效)
+    TAU19 (2000 unknown): v2 vs v1 = 80.89% vs 68.45% (+12.44%, 巨大提升)
+    → GMM的3个聚类特征(cluster_mahal/post_max/ent)需要足够校准数据
+    → 数据不足时GMM拟合质量差, 特征退化为噪声
+
+  ★ 发现3: ensemble_cluster在fewshot下失去优势
+    osr22(Q=100): ensemble_cluster=24.94% (最优) > ensemble_anti_oodext=22.91%
+    fewshot-TAU22: ensemble_cluster=43.09% < ensemble_anti_oodext=49.94%
+    fewshot-TAU19: ensemble_cluster=61.38% < ood_head_extended_v2=80.89%
+    → cluster_boundary信号在fewshot下更弱(TPR=15.17%), 三路融合退化为两路
+
+  ★ 发现4: 模型组件对OSR影响极小 (消融实验验证)
+    TAU22消融: all configs TPR在29.48%~31.36% (±1%)
+    TAU19消融: all configs TPR在45.53%~46.35% (±0.5%)
+    → flow/ood_head/reciprocal/threshold对OSR几乎无影响
+    → OSR性能完全取决于后处理方法, 非模型架构
+
+  ★ 发现5: AUROC揭示anti_prototype的信号质量问题
+    anti_prototype: TPR=37.65%但AUROC=0.5886 (接近随机0.5)
+    ood_head_extended: TPR=49.01%且AUROC=0.8328 (强信号)
+    → anti_prototype在固定阈值处有TPR, 但整体排序能力差
+    → ensemble中anti_prototype可能拉低AUROC
+
+
+══════════════════════════════════════════════════════════════════════
+三、ood_head_extended_v2 的问题诊断
+══════════════════════════════════════════════════════════════════════
+
+  当前架构: 13维特征 → LogisticRegression → known/unknown
+
+  13维特征:
+    ① min_dist         ② dist_ratio      ③ softmax_max
+    ④ entropy          ⑤ feat_norm        ⑥ 2nd_dist
+    ⑦ score_gap        ⑧ dist_to_center   ⑨ proto_score_var
+    ⑩ norm_dist_ratio  ⑪ neighbor_density  ← 原始11维
+    ⑫ cluster_mahal    ⑬ cluster_post_max  ⑭ cluster_ent    ← GMM新增
+
+  问题A: GMM在少样本下不稳定
+    TAU22 calib仅600 known + 20 unknown, GMM(12 components)严重过拟合
+    表现: cluster_mahal权重=-6.65 (极大), 说明拟合到噪声
+    对比TAU19: cluster_mahal权重=-0.24 (合理), GMM拟合质量好
+
+  问题B: 特征冗余
+    13维特征中部分高度相关:
+      dist_to_center ≈ min_dist (都度量到类中心的距离)
+      entropy ≈ -softmax_max (softmax分布的两种表达)
+      neighbor_density ≈ cluster_mahal (都度量局部密度)
+    冗余特征在少样本校准时加剧过拟合
+
+  问题C: LogisticRegression在少样本下的局限
+    TAU22: 仅20个unknown样本 + 600个known样本用于阈值校准
+    13个特征 + 1个bias = 14个参数, unknown样本仅20个
+    参数/样本比 = 14/20 = 0.7 (过高, 理想<0.1)
+    → 模型记忆校准数据, 泛化差
+
+  问题D: 校准-测试分布偏移
+    校准集unknown: 仅4类×5样本=20 (TAU22特定子集)
+    测试集unknown: 4类×1800样本=7200 (全量)
+    → 校准集的unknown分布不代表测试集, 阈值偏移
+
+
+══════════════════════════════════════════════════════════════════════
+四、osr23改进方案
+══════════════════════════════════════════════════════════════════════
+
+  ┌──────┬──────────────────────────────┬─────────┬──────────┐
+  │ 优先级│ 方案                          │ 预期收益  │ 风险      │
+  ├──────┼──────────────────────────────┼─────────┼──────────┤
+  │ P0   │ A) 自适应特征选择              │ +2~5%   │ 低        │
+  │ P0   │ B) 增强GMM鲁棒性              │ +2~5%   │ 低        │
+  │ P1   │ C) 利用训练集辅助校准          │ +3~8%   │ 中        │
+  │ P1   │ D) 特征去冗余+正则化           │ +1~3%   │ 低        │
+  │ P2   │ E) 校准集增强                  │ +3~5%   │ 中        │
+  └──────┴──────────────────────────────┴─────────┴──────────┘
+
+
+  ══════════════════════════════════════════════════════════
+  方案A: 自适应特征选择 (根据校准数据量动态选择特征)
+  ══════════════════════════════════════════════════════════
+
+    核心思想: 数据多时用全部13维, 数据少时只用最可靠的5~7维
+
+    实现方案:
+      1. 计算校准集unknown样本数 n_unknown
+      2. 自适应选择特征子集:
+         n_unknown >= 200: 全部13维 (GMM特征有效)
+         n_unknown >= 50:  10维 (去掉3个GMM特征)
+         n_unknown >= 20:  7维  (仅保留核心特征)
+         n_unknown < 20:   5维  (最可靠的基础特征)
+
+      3. 基础5维 (always included):
+         min_dist, dist_ratio, softmax_max, feat_norm, dist_to_center
+         → 这些不依赖GMM, 直接从prototype计算, 鲁棒性最高
+
+    预期效果:
+      TAU22 (20 unknown): 使用7维, 减少过拟合, TPR +2~3%
+      TAU19 (2000 unknown): 使用13维, 保持80.89%
+
+    失败判定: 自适应选择不优于固定13维 → 回退全特征
+
+
+  ══════════════════════════════════════════════════════════
+  方案B: 增强GMM鲁棒性 (少样本下的GMM改进)
+  ══════════════════════════════════════════════════════════
+
+    核心思想: 让GMM在少样本校准集上也能产生有意义的聚类特征
+
+    实现方案:
+      1. 降低GMM复杂度:
+         当前: GMM(n_components=12, covariance_type='full')
+         改进: 根据known样本数自适应:
+           n_components = min(12, n_known // 50)  # 每50个样本1个component
+           covariance_type = 'diag' (当n_known < 500时)
+         → 避免full协方差矩阵在少样本下不稳定
+
+      2. 利用训练集拟合GMM (非校准集):
+         GMM只依赖known class的结构, 不需要unknown标签
+         → 在train_features (30000 TAU22 / 15000 TAU19) 上拟合GMM
+         → 校准集仅用于阈值选择
+         → 隔离GMM拟合(大数据)和阈值校准(小数据)
+
+      3. GMM特征归一化:
+         当前直接用raw cluster_mahal (-15到-2范围)
+         → Z-score归一化后输入LogisticRegression
+         → 与其他特征范围对齐, 避免权重偏差
+
+    预期效果:
+      TAU22: GMM在train set上拟合质量大幅提升, 特征有效性 +3~5%
+      TAU19: 变化不大(已经足够好)
+
+    失败判定: 改进GMM后TPR不提升 → 回退原始GMM
+
+
+  ══════════════════════════════════════════════════════════
+  方案C: 利用训练集辅助校准 (数据增强思路)
+  ══════════════════════════════════════════════════════════
+
+    核心思想: 校准集unknown太少(20个), 用训练集known模拟unknown
+
+    实现方案:
+      1. Leave-One-Class-Out (LOCO) 校准:
+         对每个base class c:
+           - 将class c的特征视为"pseudo-unknown"
+           - 其余5个class的特征视为"known"
+           - 计算ood_head_extended对pseudo-unknown的分数分布
+         得到: 6组"known vs unknown"的分数分布
+
+      2. 合并LOCO分数:
+         将6组pseudo-unknown分数合并, 得到~25000个"类unknown"样本
+         用这些样本 + 真实20个unknown样本 → 训练LogisticRegression
+         → 参数/样本比从14/20降至14/25020
+
+      3. 阈值校准仍用真实unknown:
+         LOCO用于训练分类器, 但阈值仍用真实unknown样本校准
+         → 保持TNR=95%的约束
+
+    预期效果:
+      TAU22: LogisticRegression训练数据从620→25000+, 过拟合大幅缓解
+      TAU19: 训练数据已充足, 提升有限
+
+    风险:
+      - LOCO的pseudo-unknown可能与真实unknown分布差异大
+      - 需要验证LOCO分数与真实unknown分数的相关性
+
+    失败判定: LOCO训练的分类器不如原始 → 回退
+
+
+  ══════════════════════════════════════════════════════════
+  方案D: 特征去冗余 + 正则化
+  ══════════════════════════════════════════════════════════
+
+    核心思想: 移除冗余特征, 增强LogisticRegression正则化
+
+    实现方案:
+      1. 特征相关性分析:
+         计算校准集上13维特征的相关矩阵
+         若 |corr(f_i, f_j)| > 0.9, 移除其中一个
+
+         预期冗余对:
+           dist_to_center ≈ min_dist → 保留min_dist
+           entropy ≈ -softmax_max → 保留softmax_max
+           neighbor_density ≈ cluster_mahal → 保留cluster_mahal
+
+      2. L1正则化 (Lasso):
+         LogisticRegression(penalty='l1', C=0.1)
+         → 自动将不重要特征的权重压缩为0
+         → 等价于自动特征选择
+
+      3. 交叉验证选择C:
+         在校准集上5-fold CV选择最优正则化强度
+         → 避免手动调参
+
+    预期效果:
+      TAU22: 去冗余后从13维→~9维, 过拟合减少, +1~2%
+      TAU19: 变化不大
+
+    失败判定: L1正则化不优于L2 → 回退L2
+
+
+  ══════════════════════════════════════════════════════════
+  方案E: 校准集增强 (合成unknown样本)
+  ══════════════════════════════════════════════════════════
+
+    核心思想: 从20个真实unknown生成更多合成unknown用于校准
+
+    实现方案:
+      1. 基于known class边界的合成:
+         对每个known class的prototype:
+           合成unknown = prototype + α * (方向随机, ||方向||=known半径)
+         α ∈ [1.5, 3.0] (在已知区域之外)
+
+      2. 基于GMM low-density区域的合成:
+         在GMM拟合的特征空间中, 找到低密度区域
+         从低密度区域采样 → 合成unknown
+
+      3. Mixup增强:
+         unknown_aug = λ * unknown_i + (1-λ) * unknown_j
+         λ ~ Beta(0.5, 0.5)
+         → 20个unknown → ~200个增强unknown
+
+    预期效果:
+      TAU22: 校准unknown从20→200+, TNR/TPR更稳定
+      TAU19: 不需要(已有2000个)
+
+    风险:
+      - 合成unknown可能不代表真实unknown分布
+      - Mixup可能平滑掉边界样本
+
+    失败判定: 合成unknown导致TNR下降 → 回退
+
+
+
+
+══════════════════════════════════════════════════════════════════════
+五、执行计划
+══════════════════════════════════════════════════════════════════════
+
+  ── 已完成: A+B+D (osr23实验) ──────────────────────────────
+    结果: ood_head_osr23 TPR=49.27% AUROC=0.8339 (无实质提升)
+    结论: 特征工程天花板, TPR ≈ 49%
+
+  ── 已完成: C (LOCO辅助校准) ──────────────────────────────
+    结果: TPR=49.38% (+0.11%), AUROC=0.7908 (下降0.043)
+    结论: 失败。LOCO伪未知不匹配真实未知, LR过拟合LOCO模式
+
+  ── 待执行 ──────────────────────────────────────────────
+    5. E (合成增强) → 探索性
+    6. TAU19校准集unknown改为5/类, 重跑fewshot
+
+  目标 (再次修订):
+    TAU22 fewshot: TPR 49.17% → 53%+ (方案E或新思路)
+    TAU19 fewshot: 保持 80.89%
+    AUROC: 0.8338 → 0.85+
+
+
+══════════════════════════════════════════════════════════════════════
+六、实验结果汇总
+══════════════════════════════════════════════════════════════════════
+
+  ── osr23b (A+B+D, 无LOCO) ─────────────────────────────
+    方法                         TPR      AUROC    对比baseline
+    ─────────────────────────    ──────   ──────   ────────────
+    ood_head_extended            49.17%   0.8338   baseline
+    ood_head_osr23               49.27%   0.8339   +0.10% TPR
+
+  ── osr23c (A+B+D+LOCO) ────────────────────────────────
+    ood_head_osr23 (LOCO)        49.38%   0.7908   +0.21% TPR, AUROC下降!
+
+    校准指标 (虚高):
+      CV-AUROC=0.9467, Calib TPR=86.92% (vs 无LOCO: 0.8738, 60%)
+      → LOCO使校准集性能暴涨但无法泛化
+
+    失败机制:
+      1. LOCO伪未知太容易与已知区分 → LR学到伪特征
+      2. Calib权重: feat_norm=+15.62, dist_to_center=-13.85 (巨大)
+      3. Eval权重:  feat_norm=+0.37,  dist_to_center=0.00  (崩溃)
+      4. Mean separation: 0.07 (几乎无信号, vs 无LOCO 0.45)
+      → LR过拟合LOCO特有模式: 伪未知=同分布样本移除一个prototype
+      → 真实未知=完全不同分布, LOCO学到的特征无效
+
+  ── 所有方法对比 ────────────────────────────────────────
+    方法                         TPR      AUROC
+    ─────────────────────────    ──────   ──────
+    ood_head_extended            49.17%   0.8338   ← 最优AUROC
+    ood_head_extended_v2         49.62%   0.8307
+    ood_head_osr23 (LOCO)        49.38%   0.7908   ← AUROC退化
+    ood_head_osr23 (无LOCO)      49.27%   0.8339
+    ensemble_anti_oodext         50.09%   0.7356   ← AUROC差
+    ood_head                     41.79%   0.7819
+    anti_prototype               38.07%   0.5888   ← 接近随机
+
+
+══════════════════════════════════════════════════════════════════════
+七、不做的事
+══════════════════════════════════════════════════════════════════════
+
+    继承osr22的排除列表:
+    ✗ Flow相关 (osr18/19/21全面证伪)
+    ✗ K-means多原型 (anti_prototype_multi: TPR=19.69%)
+    ✗ 自适应融合权重 (ensemble_adaptive: TPR=37.11%)
+    ✗ 半径边界检测 (cluster_boundary: TPR=15.17%)
+
+    osr23新增排除:
+    ✗ 不改变backbone (消融实验证明组件对OSR无影响)
+    ✗ 不增加特征维度 (13维→更多维只会加剧过拟合)
+    ✗ 不使用per-class阈值 (100样本/类不足以估计)
+    ✗ 不继续特征选择/正则化优化 (已验证无提升)
+    ✗ 不使用LOCO辅助校准 (伪未知不匹配真实未知, AUROC下降0.043)

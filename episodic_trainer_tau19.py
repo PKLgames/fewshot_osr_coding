@@ -23,6 +23,7 @@ from tqdm import tqdm
 from collections import defaultdict
 import json
 from sklearn.mixture import GaussianMixture
+from sklearn.metrics import roc_auc_score
 from transformers import ASTModel as HF_ASTModel
 import transformers.utils.logging as hf_logging
 hf_logging.set_verbosity_error()
@@ -1015,7 +1016,7 @@ class FeatureCache:
     旧缓存自动失效, 重新提取特征.
     """
 
-    CACHE_VERSION = 'v22_tau19_yamnet_normalized'  # TAU-19 dataset version
+    CACHE_VERSION = 'v22_tau19_fewshot_yamnet_normalized'  # fewshot: calib known=100, unknown=5
 
     def __init__(self, cache_dir: str = 'experiment/fewshot_cache'):
         self.cache_dir = cache_dir
@@ -1797,7 +1798,7 @@ class GMMBoundarySampler:
             covariance_type='full',
             max_iter=200,
             random_state=42,
-            reg_covar=1e-6  # Add regularization to fix covariance warning
+            reg_covar=1e-4  # Regularization to ensure covariance PSD
         )
         self.gmm.fit(feats_cpu)
 
@@ -1813,6 +1814,13 @@ class GMMBoundarySampler:
 
     def _build_pool(self, feature_dim: int):
         """预采样低密度样本池，缓存到GPU"""
+        # Ensure all GMM covariance matrices are PSD before sampling
+        for k in range(self.gmm.n_components):
+            cov = self.gmm.covariances_[k]
+            eigvals = np.linalg.eigvalsh(cov)
+            if eigvals.min() < 1e-10:
+                self.gmm.covariances_[k] = cov + np.eye(cov.shape[0]) * (1e-10 - eigvals.min())
+
         # 多生成一些候选，再筛选
         n_candidates = self.pool_size * 10
         candidates, _ = self.gmm.sample(n_candidates)
@@ -2384,8 +2392,9 @@ class EpisodicTrainer:
             # Step optimizer at end of accumulation cycle
             if ep % accum_steps == 0 or ep == num_episodes:
                 # Gradient clipping: exclude reciprocal_points to allow them to train
+                rp = getattr(self.flow_classifier, 'reciprocal_points', None)
                 params_to_clip = [p for p in self.flow_classifier.parameters()
-                                 if p is not self.flow_classifier.reciprocal_points]
+                                 if p is not rp]
                 if params_to_clip:
                     torch.nn.utils.clip_grad_norm_(params_to_clip, 0.5)
 
@@ -2978,7 +2987,8 @@ class OSRCalibrator:
         X_scaled = self._ood_ext_scaler.fit_transform(X)
 
         self._ood_ext_clf = LogisticRegression(
-            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
         self._ood_ext_clf.fit(X_scaled, y)
 
         if verbose:
@@ -3039,7 +3049,7 @@ class OSRCalibrator:
             covariance_type='full',
             max_iter=200,
             random_state=random_state,
-            reg_covar=1e-6
+            reg_covar=1e-4
         )
         self._gmm.fit(all_feats)
         print(f"  GMM converged: {self._gmm.converged_}")
@@ -3190,7 +3200,8 @@ class OSRCalibrator:
         X_scaled = self._ood_ext_v2_scaler.fit_transform(X)
 
         self._ood_ext_v2_clf = LogisticRegression(
-            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
         self._ood_ext_v2_clf.fit(X_scaled, y)
 
         if verbose:
@@ -3945,7 +3956,8 @@ class OSRCalibrator:
         y = np.concatenate([np.ones(len(known_feats)), np.zeros(len(unknown_feats))], axis=0)
 
         self._ood_clf = LogisticRegression(
-            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
         self._ood_clf.fit(X, y)
 
         if verbose:
@@ -4321,6 +4333,8 @@ class OSRCalibrator:
 
         all_known_rates = []
         all_unknown_rates = []
+        all_known_scores = []    # AUROC: collect raw known scores
+        all_unknown_scores = []  # AUROC: collect raw unknown scores
         target_fpr = 0.05
 
         for round_i in range(num_rounds):
@@ -4541,19 +4555,43 @@ class OSRCalibrator:
                 unknown_rate = np.mean(unknown_detect_list)
                 all_unknown_rates.append(unknown_rate)
 
+            # AUROC: collect raw scores (known=0, unknown=1)
+            all_known_scores.append(known_scores.cpu().numpy())
+            unknown_raw_scores = []
+            for c in self.unknown_classes:
+                feats = self.cache.get_class_features(c)
+                if len(feats) == 0:
+                    continue
+                scores = self.score_samples(feats, prototypes, method)
+                unknown_raw_scores.append(scores.cpu().numpy())
+            if unknown_raw_scores:
+                all_unknown_scores.append(np.concatenate(unknown_raw_scores))
+
         mean_known = np.mean(all_known_rates)
         mean_unknown = np.mean(all_unknown_rates) if all_unknown_rates else 0.0
         osr_score = (mean_known + mean_unknown) / 2
+
+        # AUROC: aggregate scores across all rounds
+        auroc_score = 0.0
+        if all_known_scores and all_unknown_scores:
+            all_k = np.concatenate(all_known_scores)
+            all_u = np.concatenate(all_unknown_scores)
+            labels = np.concatenate([np.zeros(len(all_k)), np.ones(len(all_u))])
+            scores = np.concatenate([all_k, all_u])
+            # Higher score → more likely known → label=0, so negate for AUROC
+            auroc_score = roc_auc_score(labels, -scores)
 
         print(f"\nResults over {num_rounds} rounds:")
         print(f"  Known accepted (TNR):     {mean_known:.2%}")
         print(f"  Unknown detected (TPR):   {mean_unknown:.2%}")
         print(f"  OSR Score (mean):         {osr_score:.2%}")
+        print(f"  AUROC:                    {auroc_score:.4f}")
 
         results = {
             'known_tnr': mean_known,
             'unknown_tpr': mean_unknown,
             'osr_score': osr_score,
+            'auroc': auroc_score,
             'threshold': threshold if not recalibrate_per_round else 'per-round',
             'num_rounds': num_rounds,
             'method': method,
@@ -4742,13 +4780,13 @@ def main():
 
     N_way = 6  # osr22: 使用全部6个base classes (原来是5-way)
     K_shot = 5
-    Q_query = 100  # osr22: 大幅提升GPU利用率 (6-way * 100 = 600 queries/episode)
+    Q_query = 15  # fewshot: 校准集已知类仅100/类, 需 K_shot+Q_query ≤ 100
     num_episodes = 6000
     gradient_accum_steps = 1
     feature_dim = 64
 
     # Reuse TAU-22 trained backbone (same YAMNet architecture), only re-extract features for TAU-19
-    experiment_dir = 'experiment/yamnet_fewshot_osr22_relabel'  # osr22 on TAU-19 dataset
+    experiment_dir = 'experiment/yamnet_fewshot_osr22_fewshot_tau19'  # fewshot on TAU-19 dataset
     base_pretrained_path = 'experiment/yamnet_fewshot_osr22/base_feature_extractor.pth'
     contrastive_pretrained_path = 'experiment/yamnet_fewshot_osr22/contrastive_feature_extractor.pth'
 
@@ -5080,9 +5118,10 @@ def main():
     print(f"\n{'='*70}")
     print("OSR Method Comparison (test data, per-round recalibration)")
     print(f"{'='*70}")
-    print(f"  {'Method':<35s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s}")
+    print(f"  {'Method':<35s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s} {'AUROC':>8s}")
     for m, r in osr_results.items():
-        print(f"  {m:<35s} {r['known_tnr']:>7.2%} {r['unknown_tpr']:>7.2%} {r['osr_score']:>7.2%}")
+        auroc_str = f"{r['auroc']:.4f}" if 'auroc' in r else '  N/A '
+        print(f"  {m:<35s} {r['known_tnr']:>7.2%} {r['unknown_tpr']:>7.2%} {r['osr_score']:>7.2%} {auroc_str:>8s}")
 
     # ============ Save Final Model ============
     best_method = max(osr_results, key=lambda m: osr_results[m]['osr_score'])

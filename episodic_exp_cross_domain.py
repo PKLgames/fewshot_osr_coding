@@ -59,7 +59,7 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
 
     # --- Load trained classifier from source ---
     source_dirs = [
-        f'experiment/yamnet_fewshot_osr22_relabel',
+        f'experiment/yamnet_fewshot_osr22_fewshot',
         f'experiment/yamnet_fewshot_osr22',
         f'experiment/yamnet_fewshot_osr13',
     ]

@@ -323,6 +323,13 @@ class Train_Manager:
             
             openset_label = support_label.squeeze().max().item() + 1 + torch.zeros_like(openset_label)
             support_data, query_data, suppopen_data, openset_data = support_data.squeeze(), query_data.squeeze(), suppopen_data.squeeze(), openset_data.squeeze()
+            # fewshot: 保证所有数据至少2D (squeeze可能把batch维去掉)
+            for _i, d in enumerate([support_data, query_data, suppopen_data, openset_data]):
+                if d.dim() == 1 and d.numel() > 0:
+                    if _i == 0: support_data = d.unsqueeze(0)
+                    elif _i == 1: query_data = d.unsqueeze(0)
+                    elif _i == 2: suppopen_data = d.unsqueeze(0)
+                    else: openset_data = d.unsqueeze(0)
             the_label = tuple(x.squeeze() for x in (support_label, query_label, suppopen_label, openset_label))
             the_img     = (support_data, query_data, suppopen_data, openset_data)
             # Tensor Input Preparation

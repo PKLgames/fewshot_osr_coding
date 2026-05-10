@@ -220,13 +220,24 @@ class OpenTAU22(Dataset):
             paths = self.data[the_cls]
             audio = [self._audio_cache[p] for p in paths]
 
-            suppopen_ids = np.random.choice(len(audio), self.n_shots, False)
+            # fewshot: 限制support数量，确保至少留1个给query
+            max_support = max(0, len(audio) - 1)
+            actual_shots = min(self.n_shots, max_support)
+            if actual_shots > 0:
+                suppopen_ids = np.random.choice(len(audio), actual_shots, False)
+            else:
+                suppopen_ids = np.array([], dtype=int)
             suppopen_xs.extend([audio[i].view(1, -1) for i in suppopen_ids])
-            suppopen_ys.extend([idx] * self.n_shots)
+            suppopen_ys.extend([idx] * len(suppopen_ids))
 
-            openset_ids = np.random.choice(len(audio), self.n_queries, False)
+            open_pool = np.setxor1d(np.arange(len(audio)), suppopen_ids)
+            n_q = min(self.n_queries, len(open_pool))
+            if n_q > 0:
+                openset_ids = np.random.choice(open_pool, n_q, False)
+            else:
+                openset_ids = np.array([], dtype=int)
             openset_xs.extend([audio[i].view(1, -1) for i in openset_ids])
-            openset_ys.extend([the_cls] * self.n_queries)
+            openset_ys.extend([the_cls] * n_q)
 
         suppopen_xs = torch.cat(suppopen_xs, dim=0) if suppopen_xs else torch.empty(0)
         openset_xs = torch.cat(openset_xs, dim=0) if openset_xs else torch.empty(0)

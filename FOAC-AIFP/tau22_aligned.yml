@@ -16,7 +16,7 @@ train:
   test_n_ways: 6            # Aligned: consistent 6-way eval (was absent/mixed)
   test_n_open_ways: 4       # Aligned: use all 4 unknown classes at test
   n_shots: 5
-  n_queries: 100            # Aligned: match episodic Q_query=100 (was 15)
+  n_queries: 15             # fewshot: 校准集已知类仅100/类, 需 K_shot+Q_query ≤ 100
   train_classes: 6
 
   # Meta-train / meta-test episode counts
@@ -25,8 +25,8 @@ train:
   test_times: 200
 
   # ========== Training hyper-parameters ==========
-  epoch: 20
-  epochs_pre: 20
+  epoch: 80
+  epochs_pre: 80
   batch_size: 256
   learning_rate: 0.05
   lr: 0.001
@@ -44,8 +44,8 @@ train:
   train_shot: 5
   test_shot:
     - 5
-  train_query_shot: 100     # Aligned: match n_queries
-  test_query_shot: 100      # Aligned: match n_queries
+  train_query_shot: 15      # fewshot: match n_queries
+  test_query_shot: 15       # fewshot: match n_queries
   resnet: true
 
   temp: 10.0
@@ -64,7 +64,7 @@ train:
 
   # ========== OSR evaluation protocol (matching episodic_trainer.py) ==========
   osr_num_rounds: 10
-  osr_k_shot: 50
+  osr_k_shot: 5  # fewshot: 未知类仅5样本/类
 
   # ========== Misc ==========
   dataset: 'TAU22'

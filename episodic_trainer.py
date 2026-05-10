@@ -36,7 +36,9 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-from utils.TAU22 import TAUDataset
+# Dataset import deferred to main() based on --dataset argument
+# Available: from utils.TAU22 import TAUDataset  /  from utils.TAU19 import TAUDataset
+TAUDataset = None  # will be set in main()
 import yamnet_PT_inference as yamnet_infer
 from torch_audioset.yamnet.model import yamnet as torch_yamnet
 # osr21: Flow reintroduced as feature generator and transformer (NOT for density scoring)
@@ -1016,7 +1018,7 @@ class FeatureCache:
     旧缓存自动失效, 重新提取特征.
     """
 
-    CACHE_VERSION = 'v20_tau22relabel_yamnet_normalized'  # Same features as osr20 (same backbone)
+    CACHE_VERSION = 'v22_fewshot_yamnet_normalized'  # set per-dataset in main()
 
     def __init__(self, cache_dir: str = 'experiment/fewshot_cache'):
         self.cache_dir = cache_dir
@@ -1825,7 +1827,7 @@ class GMMBoundarySampler:
             covariance_type='full',
             max_iter=200,
             random_state=42,
-            reg_covar=1e-6  # Add regularization to fix covariance warning
+            reg_covar=1e-4  # Regularization to ensure covariance PSD
         )
         self.gmm.fit(feats_cpu)
 
@@ -1841,6 +1843,14 @@ class GMMBoundarySampler:
 
     def _build_pool(self, feature_dim: int):
         """预采样低密度样本池，缓存到GPU"""
+        # Ensure all GMM covariance matrices are PSD before sampling
+        for k in range(self.gmm.n_components):
+            cov = self.gmm.covariances_[k]
+            eigvals = np.linalg.eigvalsh(cov)
+            if eigvals.min() < 1e-10:
+                # Add small regularization to ensure PSD
+                self.gmm.covariances_[k] = cov + np.eye(cov.shape[0]) * (1e-10 - eigvals.min())
+
         # 多生成一些候选，再筛选
         n_candidates = self.pool_size * 10
         candidates, _ = self.gmm.sample(n_candidates)
@@ -2523,9 +2533,11 @@ class OSRCalibrator:
                  feature_cache: FeatureCache,
                  base_classes: List[int],
                  unknown_classes: List[int],
-                 device: str = 'cuda'):
+                 device: str = 'cuda',
+                 train_cache: FeatureCache = None):
         self.flow = flow_classifier
         self.cache = feature_cache
+        self.train_cache = train_cache  # osr23: for GMM fitting on training set
         self.base_classes = base_classes
         self.unknown_classes = unknown_classes
         self.device = device
@@ -3007,7 +3019,8 @@ class OSRCalibrator:
         X_scaled = self._ood_ext_scaler.fit_transform(X)
 
         self._ood_ext_clf = LogisticRegression(
-            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
         self._ood_ext_clf.fit(X_scaled, y)
 
         if verbose:
@@ -3068,10 +3081,117 @@ class OSRCalibrator:
             covariance_type='full',
             max_iter=200,
             random_state=random_state,
-            reg_covar=1e-6
+            reg_covar=1e-4
         )
         self._gmm.fit(all_feats)
         print(f"  GMM converged: {self._gmm.converged_}")
+
+    def _fit_global_gmm_osr23(self, prototypes: torch.Tensor = None,
+                                n_components: int = None,
+                                random_state: int = 42,
+                                verbose: bool = True):
+        """osr23b: Improved GMM fitting — uses train set for robust fitting.
+
+        Improvements over _fit_global_gmm:
+          1. Fits GMM on train set (large data) instead of calib set (small data)
+          2. Adaptive n_components: min(12, n_samples // 50)
+          3. Uses 'diag' covariance when n_samples < 500 (avoids overfitting)
+          4. Z-score normalizes cluster features before returning
+        """
+        from sklearn.mixture import GaussianMixture
+        from sklearn.preprocessing import StandardScaler
+
+        # Prefer train_cache for GMM fitting (much larger dataset)
+        gmm_cache = self.train_cache if self.train_cache is not None else self.cache
+        cache_name = 'train' if self.train_cache is not None else 'calib'
+
+        all_feats_list = []
+        total_samples = 0
+        for c in self.base_classes:
+            feats = gmm_cache.get_class_features(c)
+            all_feats_list.append(feats.numpy())
+            total_samples += len(feats)
+        all_feats = np.concatenate(all_feats_list, axis=0)
+
+        # Adaptive n_components: each component needs ~50 samples
+        if n_components is None:
+            n_components = min(12, max(2, total_samples // 50))
+
+        # Adaptive covariance: use 'diag' when data is scarce
+        cov_type = 'diag' if total_samples < 500 else 'full'
+
+        if verbose:
+            print(f"  osr23 GMM: fitting on {cache_name} set ({total_samples} samples), "
+                  f"n_components={n_components}, covariance={cov_type}")
+
+        self._gmm_osr23 = GaussianMixture(
+            n_components=n_components,
+            covariance_type=cov_type,
+            max_iter=300,
+            random_state=random_state,
+            reg_covar=1e-4
+        )
+        self._gmm_osr23.fit(all_feats)
+
+        # Z-score normalizer for cluster features (osr23b improvement)
+        # Fit on a sample of base class features to get normalization stats
+        sample_cluster_feats = self._extract_cluster_features_osr23(
+            torch.from_numpy(all_feats[:min(2000, len(all_feats))]), prototypes)
+        self._cluster_scaler = StandardScaler()
+        self._cluster_scaler.fit(sample_cluster_feats.numpy())
+
+        if verbose:
+            print(f"  osr23 GMM converged: {self._gmm_osr23.converged_}")
+
+    def _extract_cluster_features_osr23(self, features: torch.Tensor,
+                                          prototypes: torch.Tensor = None,
+                                          batch_size: int = 4096) -> torch.Tensor:
+        """osr23b: Extract GMM cluster features using the osr23-fitted GMM.
+        Same 3 features as v2 but with Z-score normalization applied."""
+        if not hasattr(self, '_gmm_osr23'):
+            raise RuntimeError("Call _fit_global_gmm_osr23() first")
+
+        all_cluster_feats = []
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].numpy()
+
+                log_probs = self._gmm_osr23._estimate_weighted_log_prob(batch)
+
+                # Stable posterior computation
+                log_prob_max = log_probs.max(axis=1, keepdims=True)
+                log_prob_shifted = log_probs - log_prob_max
+                posteriors = np.exp(log_prob_shifted)
+                posteriors = posteriors / posteriors.sum(axis=1, keepdims=True)
+
+                # Mahalanobis distance to each cluster
+                mahal_dists = []
+                for k in range(self._gmm_osr23.n_components):
+                    mean = self._gmm_osr23.means_[k]
+                    prec = self._gmm_osr23.precisions_[k]
+                    diff = batch - mean
+                    if self._gmm_osr23.covariance_type == 'diag':
+                        mahal = np.sqrt(np.sum(diff * (prec * diff), axis=1))
+                    else:
+                        mahal = np.sqrt(np.sum(diff @ prec * diff, axis=1))
+                    mahal_dists.append(mahal)
+
+                mahal_dists = np.stack(mahal_dists, axis=1)
+
+                cluster_mahal = mahal_dists.min(axis=1, keepdims=True)
+                cluster_posterior_max = posteriors.max(axis=1, keepdims=True)
+                posteriors_clipped = np.clip(posteriors, 1e-10, 1.0)
+                cluster_entropy = -(posteriors_clipped * np.log(posteriors_clipped)).sum(
+                    axis=1, keepdims=True)
+
+                cluster_feats = np.concatenate([
+                    cluster_mahal, cluster_posterior_max, cluster_entropy
+                ], axis=1)
+
+                all_cluster_feats.append(cluster_feats)
+
+        raw_feats = np.concatenate(all_cluster_feats, axis=0)
+        return torch.from_numpy(raw_feats)
 
     def _extract_cluster_features(self, features: torch.Tensor,
                                    batch_size: int = 4096) -> torch.Tensor:
@@ -3219,7 +3339,8 @@ class OSRCalibrator:
         X_scaled = self._ood_ext_v2_scaler.fit_transform(X)
 
         self._ood_ext_v2_clf = LogisticRegression(
-            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
         self._ood_ext_v2_clf.fit(X_scaled, y)
 
         if verbose:
@@ -3254,6 +3375,262 @@ class OSRCalibrator:
         feats = self._extract_ood_features_extended_v2(features, prototypes, batch_size).numpy()
         feats_scaled = self._ood_ext_v2_scaler.transform(feats)
         probs = self._ood_ext_v2_clf.predict_proba(feats_scaled)[:, 1]
+        return torch.from_numpy(probs).float()
+
+    # ---- osr23: Adaptive feature selection + robust GMM + L1 regularization ----
+
+    def _select_features_osr23(self, n_unknown: int, verbose: bool = True):
+        """osr23a: Select feature subset based on calibration data size.
+
+        Adaptive feature selection:
+          n_unknown >= 200: all 13 features (GMM features effective)
+          n_unknown >= 50:  10 features (drop 3 GMM cluster features)
+          n_unknown >= 20:  7 features  (core features only)
+          n_unknown < 20:   5 features  (most reliable basics)
+
+        Core 5 (always included):
+          min_dist, dist_ratio, softmax_max, feat_norm, dist_to_center
+        """
+        ALL_FEAT_NAMES = [
+            'min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm',
+            '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var',
+            'norm_dist_ratio',
+            'cluster_mahal', 'cluster_post_max', 'cluster_ent'
+        ]
+        # Indices: 0-9 = base features, 10-12 = GMM cluster features
+        if n_unknown >= 200:
+            selected = list(range(13))  # all features
+            level = "full (13-dim)"
+        elif n_unknown >= 50:
+            selected = list(range(10))  # drop GMM cluster features
+            level = "medium (10-dim, no GMM)"
+        elif n_unknown >= 20:
+            # Core 7: min_dist(0), dist_ratio(1), softmax_max(2), feat_norm(4),
+            #         2nd_dist(5), score_gap(6), dist_to_center(7)
+            selected = [0, 1, 2, 4, 5, 6, 7]
+            level = "compact (7-dim)"
+        else:
+            # Core 5: most reliable features
+            selected = [0, 1, 2, 4, 7]  # min_dist, dist_ratio, softmax_max, feat_norm, dist_to_center
+            level = "minimal (5-dim)"
+
+        selected_names = [ALL_FEAT_NAMES[i] for i in selected]
+        if verbose:
+            print(f"  osr23a: n_unknown={n_unknown} → {level}: {selected_names}")
+
+        return selected, selected_names
+
+    def _extract_ood_features_osr23(self, features: torch.Tensor,
+                                     prototypes: torch.Tensor,
+                                     selected_indices: List[int],
+                                     batch_size: int = 4096) -> torch.Tensor:
+        """osr23a: Extract OOD features with adaptive feature selection.
+
+        Computes all 13 features then selects only the chosen subset.
+        Cluster features are computed using the osr23 GMM (train-set fitted).
+        """
+        self.flow.eval()
+        all_feats = []
+        feat_center = prototypes.mean(dim=0, keepdim=True)
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                dists = torch.cdist(batch, prototypes, p=2)
+                sorted_d, _ = dists.sort(dim=1)
+                min_d = sorted_d[:, 0:1]
+                second_d = sorted_d[:, 1:2]
+                dist_ratio = min_d / (second_d + 1e-6)
+                score_gap = (second_d - min_d)
+
+                log_probs = self.flow.classify(batch, prototypes)
+                probs = F.softmax(log_probs, dim=1)
+                softmax_max = probs.max(dim=1, keepdim=True)[0]
+                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1, keepdim=True)
+                feat_norm = (batch ** 2).sum(dim=1, keepdim=True).sqrt()
+
+                dist_to_center = torch.cdist(batch, feat_center, p=2)
+                proto_score_var = probs.var(dim=1, keepdim=True)
+                norm_dist_ratio = min_d / (dist_to_center + 1e-6)
+
+                # GMM cluster features (3-dim) using osr23 GMM
+                cluster_feats = self._extract_cluster_features_osr23(
+                    features[i:i+batch_size], prototypes, batch_size).to(self.device)
+
+                # Z-score normalize cluster features (osr23b)
+                if hasattr(self, '_cluster_scaler'):
+                    cluster_feats = torch.from_numpy(
+                        self._cluster_scaler.transform(cluster_feats.cpu().numpy())
+                    ).to(self.device)
+
+                # All 13 features
+                all_13 = torch.cat([
+                    min_d, dist_ratio, softmax_max, entropy, feat_norm,
+                    second_d, score_gap, dist_to_center,
+                    proto_score_var, norm_dist_ratio,
+                    cluster_feats
+                ], dim=1)
+
+                # Select only the chosen subset
+                selected_feats = all_13[:, selected_indices]
+                all_feats.append(selected_feats.cpu())
+
+        return torch.cat(all_feats, dim=0)
+
+    @staticmethod
+    def _augment_unknown_mixup(unknown_feats: np.ndarray,
+                               target_count: int = 200,
+                               alpha: float = 0.5) -> np.ndarray:
+        """osr23e: Mixup augmentation for unknown calibration features.
+
+        Creates convex combinations of real unknown samples.
+        Unlike LOCO, Mixup stays on the real data manifold — no distribution shift.
+        """
+        n = len(unknown_feats)
+        if n >= target_count or n < 2:
+            return unknown_feats
+
+        rng = np.random.RandomState(42)
+        augmented = [unknown_feats]
+        n_augment = target_count - n
+
+        for _ in range(n_augment):
+            i, j = rng.choice(n, 2, replace=False)
+            lam = rng.beta(alpha, alpha)
+            new_sample = lam * unknown_feats[i] + (1 - lam) * unknown_feats[j]
+            augmented.append(new_sample[np.newaxis])
+
+        return np.concatenate(augmented, axis=0)
+
+    def train_ood_head_osr23(self, prototypes: torch.Tensor,
+                              target_fpr: float = 0.05,
+                              batch_size: int = 4096,
+                              verbose: bool = True):
+        """osr23e: Train OOD head with adaptive features + robust GMM + L1 + Mixup.
+
+        Combines plans A (adaptive features), B (robust GMM), D (L1), E (Mixup).
+        """
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.model_selection import cross_val_score
+        import warnings
+
+        if verbose:
+            print("Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...")
+
+        # Step 1: Fit GMM on train set (osr23b)
+        self._fit_global_gmm_osr23(prototypes, verbose=verbose)
+
+        # Step 2: Count unknown samples for adaptive feature selection (osr23a)
+        # Include Mixup augmented count for feature selection
+        n_unknown_real = sum(len(self.cache.get_class_features(c)) for c in self.unknown_classes)
+        n_unknown_aug = max(0, 200 - n_unknown_real) if n_unknown_real < 200 else 0
+        n_unknown = n_unknown_real + n_unknown_aug
+        selected_indices, selected_names = self._select_features_osr23(n_unknown, verbose=verbose)
+        self._osr23_selected_indices = selected_indices
+
+        n_features = len(selected_indices)
+
+        # Step 3: Extract features
+        known_feats_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_feats_list.append(self._extract_ood_features_osr23(
+                feats, prototypes, selected_indices, batch_size))
+        known_feats = torch.cat(known_feats_list).numpy()
+
+        unknown_feats_list = []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_feats_list.append(self._extract_ood_features_osr23(
+                    feats, prototypes, selected_indices, batch_size))
+        if not unknown_feats_list:
+            if verbose:
+                print("  No unknown samples, skipping.")
+            return
+        unknown_feats = torch.cat(unknown_feats_list).numpy()
+
+        # Mixup augmentation (osr23e): augment small unknown sets
+        if n_unknown_real < 200:
+            n_before = len(unknown_feats)
+            unknown_feats = self._augment_unknown_mixup(
+                unknown_feats, target_count=max(200, n_unknown_real * 10))
+            if verbose and len(unknown_feats) > n_before:
+                print(f"  osr23e Mixup: {n_before} real → {len(unknown_feats)} total unknown")
+
+        X = np.concatenate([known_feats, unknown_feats], axis=0)
+        y = np.concatenate([np.ones(len(known_feats)), np.zeros(len(unknown_feats))], axis=0)
+
+        # Step 4: Standardize
+        self._osr23_scaler = StandardScaler()
+        X_scaled = self._osr23_scaler.fit_transform(X)
+
+        # Step 5: L1 regularization with cross-validation (osr23d)
+        # Use l1_ratio=1.0 (= pure L1) without deprecated penalty parameter
+        n_cv = min(5, n_unknown) if n_unknown >= 10 else 2
+        best_c, best_score = 1.0, -1
+        for c_val in [0.01, 0.05, 0.1, 0.5, 1.0]:
+            try:
+                clf_tmp = LogisticRegression(
+                    l1_ratio=1.0, C=c_val, solver='saga',
+                    max_iter=10000, class_weight='balanced', tol=1e-3)
+                # Suppress convergence warnings during CV with tiny calibration sets
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+                    scores = cross_val_score(clf_tmp, X_scaled, y, cv=n_cv,
+                                             scoring='roc_auc')
+                mean_score = scores.mean()
+                if verbose:
+                    print(f"    L1 C={c_val:.2f}: CV-AUROC={mean_score:.4f}")
+                if mean_score > best_score:
+                    best_c, best_score = c_val, mean_score
+            except Exception:
+                continue
+
+        if verbose:
+            print(f"  osr23d: Best L1 C={best_c:.2f} (CV-AUROC={best_score:.4f})")
+
+        # Train final model with best C
+        self._osr23_clf = LogisticRegression(
+            l1_ratio=1.0, C=best_c, solver='saga',
+            max_iter=10000, class_weight='balanced', tol=1e-3)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+            self._osr23_clf.fit(X_scaled, y)
+
+        if verbose:
+            w = self._osr23_clf.coef_[0]
+            n_nonzero = np.sum(np.abs(w) > 1e-6)
+            print(f"  osr23 weights ({n_nonzero}/{n_features} non-zero):")
+            for name, wi in zip(selected_names, w):
+                marker = " *" if abs(wi) < 1e-6 else ""
+                print(f"    {name:>20s}: {wi:+.4f}{marker}")
+
+        # Calibrate threshold
+        known_probs = self._osr23_clf.predict_proba(
+            self._osr23_scaler.transform(known_feats))[:, 1]
+        sorted_probs = np.sort(known_probs)
+        idx = min(int(len(sorted_probs) * target_fpr), len(sorted_probs) - 1)
+        self._osr23_threshold = sorted_probs[idx]
+
+        if verbose:
+            unknown_probs = self._osr23_clf.predict_proba(
+                self._osr23_scaler.transform(unknown_feats))[:, 1]
+            tnr = (known_probs >= self._osr23_threshold).mean()
+            tpr = (unknown_probs < self._osr23_threshold).mean()
+            print(f"  Calib TNR: {tnr:.2%}  TPR: {tpr:.2%}  "
+                  f"(threshold={self._osr23_threshold:.4f})")
+
+    def score_ood_head_osr23(self, features: torch.Tensor,
+                              prototypes: torch.Tensor,
+                              batch_size: int = 4096) -> torch.Tensor:
+        """osr23: Score using adaptive OOD head with robust GMM + L1 regularization."""
+        if not hasattr(self, '_osr23_clf'):
+            raise RuntimeError("Call train_ood_head_osr23() first")
+        feats = self._extract_ood_features_osr23(
+            features, prototypes, self._osr23_selected_indices, batch_size).numpy()
+        feats_scaled = self._osr23_scaler.transform(feats)
+        probs = self._osr23_clf.predict_proba(feats_scaled)[:, 1]
         return torch.from_numpy(probs).float()
 
     # ---- Unified scoring interface ----
@@ -3320,6 +3697,15 @@ class OSRCalibrator:
         # osr22d: three-way ensemble with cluster boundary
         if method == 'ensemble_cluster':
             return self.score_ensemble_cluster(features, prototypes, batch_size)
+        # osr23: adaptive features + robust GMM + L1 regularization
+        if method == 'ood_head_osr23':
+            return self.score_ood_head_osr23(features, prototypes, batch_size)
+        # osr24b: train-set GMM + 13-dim LR
+        if method == 'ood_head_cluster_v2':
+            return self.score_ood_head_cluster_v2(features, prototypes, batch_size)
+        # osr24b fusion: 14-dim LR (13 cluster_v2 + anti_proto)
+        if method == 'ood_head_fusion_v2':
+            return self.score_ood_head_fusion_v2(features, prototypes, batch_size)
         return self.score_samples_feat_mahalanobis(features, prototypes, batch_size)
 
     # ---- osr20b: Ensemble anti_prototype + ood_head_extended ----
@@ -3773,6 +4159,228 @@ class OSRCalibrator:
         weights = getattr(self, '_cluster_ens_weights', (0.5, 0.3, 0.2))
         return weights[0] * norm_anti + weights[1] * norm_ood + weights[2] * norm_boundary
 
+    # ---- osr24: Train-set GMM LR + original anti-prototype fusion via 14-dim LR ----
+
+    def _extract_ood_features_cluster_v2(self, features: torch.Tensor,
+                                          prototypes: torch.Tensor,
+                                          batch_size: int = 4096) -> torch.Tensor:
+        """osr24b: 13-dim features using train-set GMM (osr23 GMM + v2 feature layout).
+        Same 13 features as ood_head_extended_v2, but GMM cluster features come from
+        the train-set fitted GMM (_gmm_osr23) with Z-score normalization."""
+        self.flow.eval()
+        all_feats = []
+        feat_center = prototypes.mean(dim=0, keepdim=True)
+        with torch.no_grad():
+            for i in range(0, len(features), batch_size):
+                batch = features[i:i+batch_size].to(self.device)
+                dists = torch.cdist(batch, prototypes, p=2)
+                sorted_d, _ = dists.sort(dim=1)
+                min_d = sorted_d[:, 0:1]
+                second_d = sorted_d[:, 1:2]
+                dist_ratio = min_d / (second_d + 1e-6)
+                score_gap = (second_d - min_d)
+
+                log_probs = self.flow.classify(batch, prototypes)
+                probs = F.softmax(log_probs, dim=1)
+                softmax_max = probs.max(dim=1, keepdim=True)[0]
+                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1, keepdim=True)
+                feat_norm = (batch ** 2).sum(dim=1, keepdim=True).sqrt()
+
+                dist_to_center = torch.cdist(batch, feat_center, p=2)
+                proto_score_var = probs.var(dim=1, keepdim=True)
+                norm_dist_ratio = min_d / (dist_to_center + 1e-6)
+
+                # GMM cluster features using train-set GMM (osr23)
+                cluster_feats = self._extract_cluster_features_osr23(
+                    features[i:i+batch_size], prototypes, batch_size).to(self.device)
+
+                # Z-score normalize cluster features
+                if hasattr(self, '_cluster_scaler'):
+                    cluster_feats = torch.from_numpy(
+                        self._cluster_scaler.transform(cluster_feats.cpu().numpy())
+                    ).to(self.device)
+
+                feats = torch.cat([
+                    min_d, dist_ratio, softmax_max, entropy, feat_norm,
+                    second_d, score_gap, dist_to_center,
+                    proto_score_var, norm_dist_ratio,
+                    cluster_feats
+                ], dim=1)
+                all_feats.append(feats.cpu())
+        return torch.cat(all_feats, dim=0)
+
+    def _extract_ood_features_fusion_v2(self, features: torch.Tensor,
+                                         prototypes: torch.Tensor,
+                                         batch_size: int = 4096) -> torch.Tensor:
+        """osr24b fusion: 14-dim = 13-dim cluster_v2 features + 1-dim anti_prototype score.
+        Let LR automatically learn the optimal weight for the anti-prototype signal."""
+        # Get 13-dim cluster_v2 features
+        base_feats = self._extract_ood_features_cluster_v2(features, prototypes, batch_size)
+
+        # Get original anti_prototype score (1-dim) — uses query-dependent center
+        anti_scores = self.score_anti_prototype_all(features, prototypes, batch_size).unsqueeze(1)
+
+        return torch.cat([base_feats, anti_scores], dim=1)
+
+    def train_ood_head_cluster_v2(self, prototypes: torch.Tensor,
+                                   target_fpr: float = 0.05,
+                                   batch_size: int = 4096,
+                                   verbose: bool = True):
+        """osr24b: Train LR on 13-dim features with train-set GMM cluster features."""
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+
+        if verbose:
+            print("Training osr24b OOD head (13-dim with train-set GMM clusters)...")
+
+        self._fit_global_gmm_osr23(prototypes, verbose=verbose)
+
+        known_feats_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_feats_list.append(self._extract_ood_features_cluster_v2(
+                feats, prototypes, batch_size))
+        known_feats = torch.cat(known_feats_list).numpy()
+
+        unknown_feats_list = []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_feats_list.append(self._extract_ood_features_cluster_v2(
+                    feats, prototypes, batch_size))
+        if not unknown_feats_list:
+            if verbose:
+                print("  No unknown samples, skipping.")
+            return
+        unknown_feats = torch.cat(unknown_feats_list).numpy()
+
+        X = np.concatenate([known_feats, unknown_feats], axis=0)
+        y = np.concatenate([np.ones(len(known_feats)), np.zeros(len(unknown_feats))], axis=0)
+
+        self._cluster_v2_scaler = StandardScaler()
+        X_scaled = self._cluster_v2_scaler.fit_transform(X)
+
+        self._cluster_v2_clf = LogisticRegression(
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
+        self._cluster_v2_clf.fit(X_scaled, y)
+
+        if verbose:
+            feat_names = ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm',
+                          '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var',
+                          'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
+            w = self._cluster_v2_clf.coef_[0]
+            print("  osr24b OOD head weights:")
+            for name, wi in zip(feat_names, w):
+                print(f"    {name:>20s}: {wi:+.4f}")
+
+        known_probs = self._cluster_v2_clf.predict_proba(
+            self._cluster_v2_scaler.transform(known_feats))[:, 1]
+        sorted_probs = np.sort(known_probs)
+        idx = min(int(len(sorted_probs) * target_fpr), len(sorted_probs) - 1)
+        self._cluster_v2_threshold = sorted_probs[idx]
+
+        if verbose:
+            unknown_probs = self._cluster_v2_clf.predict_proba(
+                self._cluster_v2_scaler.transform(unknown_feats))[:, 1]
+            tnr = (known_probs >= self._cluster_v2_threshold).mean()
+            tpr = (unknown_probs < self._cluster_v2_threshold).mean()
+            print(f"  Calib TNR: {tnr:.2%}  TPR: {tpr:.2%}  "
+                  f"(threshold={self._cluster_v2_threshold:.4f})")
+
+    def score_ood_head_cluster_v2(self, features: torch.Tensor,
+                                   prototypes: torch.Tensor,
+                                   batch_size: int = 4096) -> torch.Tensor:
+        """osr24b: Score using train-set GMM + 13-dim LR."""
+        if not hasattr(self, '_cluster_v2_clf'):
+            raise RuntimeError("Call train_ood_head_cluster_v2() first")
+        feats = self._extract_ood_features_cluster_v2(features, prototypes, batch_size).numpy()
+        feats_scaled = self._cluster_v2_scaler.transform(feats)
+        probs = self._cluster_v2_clf.predict_proba(feats_scaled)[:, 1]
+        return torch.from_numpy(probs).float()
+
+    def train_ood_head_fusion_v2(self, prototypes: torch.Tensor,
+                                  target_fpr: float = 0.05,
+                                  batch_size: int = 4096,
+                                  verbose: bool = True):
+        """osr24b fusion: 14-dim LR = 13-dim cluster_v2 + 1-dim original anti_prototype.
+        LR automatically learns the optimal weight for the anti-prototype signal.
+        Worst case: LR learns anti weight ≈ 0 (equivalent to cluster_v2, no loss).
+        Best case: anti provides complementary signal in some samples."""
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+
+        if verbose:
+            print("Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...")
+
+        self._fit_global_gmm_osr23(prototypes, verbose=verbose)
+
+        known_feats_list = []
+        for c in self.base_classes:
+            feats = self.cache.get_class_features(c)
+            known_feats_list.append(self._extract_ood_features_fusion_v2(
+                feats, prototypes, batch_size))
+        known_feats = torch.cat(known_feats_list).numpy()
+
+        unknown_feats_list = []
+        for c in self.unknown_classes:
+            feats = self.cache.get_class_features(c)
+            if len(feats) > 0:
+                unknown_feats_list.append(self._extract_ood_features_fusion_v2(
+                    feats, prototypes, batch_size))
+        if not unknown_feats_list:
+            if verbose:
+                print("  No unknown samples, skipping.")
+            return
+        unknown_feats = torch.cat(unknown_feats_list).numpy()
+
+        X = np.concatenate([known_feats, unknown_feats], axis=0)
+        y = np.concatenate([np.ones(len(known_feats)), np.zeros(len(unknown_feats))], axis=0)
+
+        self._fusion_v2_scaler = StandardScaler()
+        X_scaled = self._fusion_v2_scaler.fit_transform(X)
+
+        self._fusion_v2_clf = LogisticRegression(
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
+        self._fusion_v2_clf.fit(X_scaled, y)
+
+        if verbose:
+            feat_names = ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm',
+                          '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var',
+                          'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent',
+                          'anti_proto_score']
+            w = self._fusion_v2_clf.coef_[0]
+            print("  osr24b fusion OOD head weights:")
+            for name, wi in zip(feat_names, w):
+                marker = " ← NEW" if name == 'anti_proto_score' else ""
+                print(f"    {name:>20s}: {wi:+.4f}{marker}")
+
+        known_probs = self._fusion_v2_clf.predict_proba(
+            self._fusion_v2_scaler.transform(known_feats))[:, 1]
+        sorted_probs = np.sort(known_probs)
+        idx = min(int(len(sorted_probs) * target_fpr), len(sorted_probs) - 1)
+        self._fusion_v2_threshold = sorted_probs[idx]
+
+        if verbose:
+            unknown_probs = self._fusion_v2_clf.predict_proba(
+                self._fusion_v2_scaler.transform(unknown_feats))[:, 1]
+            tnr = (known_probs >= self._fusion_v2_threshold).mean()
+            tpr = (unknown_probs < self._fusion_v2_threshold).mean()
+            print(f"  Calib TNR: {tnr:.2%}  TPR: {tpr:.2%}  "
+                  f"(threshold={self._fusion_v2_threshold:.4f})")
+
+    def score_ood_head_fusion_v2(self, features: torch.Tensor,
+                                  prototypes: torch.Tensor,
+                                  batch_size: int = 4096) -> torch.Tensor:
+        """osr24b fusion: Score using 14-dim LR (13 cluster_v2 + anti_proto)."""
+        if not hasattr(self, '_fusion_v2_clf'):
+            raise RuntimeError("Call train_ood_head_fusion_v2() first")
+        feats = self._extract_ood_features_fusion_v2(features, prototypes, batch_size).numpy()
+        feats_scaled = self._fusion_v2_scaler.transform(feats)
+        probs = self._fusion_v2_clf.predict_proba(feats_scaled)[:, 1]
+        return torch.from_numpy(probs).float()
+
     # ---- osr21b: Anti-prototype in Flow-transformed space ----
 
     def score_anti_prototype_flow(self, features: torch.Tensor,
@@ -3974,7 +4582,8 @@ class OSRCalibrator:
         y = np.concatenate([np.ones(len(known_feats)), np.zeros(len(unknown_feats))], axis=0)
 
         self._ood_clf = LogisticRegression(
-            C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+            C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs',
+            l1_ratio=0)
         self._ood_clf.fit(X, y)
 
         if verbose:
@@ -4023,9 +4632,9 @@ class OSRCalibrator:
         if method in ('feature_mahalanobis', 'feat_mahalanobis_relative', 'geo_fusion',
                        'anti_prototype', 'anti_prototype_enhanced', 'anti_prototype_multi',
                        'ood_head', 'learned_ensemble', 'anti_proto_var_norm', 'anti_proto_cosine',
-                       'ood_head_extended', 'ood_head_extended_v2', 'cluster_boundary'):
-            print("Computing feature-space statistics...")
-            self.compute_feat_stats()
+                       'ood_head_extended', 'ood_head_extended_v2', 'cluster_boundary',
+                       'ood_head_osr23',
+                       'ood_head_cluster_v2', 'ood_head_fusion_v2'):
             print("Computing feature-space statistics...")
             self.compute_feat_stats()
 
@@ -4036,7 +4645,8 @@ class OSRCalibrator:
         # Transductive refinement
         if method not in ('learned_ensemble', 'ood_head_extended', 'ood_head_extended_v2',
                           'anti_prototype_multi', 'cluster_boundary',
-                          'ensemble_adaptive', 'ensemble_cluster'):
+                          'ensemble_adaptive', 'ensemble_cluster',
+                          'ood_head_cluster_v2', 'ood_head_fusion_v2'):
             support_feats_list = []
             support_labels_list = []
             query_feats_list = []
@@ -4277,6 +4887,63 @@ class OSRCalibrator:
             print(f"\nThreshold (tau): {self.threshold:.4f}")
             return self.threshold
 
+        # osr23: adaptive features + robust GMM + L1 regularization
+        if method == 'ood_head_osr23':
+            self.train_ood_head_osr23(prototypes, target_fpr)
+            known_scores = self.score_ood_head_osr23(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_ood_head_osr23(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
+        # osr24b: train-set GMM + 13-dim LR
+        if method == 'ood_head_cluster_v2':
+            self.train_ood_head_cluster_v2(prototypes, target_fpr)
+            known_scores = self.score_ood_head_cluster_v2(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_ood_head_cluster_v2(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
+        # osr24b fusion: 14-dim LR (13 cluster_v2 + anti_proto)
+        if method == 'ood_head_fusion_v2':
+            self.train_ood_head_fusion_v2(prototypes, target_fpr)
+            known_scores = self.score_ood_head_fusion_v2(
+                torch.cat([self.cache.get_class_features(c) for c in self.base_classes]),
+                prototypes)
+            sorted_known, _ = known_scores.sort()
+            idx = min(int(len(sorted_known) * target_fpr), len(sorted_known) - 1)
+            self.threshold = sorted_known[idx].item()
+            unknown_feats = [self.cache.get_class_features(c) for c in self.unknown_classes]
+            unknown_feats = [f for f in unknown_feats if len(f) > 0]
+            if unknown_feats:
+                unknown_scores = self.score_ood_head_fusion_v2(
+                    torch.cat(unknown_feats), prototypes)
+                sep = known_scores.mean() - unknown_scores.mean()
+                print(f"Mean separation: {sep:.2f} (positive = known higher = good)")
+            print(f"\nThreshold (tau): {self.threshold:.4f}")
+            return self.threshold
+
         # Score known and unknown samples
         known_scores_list = []
         for c in self.base_classes:
@@ -4366,7 +5033,9 @@ class OSRCalibrator:
             if method not in ('feature_mahalanobis', 'feat_mahalanobis_relative',
                               'learned_ensemble', 'ood_head_extended',
                               'anti_prototype_multi', 'ood_head_extended_v2',
-                              'cluster_boundary', 'ensemble_adaptive', 'ensemble_cluster'):
+                              'cluster_boundary', 'ensemble_adaptive', 'ensemble_cluster',
+                              'ood_head_osr23',
+                              'ood_head_cluster_v2', 'ood_head_fusion_v2'):
                 support_feats_list = []
                 support_labels_list = []
                 query_feats_list = []
@@ -4505,6 +5174,21 @@ class OSRCalibrator:
                 else:
                     self._fit_global_gmm()
                     self.train_ood_head_extended_v2(prototypes, target_fpr, verbose=False)
+
+            # osr23: adaptive features + robust GMM + L1 regularization
+            if method == 'ood_head_osr23':
+                self.train_ood_head_osr23(prototypes, target_fpr,
+                                           verbose=(round_i == 0))
+
+            # osr24b: train-set GMM + 13-dim LR
+            if method == 'ood_head_cluster_v2':
+                self.train_ood_head_cluster_v2(prototypes, target_fpr,
+                                                verbose=(round_i == 0))
+
+            # osr24b fusion: 14-dim LR
+            if method == 'ood_head_fusion_v2':
+                self.train_ood_head_fusion_v2(prototypes, target_fpr,
+                                               verbose=(round_i == 0))
 
             # Score known samples
             known_scores_list = []
@@ -4780,11 +5464,48 @@ def visualize_features_tsne(train_cache: FeatureCache,
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Episodic Meta-Trainer for Few-Shot OSR')
+    parser.add_argument('--dataset', type=str, default='tau22',
+                        choices=['tau22', 'tau19'],
+                        help='Dataset: tau22 (TAU Urban Acoustic Scenes 2022) or tau19 (DCASE 2019 Task 1a)')
     parser.add_argument('--eval_only', action='store_true',
                         help='Skip training, load checkpoint and run evaluation only')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='Path to fewshot_final.pth (default: auto-detect from experiment_dir)')
     args = parser.parse_args()
+
+    # ============ Dataset Configuration ============
+    # Per-dataset settings: import, paths, cache version, base/unknown classes
+    DATASET_CONFIGS = {
+        'tau22': {
+            'import_module': 'utils.TAU22',
+            'import_class': 'TAUDataset',
+            'experiment_dir': 'experiment/yamnet_realfewshot_osr24',
+            'cache_version': 'v24_fewshot_yamnet_normalized',
+            'base_classes': [0, 1, 2, 3, 4, 5],
+            'unknown_classes': [6, 7, 8, 9],
+            'base_pretrained': None,  # None = train from scratch, use experiment_dir
+            'contrastive_pretrained': None,
+        },
+        'tau19': {
+            'import_module': 'utils.TAU19',
+            'import_class': 'TAUDataset',
+            'experiment_dir': 'experiment/yamnet_realfewshot_osr24_tau19',
+            'cache_version': 'v24_tau19_fewshot_yamnet_normalized',
+            'base_classes': [0, 1, 2, 3, 4, 5],
+            'unknown_classes': [6, 7, 8, 9],
+            'base_pretrained': 'experiment/yamnet_fewshot_osr22/base_feature_extractor.pth',
+            'contrastive_pretrained': 'experiment/yamnet_fewshot_osr22/contrastive_feature_extractor.pth',
+        },
+    }
+
+    cfg = DATASET_CONFIGS[args.dataset]
+
+    # Dynamic import
+    import importlib
+    _mod = importlib.import_module(cfg['import_module'])
+    global TAUDataset
+    TAUDataset = getattr(_mod, cfg['import_class'])
+    print(f"Dataset: {args.dataset} (TAUDataset from {cfg['import_module']})")
 
     torch.manual_seed(42)
     random.seed(42)
@@ -4796,25 +5517,24 @@ def main():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
 
-    # 10 acoustic scene classes -> 6 base (known), 4 novel (unknown)
-    # New mapping: 0=airport, 1=shopping_mall, 2=metro_station, 3=street_pedestrian,
-    #              4=public_square, 5=street_traffic, 6=tram, 7=bus, 8=metro, 9=park
-    # Base (known): airport(0), tram(6), bus(7), public_square(4), shopping_mall(1), street_pedestrian(3)
-    # Unknown (novel): metro_station(2), street_traffic(5), metro(8), park(9)
-    base_classes = [0, 1, 2, 3, 4, 5]
-    unknown_classes = [6, 7, 8, 9]
+    base_classes = cfg['base_classes']
+    unknown_classes = cfg['unknown_classes']
 
-    N_way = 6  # osr22: 使用全部6个base classes (原来是5-way)
+    N_way = len(base_classes)  # 使用全部base classes
     K_shot = 5
-    Q_query = 100  # osr22: 大幅提升GPU利用率 (6-way * 100 = 600 queries/episode)
+    Q_query = 15  # fewshot: 校准集已知类仅100/类, 需 K_shot+Q_query ≤ 100
     num_episodes = 6000
     gradient_accum_steps = 1
     feature_dim = 64
 
-    # Change this one variable to redirect all model output paths
-    experiment_dir = 'experiment/yamnet_fewshot_osr22_relabel'  # osr22: resetlabel with new vocabulary mapping
-    base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
-    contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
+    # Paths
+    experiment_dir = cfg['experiment_dir']
+    if cfg['base_pretrained'] is not None:
+        base_pretrained_path = cfg['base_pretrained']
+        contrastive_pretrained_path = cfg['contrastive_pretrained']
+    else:
+        base_pretrained_path = os.path.join(experiment_dir, 'base_feature_extractor.pth')
+        contrastive_pretrained_path = os.path.join(experiment_dir, 'contrastive_feature_extractor.pth')
 
     # ---- Backbone selection: 'yamnet', 'distil_ast' or 'panns_cnn14' ----
     backbone_choice = 'yamnet'
@@ -4839,9 +5559,12 @@ def main():
         raise ValueError(f"Unknown backbone: {backbone_choice}")
 
     print(f"\n{'='*70}")
-    print("Few-Shot Open Set Recognition - Episodic Training Pipeline")
-    print(f"Backbone: {backbone_choice}")
+    print("Few-Shot Open Set Recognition - Episodic Training Pipeline (osr24)")
+    print(f"Backbone: {backbone_choice}  |  Dataset: {args.dataset}")
     print(f"{'='*70}")
+
+    # Set dataset-specific cache version
+    FeatureCache.CACHE_VERSION = cfg['cache_version']
 
     # ============ Phase 0: Feature Extractor Pre-training ============
     print("\nLoading datasets...")
@@ -5062,149 +5785,36 @@ def main():
         novel_results[k] = evaluator.evaluate(
             test_cache, unknown_classes, N_way=novel_N, K_shot=k)
 
-    # --- OSR calibration & evaluation: feature-space methods only ---
+    # --- OSR calibration & evaluation ---
     osr_results = {}
-    # Core baselines (kept from osr20a)
-    osr_methods = ['feature_mahalanobis', 'anti_prototype', 'geo_fusion',
-                   'ood_head', 'ood_head_extended']
+    # osr24b: Only fast baselines + target methods; disable slow methods for speed
+    osr_methods = ['ood_head_extended',       # main baseline (TPR ~49%)
+                   'ood_head_cluster_v2',     # osr24b component (13-dim LR)
+                   'ood_head_fusion_v2']      # osr24b target (14-dim LR = 13 + anti)
 
     for method in osr_methods:
         print(f"\n--- OSR {method.upper()} calibration (calib data) ---")
         calibrator = OSRCalibrator(
             trainer.flow_classifier, calib_cache,
-            base_classes, unknown_classes, device)
+            base_classes, unknown_classes, device,
+            train_cache=train_cache)
         threshold = calibrator.calibrate(target_fpr=0.05, K_shot=50, method=method)
 
         print(f"\n--- OSR {method.upper()} evaluation (test data, per-round recalib) ---")
         test_calibrator = OSRCalibrator(
             trainer.flow_classifier, test_cache,
-            base_classes, unknown_classes, device)
+            base_classes, unknown_classes, device,
+            train_cache=train_cache)
         osr_results[method] = test_calibrator.evaluate_osr(
             threshold=threshold, K_shot=50, num_rounds=10,
             method=method, recalibrate_per_round=True)
 
-    # osr20a winner: anti_prototype with per-class threshold
-    per_class_methods = ['anti_prototype', 'ood_head_extended']
-    for method in per_class_methods:
-        tag = f"{method}_per_class"
-        print(f"\n--- OSR {tag.upper()} calibration (calib data) ---")
-        calibrator = OSRCalibrator(
-            trainer.flow_classifier, calib_cache,
-            base_classes, unknown_classes, device)
-        calibrator.calibrate(target_fpr=0.05, K_shot=50, method=method)
-
-        print(f"\n--- OSR {tag.upper()} evaluation (test data, per-class threshold) ---")
-        test_calibrator = OSRCalibrator(
-            trainer.flow_classifier, test_cache,
-            base_classes, unknown_classes, device)
-        osr_results[tag] = test_calibrator.evaluate_osr(
-            K_shot=50, num_rounds=10,
-            method=method, recalibrate_per_round=True,
-            use_per_class_threshold=True)
-
-    # osr20b direction 1: Ensemble anti_prototype + ood_head_extended
-    print(f"\n--- OSR ENSEMBLE_ANTI_OODEXT calibration (calib data) ---")
-    calibrator = OSRCalibrator(
-        trainer.flow_classifier, calib_cache,
-        base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_anti_oodext')
-
-    print(f"\n--- OSR ENSEMBLE_ANTI_OODEXT evaluation (test data) ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    osr_results['ensemble_anti_oodext'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='ensemble_anti_oodext', recalibrate_per_round=True)
-
-    # osr20b: ensemble + per-class threshold
-    print(f"\n--- OSR ensemble_anti_oodext_per_class evaluation ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    osr_results['ensemble_anti_oodext_per_class'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='ensemble_anti_oodext', recalibrate_per_round=True,
-        use_per_class_threshold=True)
-
-    # ============ osr22 new methods: clustering-augmented OSR ============
-
-    # osr22a: Multi-prototype anti_prototype (K-means sub-clusters)
-    print(f"\n--- OSR ANTI_PROTOTYPE_MULTI calibration (calib data) ---")
-    calibrator = OSRCalibrator(
-        trainer.flow_classifier, calib_cache,
-        base_classes, unknown_classes, device)
-    calibrator._multi_proto_K_sub = 2
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='anti_prototype_multi')
-
-    print(f"\n--- OSR ANTI_PROTOTYPE_MULTI evaluation (test data) ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    test_calibrator._multi_proto_K_sub = 2
-    osr_results['anti_prototype_multi'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='anti_prototype_multi', recalibrate_per_round=True)
-
-    # osr22b: Extended OOD head v2 (with GMM cluster features)
-    print(f"\n--- OSR OOD_HEAD_EXTENDED_V2 calibration (calib data) ---")
-    calibrator = OSRCalibrator(
-        trainer.flow_classifier, calib_cache,
-        base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ood_head_extended_v2')
-
-    print(f"\n--- OSR OOD_HEAD_EXTENDED_V2 evaluation (test data) ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    osr_results['ood_head_extended_v2'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='ood_head_extended_v2', recalibrate_per_round=True)
-
-    # osr22c: Adaptive ensemble fusion (density-based alpha)
-    print(f"\n--- OSR ENSEMBLE_ADAPTIVE calibration (calib data) ---")
-    calibrator = OSRCalibrator(
-        trainer.flow_classifier, calib_cache,
-        base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_adaptive')
-
-    print(f"\n--- OSR ENSEMBLE_ADAPTIVE evaluation (test data) ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    osr_results['ensemble_adaptive'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='ensemble_adaptive', recalibrate_per_round=True)
-
-    # osr22d: Cluster boundary detection
-    print(f"\n--- OSR CLUSTER_BOUNDARY calibration (calib data) ---")
-    calibrator = OSRCalibrator(
-        trainer.flow_classifier, calib_cache,
-        base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='cluster_boundary')
-
-    print(f"\n--- OSR CLUSTER_BOUNDARY evaluation (test data) ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    osr_results['cluster_boundary'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='cluster_boundary', recalibrate_per_round=True)
-
-    # osr22d: Three-way ensemble (anti_proto + ood_head_v2 + cluster_boundary)
-    print(f"\n--- OSR ENSEMBLE_CLUSTER calibration (calib data) ---")
-    calibrator = OSRCalibrator(
-        trainer.flow_classifier, calib_cache,
-        base_classes, unknown_classes, device)
-    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_cluster')
-
-    print(f"\n--- OSR ENSEMBLE_CLUSTER evaluation (test data) ---")
-    test_calibrator = OSRCalibrator(
-        trainer.flow_classifier, test_cache,
-        base_classes, unknown_classes, device)
-    osr_results['ensemble_cluster'] = test_calibrator.evaluate_osr(
-        K_shot=50, num_rounds=10,
-        method='ensemble_cluster', recalibrate_per_round=True)
+    # ============ Disabled slow methods (re-enable after target method validated) ============
+    # TODO: re-enable these for full comparison:
+    #   feature_mahalanobis, anti_prototype, geo_fusion, ood_head,
+    #   ood_head_osr23, per_class_methods, ensemble_anti_oodext,
+    #   anti_prototype_multi, ood_head_extended_v2, ensemble_adaptive,
+    #   cluster_boundary, ensemble_cluster
 
     # Summary comparison
     print(f"\n{'='*70}")
@@ -5228,7 +5838,7 @@ def main():
             'base_classes': base_classes,
             'unknown_classes': unknown_classes,
             'scoring_method': best_method,
-            'use_flow_transform': False,  # osr22: clustering-based OSR, no Flow transform
+            'use_flow_transform': False,  # osr24b: 14-dim LR fusion (cluster_v2 + anti_proto)
         },
         'base_results': base_results,
         'novel_results': novel_results,
@@ -5245,7 +5855,8 @@ def main():
         from plot_training import generate_all_plots
         import glob
         # Find the latest log (redirected output or default)
-        log_candidates = glob.glob('TAU22_*_osr*.log')
+        log_pattern = f'{args.dataset.upper()}_*_osr*.log'
+        log_candidates = glob.glob(log_pattern)
         if log_candidates:
             latest_log = max(log_candidates, key=os.path.getmtime)
             generate_all_plots(latest_log, experiment_dir)

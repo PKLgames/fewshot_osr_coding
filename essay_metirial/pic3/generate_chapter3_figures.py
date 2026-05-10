@@ -256,7 +256,7 @@ def plot_fig3_4(model, calib_features, calib_labels, train_features, train_label
     unknown_feats = adapted_feats[~known_mask].numpy()
 
     gmm = GaussianMixture(n_components=12, covariance_type='full',
-                          max_iter=200, random_state=SEED, reg_covar=1e-6)
+                          max_iter=200, random_state=SEED, reg_covar=1e-4)
     gmm.fit(known_feats)
 
     # PCA 降维
@@ -417,7 +417,7 @@ def plot_fig3_5(model, calib_features, calib_labels, train_features, train_label
 
     # GMM + OOD Head V2
     gmm = GaussianMixture(n_components=12, covariance_type='full',
-                          max_iter=200, random_state=SEED, reg_covar=1e-6)
+                          max_iter=200, random_state=SEED, reg_covar=1e-4)
     gmm.fit(known_feats.numpy())
 
     def _cluster_feats(x_np, gmm_m):
@@ -468,7 +468,7 @@ def plot_fig3_5(model, calib_features, calib_labels, train_features, train_label
     y = np.concatenate([np.ones(len(known_ood_np)), np.zeros(len(unknown_ood_np))])
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    clf = LogisticRegression(C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+    clf = LogisticRegression(C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs', l1_ratio=0)
     clf.fit(X_scaled, y)
 
     known_ood_scores = torch.from_numpy(clf.predict_proba(scaler.transform(known_ood_np))[:, 1]).float()
@@ -591,7 +591,7 @@ def plot_fig3_6(model, calib_features, calib_labels, train_features, train_label
 
     # OOD Head V2 评分（使用 GMM）
     gmm = GaussianMixture(n_components=12, covariance_type='full',
-                          max_iter=200, random_state=SEED, reg_covar=1e-6)
+                          max_iter=200, random_state=SEED, reg_covar=1e-4)
     gmm.fit(known_feats.numpy())
 
     def extract_cluster_features_np(x_np, gmm_model):
@@ -645,7 +645,7 @@ def plot_fig3_6(model, calib_features, calib_labels, train_features, train_label
     y = np.concatenate([np.ones(len(known_ood_feats)), np.zeros(len(unknown_ood_feats))])
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    clf = LogisticRegression(C=1.0, max_iter=1000, class_weight='balanced', solver='lbfgs')
+    clf = LogisticRegression(C=1.0, max_iter=5000, class_weight='balanced', solver='lbfgs', l1_ratio=0)
     clf.fit(X_scaled, y)
 
     known_ood_scores = clf.predict_proba(scaler.transform(known_ood_feats))[:, 1]

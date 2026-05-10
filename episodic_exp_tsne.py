@@ -122,7 +122,7 @@ def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title=
 def main():
     parser = argparse.ArgumentParser(description='Episodic t-SNE Visualization')
     parser.add_argument('--experiment_dir', type=str,
-                        default='experiment/yamnet_fewshot_osr22_relabel')
+                        default='experiment/yamnet_fewshot_osr22_fewshot')
     parser.add_argument('--dataset', choices=['TAU22', 'TAU19'], default='TAU22')
     parser.add_argument('--compare_ablation', action='store_true',
                         help='Compare full model vs baseline (no extras)')

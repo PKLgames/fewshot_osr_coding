@@ -1,0 +1,750 @@
+{
+  "TAU22": {
+    "full_model": {
+      "base_1shot": {
+        "mean_acc": 0.39455556236207484,
+        "std_acc": 0.10204689018462129,
+        "ci95": 0.020001190476185773,
+        "mean_confidence": 0.8088075745105744,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.508888897895813,
+        "std_acc": 0.07308037497234557,
+        "ci95": 0.01432375349457973,
+        "mean_confidence": 0.8189153558015824,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5243333420157432,
+        "std_acc": 0.0538102555597099,
+        "ci95": 0.010546810089703141,
+        "mean_confidence": 0.8297341120243072,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.3073055577464402,
+          "osr_score": 0.6286527729127556,
+          "auroc": 0.5971086567644033,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.1737499963492155,
+          "osr_score": 0.5618749922141433,
+          "auroc": 0.695144508744856,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "full_model",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_flow_transform": {
+      "base_1shot": {
+        "mean_acc": 0.4130000074952841,
+        "std_acc": 0.09718322917493073,
+        "ci95": 0.019047912918286423,
+        "mean_confidence": 0.7784802907705307,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5257777860760688,
+        "std_acc": 0.0681842096914964,
+        "ci95": 0.013364105099533294,
+        "mean_confidence": 0.795030397772789,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5405555659532547,
+        "std_acc": 0.054123202137869995,
+        "ci95": 0.010608147619022519,
+        "mean_confidence": 0.7905533593893052,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.30686111133545635,
+          "osr_score": 0.6284305497072638,
+          "auroc": 0.598443313143004,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.1737499963492155,
+          "osr_score": 0.5618749922141433,
+          "auroc": 0.695144508744856,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_flow_transform",
+        "use_flow": false,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_ood_head": {
+      "base_1shot": {
+        "mean_acc": 0.4073333416879177,
+        "std_acc": 0.09723612677464591,
+        "ci95": 0.019058280847830598,
+        "mean_confidence": 0.7767352566123009,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5110000076889992,
+        "std_acc": 0.05446700412859989,
+        "ci95": 0.010675532809205577,
+        "mean_confidence": 0.8169231104850769,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5293333429098129,
+        "std_acc": 0.04857271903161291,
+        "ci95": 0.00952025293019613,
+        "mean_confidence": 0.8240048092603683,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.31359722280176355,
+          "osr_score": 0.6317986054404173,
+          "auroc": 0.6001749902263375,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.1737499963492155,
+          "osr_score": 0.5618749922141433,
+          "auroc": 0.695144508744856,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_ood_head",
+        "use_flow": true,
+        "use_ood": false,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_reciprocal": {
+      "base_1shot": {
+        "mean_acc": 0.3960000070184469,
+        "std_acc": 0.09669246147820541,
+        "ci95": 0.018951722449728262,
+        "mean_confidence": 0.8518510341644288,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5252222311496735,
+        "std_acc": 0.05775330962247649,
+        "ci95": 0.011319648686005391,
+        "mean_confidence": 0.8728015166521073,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5380000093579292,
+        "std_acc": 0.050970339151901814,
+        "ci95": 0.009990186473772755,
+        "mean_confidence": 0.8674880051612854,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.30211111177923156,
+          "osr_score": 0.6260555499291514,
+          "auroc": 0.5984826739969136,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.1737499963492155,
+          "osr_score": 0.5618749922141433,
+          "auroc": 0.695144508744856,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_reciprocal",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": false,
+        "use_threshold": true
+      }
+    },
+    "wo_threshold": {
+      "base_1shot": {
+        "mean_acc": 0.3774444527179003,
+        "std_acc": 0.09837513200226153,
+        "ci95": 0.019281525872443257,
+        "mean_confidence": 0.8469706434011459,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.527000008225441,
+        "std_acc": 0.060149096336565795,
+        "ci95": 0.011789222881966896,
+        "mean_confidence": 0.8650485211610794,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5366666743159294,
+        "std_acc": 0.05744562685159358,
+        "ci95": 0.01125934286291234,
+        "mean_confidence": 0.8699867993593215,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.29694444395718167,
+          "osr_score": 0.6234722160181263,
+          "auroc": 0.597864150141461,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.1737499963492155,
+          "osr_score": 0.5618749922141433,
+          "auroc": 0.695144508744856,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_threshold",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": false
+      }
+    },
+    "only_distance_head": {
+      "base_1shot": {
+        "mean_acc": 0.4128888955712318,
+        "std_acc": 0.10277291204314448,
+        "ci95": 0.020143490760456316,
+        "mean_confidence": 0.7980762603878975,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.5244444546103477,
+        "std_acc": 0.05706829620664528,
+        "ci95": 0.011185386056502475,
+        "mean_confidence": 0.8164363306760788,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.5375555631518364,
+        "std_acc": 0.05568385314784676,
+        "ci95": 0.010914035216977964,
+        "mean_confidence": 0.8188059777021408,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.29477777765714563,
+          "osr_score": 0.6223888828681083,
+          "auroc": 0.5988730704089507,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.1737499963492155,
+          "osr_score": 0.5618749922141433,
+          "auroc": 0.695144508744856,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "only_distance_head",
+        "use_flow": false,
+        "use_ood": false,
+        "use_reciprocal": false,
+        "use_threshold": false
+      }
+    }
+  },
+  "TAU19": {
+    "full_model": {
+      "base_1shot": {
+        "mean_acc": 0.2933333419263363,
+        "std_acc": 0.07443615245414932,
+        "ci95": 0.014589485881013267,
+        "mean_confidence": 0.8005504709482193,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.34900000810623166,
+        "std_acc": 0.06581108178532963,
+        "ci95": 0.012898972029924608,
+        "mean_confidence": 0.8105564308166504,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.36611111864447593,
+        "std_acc": 0.0519585521832055,
+        "ci95": 0.010183876227908277,
+        "mean_confidence": 0.8186743080615997,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4614999994635582,
+          "osr_score": 0.7057499937713146,
+          "auroc": 0.60980324,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "auroc": 0.875328,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "full_model",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_flow_transform": {
+      "base_1shot": {
+        "mean_acc": 0.2910000083595514,
+        "std_acc": 0.07188287898536551,
+        "ci95": 0.01408904428113164,
+        "mean_confidence": 0.7557253569364548,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.36200000762939455,
+        "std_acc": 0.062126511704572965,
+        "ci95": 0.012176796294096301,
+        "mean_confidence": 0.7613683307170868,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.37533334136009217,
+        "std_acc": 0.0519396596886489,
+        "ci95": 0.010180173298975184,
+        "mean_confidence": 0.7486129081249238,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4575500011444092,
+          "osr_score": 0.7037749946117401,
+          "auroc": 0.6102821291666667,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "auroc": 0.875328,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_flow_transform",
+        "use_flow": false,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_ood_head": {
+      "base_1shot": {
+        "mean_acc": 0.31611111901700495,
+        "std_acc": 0.06871618185632732,
+        "ci95": 0.013468371643840155,
+        "mean_confidence": 0.7555990672111511,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3870000085234642,
+        "std_acc": 0.0736198953496248,
+        "ci95": 0.014429499488526462,
+        "mean_confidence": 0.770343170762062,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.4090000057220459,
+        "std_acc": 0.05647450809237963,
+        "ci95": 0.011069003586106407,
+        "mean_confidence": 0.7593597406148911,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4616999953985214,
+          "osr_score": 0.7058499917387963,
+          "auroc": 0.6107616008333333,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "auroc": 0.875328,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_ood_head",
+        "use_flow": true,
+        "use_ood": false,
+        "use_reciprocal": true,
+        "use_threshold": true
+      }
+    },
+    "wo_reciprocal": {
+      "base_1shot": {
+        "mean_acc": 0.29855556346476075,
+        "std_acc": 0.0782470780482347,
+        "ci95": 0.015336427297454002,
+        "mean_confidence": 0.8491566032171249,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3816666740179062,
+        "std_acc": 0.055697039429180875,
+        "ci95": 0.010916619728119453,
+        "mean_confidence": 0.865447039604187,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.40200000584125517,
+        "std_acc": 0.050708069727129636,
+        "ci95": 0.009938781666517408,
+        "mean_confidence": 0.8555788183212281,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4635499991476536,
+          "osr_score": 0.7067749936133623,
+          "auroc": 0.6082388066666666,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "auroc": 0.875328,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_reciprocal",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": false,
+        "use_threshold": true
+      }
+    },
+    "wo_threshold": {
+      "base_1shot": {
+        "mean_acc": 0.28255556389689446,
+        "std_acc": 0.07159996983685982,
+        "ci95": 0.014033594088024523,
+        "mean_confidence": 0.8063468652963638,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3655555631220341,
+        "std_acc": 0.05576626495701893,
+        "ci95": 0.01093018793157571,
+        "mean_confidence": 0.8378122305870056,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.3786666741967201,
+        "std_acc": 0.05357998275037121,
+        "ci95": 0.010501676619072756,
+        "mean_confidence": 0.8370019835233689,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4552500002086163,
+          "osr_score": 0.7026249941438436,
+          "auroc": 0.6092285775,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "auroc": 0.875328,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "wo_threshold",
+        "use_flow": true,
+        "use_ood": true,
+        "use_reciprocal": true,
+        "use_threshold": false
+      }
+    },
+    "only_distance_head": {
+      "base_1shot": {
+        "mean_acc": 0.290333341807127,
+        "std_acc": 0.07014368088186686,
+        "ci95": 0.013748161452845903,
+        "mean_confidence": 0.7730376082658768,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100
+      },
+      "base_5shot": {
+        "mean_acc": 0.3736666738986969,
+        "std_acc": 0.04877904114581236,
+        "ci95": 0.009560692064579223,
+        "mean_confidence": 0.7915508967638015,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100
+      },
+      "base_10shot": {
+        "mean_acc": 0.39888889536261557,
+        "std_acc": 0.05332175663515804,
+        "ci95": 0.010451064300490977,
+        "mean_confidence": 0.7780729031562805,
+        "N_way": 6,
+        "K_shot": 10,
+        "num_episodes": 100
+      },
+      "osr": {
+        "anti_prototype": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.46125000044703485,
+          "osr_score": 0.7056249942630529,
+          "auroc": 0.6096456075000001,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "anti_prototype",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        },
+        "feature_mahalanobis": {
+          "known_tnr": 0.949999988079071,
+          "unknown_tpr": 0.4494999945163727,
+          "osr_score": 0.6997499912977219,
+          "auroc": 0.875328,
+          "threshold": "per-round",
+          "num_rounds": 10,
+          "method": "feature_mahalanobis",
+          "recalibrate": true,
+          "per_class_threshold": false,
+          "rectified_prototypes": false
+        }
+      },
+      "config": {
+        "name": "only_distance_head",
+        "use_flow": false,
+        "use_ood": false,
+        "use_reciprocal": false,
+        "use_threshold": false
+      }
+    }
+  }
+}

@@ -108,11 +108,20 @@ class My_Net(nn.Module):
             support_feat,s1= self.encode(support_data.cuda())
             q1,query_feat = self.encode(query_data.cuda())
             supopen_feat,so1= self.encode(suppopen_data.cuda())
-            openset_feat,q2 = self.encode(openset_data.cuda())
+            # fewshot: openset可能为空(未知类样本不足)，跳过encode
+            if openset_data.numel() > 0 and openset_data.dim() >= 2:
+                openset_feat,q2 = self.encode(openset_data.cuda())
+            else:
+                openset_feat = torch.empty(0, query_feat.shape[-1]).cuda()
+                q2 = torch.empty(0, query_feat.shape[-1]).cuda()
             #Task 1: dynamically compute number of known classes from query_label
             actual_n_ways = query_label.max().item() + 1
             open_label = actual_n_ways * torch.ones_like(openset_label)
-            cls_label = torch.cat([query_label, open_label])
+            # fewshot: openset为空时cls_label仅含query部分
+            if openset_label.numel() > 0:
+                cls_label = torch.cat([query_label, open_label])
+            else:
+                cls_label = query_label
 
             if test:
                  loss_cls,loss_fake,prediction = self.task(s1,support_feat,query_feat,q1,openset_feat,support_label.cuda(),cls_label.cuda(),query_label.cuda())
@@ -168,19 +177,26 @@ class My_Net(nn.Module):
         cls_protos = torch.cat([supp_protos.unsqueeze(0), fake_center], dim=1)
 
         query_score = self.metric(cls_protos,q1.unsqueeze(0)).squeeze()
-        open_score = self.metric(cls_protos,openset_feat.unsqueeze(0)).squeeze()
+        # fewshot: openset_feat可能为空
+        if openset_feat.numel() > 0:
+            open_score = self.metric(cls_protos,openset_feat.unsqueeze(0)).squeeze()
+            cls_score =torch.cat([query_score.squeeze(),open_score.squeeze()],dim=0)
+            loss_cls =F.cross_entropy(cls_score, cls_label)
 
-        cls_score =torch.cat([query_score.squeeze(),open_score.squeeze()],dim=0)
-        loss_cls =F.cross_entropy(cls_score, cls_label)
-        
-        # funit_distance = self.metric(recip_units.transpose(0,1),q1.unsqueeze(0)).squeeze()
-        # qopen_funit_distance = self.metric(recip_units.transpose(0,1), openset_feat.unsqueeze(0)).squeeze()
-        # funit_distance = torch.cat([funit_distance,qopen_funit_distance],dim=0)
-       
-        loss_fake = 0.0#fakeunit_compare(funit_distance,self.args.n_ways,cls_label)
+            # funit_distance = self.metric(recip_units.transpose(0,1),q1.unsqueeze(0)).squeeze()
+            # qopen_funit_distance = self.metric(recip_units.transpose(0,1), openset_feat.unsqueeze(0)).squeeze()
+            # funit_distance = torch.cat([funit_distance,qopen_funit_distance],dim=0)
 
-        query_score = F.softmax(query_score.detach(), dim=-1).squeeze()
-        open_score = F.softmax(open_score.detach(), dim=-1).squeeze()
+            loss_fake = 0.0#fakeunit_compare(funit_distance,self.args.n_ways,cls_label)
+
+            query_score = F.softmax(query_score.detach(), dim=-1).squeeze()
+            open_score = F.softmax(open_score.detach(), dim=-1).squeeze()
+        else:
+            cls_score = query_score.squeeze()
+            loss_cls = F.cross_entropy(cls_score, cls_label)
+            loss_fake = 0.0
+            query_score = F.softmax(query_score.detach(), dim=-1).squeeze()
+            open_score = torch.empty(0, query_score.shape[-1] if query_score.dim() > 1 else self.args.train_classes + 1).cuda()
         
         return loss_cls,loss_fake,(query_score,open_score)      
 
