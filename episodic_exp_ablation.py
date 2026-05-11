@@ -24,20 +24,12 @@ from datetime import datetime
 
 # Import everything from episodic_trainer (or tau19 variant)
 def get_trainer_module(dataset):
-    if dataset == 'TAU19':
-        import importlib
-        spec = importlib.util.spec_from_file_location(
-            'episodic_trainer_tau19', 'episodic_trainer_tau19.py')
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    else:
-        import importlib
-        spec = importlib.util.spec_from_file_location(
-            'episodic_trainer', 'episodic_trainer.py')
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
+    import importlib
+    spec = importlib.util.spec_from_file_location(
+        'episodic_trainer', 'episodic_trainer.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 # Ablation configurations
@@ -53,12 +45,13 @@ ABLATION_CONFIGS = [
 
 
 def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
-                 base_classes, unknown_classes, backbone_choice='yamnet',
+                 base_classes, unknown_classes, dataset_name='TAU22',
+                 backbone_choice='yamnet',
                  N_way=6, K_shot=5, Q_query=15, num_episodes=3000,
                  feature_dim=64, output_root='experiment/episodic_exp'):
     """Run one ablation configuration."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    experiment_dir = f'{output_root}/ablation/{config_name}'
+    experiment_dir = f'{output_root}/ablation/{dataset_name}/{config_name}'
 
     print(f"\n{'='*60}")
     print(f"Ablation: {config_name}")
@@ -90,16 +83,20 @@ def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
     feature_extractor = feature_extractor.to(device).freeze()
 
     # --- Phase 1: Feature extraction ---
-    TAUDataset = mod.TAUDataset
+    # TAUDataset is None in the module (set lazily in main()), import directly
+    from utils.TAU22 import TAUDataset as TAU22Dataset
+    from utils.TAU19 import TAUDataset as TAU19Dataset
+    TAUDataset = TAU19Dataset if dataset_name == 'TAU19' else TAU22Dataset
+
     train_dataset = TAUDataset(split='train')
     calib_dataset = TAUDataset(split='calib')
     test_dataset = TAUDataset(split='test')
 
-    train_cache = mod.FeatureCache()
+    train_cache = mod.FeatureCache(dataset_name=dataset_name.lower())
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
-    calib_cache = mod.FeatureCache()
+    calib_cache = mod.FeatureCache(dataset_name=dataset_name.lower())
     calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
-    test_cache = mod.FeatureCache()
+    test_cache = mod.FeatureCache(dataset_name=dataset_name.lower())
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
 
     # --- Phase 2: Episodic training ---
@@ -206,6 +203,7 @@ def main():
                 continue
             r = run_ablation(mod, name, flow, ood, recip, thresh,
                              base_classes, unknown_classes,
+                             dataset_name=dataset,
                              num_episodes=cl_args.num_episodes,
                              output_root=cl_args.output_dir)
             if r:

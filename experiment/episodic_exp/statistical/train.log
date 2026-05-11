@@ -1,0 +1,31 @@
+
+Friedman-Nemenyi Test
+  Methods: 6, Datasets: 2
+
+  Per-dataset ranks:
+  Dataset             full_modelwo_flow_transform    wo_ood_head  wo_reciprocal   wo_thresholdonly_distance_head
+  TAU22                      4.0            3.0            2.0            6.0            1.0            5.0
+  TAU19                      3.0            5.0            6.0            4.0            1.0            2.0
+  Average                   3.50           4.00           4.00           5.00           1.00           3.50
+
+  Friedman chi-square: 5.1429
+  p-value: 0.398696
+  Significant: NO
+
+  Nemenyi CD: 7.5394
+    full_model                vs wo_flow_transform        : |0.50| 
+    full_model                vs wo_ood_head              : |0.50| 
+    full_model                vs wo_reciprocal            : |1.50| 
+    full_model                vs wo_threshold             : |2.50| 
+    full_model                vs only_distance_head       : |0.00| 
+    wo_flow_transform         vs wo_ood_head              : |0.00| 
+    wo_flow_transform         vs wo_reciprocal            : |1.00| 
+    wo_flow_transform         vs wo_threshold             : |3.00| 
+    wo_flow_transform         vs only_distance_head       : |0.50| 
+    wo_ood_head               vs wo_reciprocal            : |1.00| 
+    wo_ood_head               vs wo_threshold             : |3.00| 
+    wo_ood_head               vs only_distance_head       : |0.50| 
+    wo_reciprocal             vs wo_threshold             : |4.00| 
+    wo_reciprocal             vs only_distance_head       : |1.50| 
+    wo_threshold              vs only_distance_head       : |2.50| 
+CD diagram saved to experiment/episodic_exp/statistical/cd_diagram.png

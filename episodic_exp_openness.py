@@ -20,8 +20,10 @@ import torch
 
 from episodic_trainer import (
     FeatureExtractor, FeatureCache, EpisodicFlowClassifier,
-    EpisodicTrainer, FewShotEvaluator, OSRCalibrator, TAUDataset,
+    EpisodicTrainer, FewShotEvaluator, OSRCalibrator,
 )
+from utils.TAU22 import TAUDataset as TAU22Dataset
+from utils.TAU19 import TAUDataset as TAU19Dataset
 
 
 OPEN_WAY_VALUES = [1, 2, 3, 4]
@@ -114,15 +116,16 @@ def main():
 
     # Extract features
     print("Extracting features...")
+    TAUDataset = TAU19Dataset if cl_args.dataset == 'TAU19' else TAU22Dataset
     train_dataset = TAUDataset(split='train')
     calib_dataset = TAUDataset(split='calib')
     test_dataset = TAUDataset(split='test')
 
-    train_cache = FeatureCache()
+    train_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
-    calib_cache = FeatureCache()
+    calib_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
     calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
-    test_cache = FeatureCache()
+    test_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
 
     base_classes = [0, 1, 2, 3, 4, 5]

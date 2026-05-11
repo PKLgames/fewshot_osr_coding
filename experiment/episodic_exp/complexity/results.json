@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Full_Model",
+    "total_params": 40100,
+    "trainable_params": 40100,
+    "macs": null,
+    "ait_mean_ms": 4.050688139959675,
+    "ait_std_ms": 0.033968365844851654,
+    "ait_median_ms": 4.042450000270037
+  },
+  {
+    "name": "wo_Flow_Transform",
+    "total_params": 14756,
+    "trainable_params": 14756,
+    "macs": null,
+    "ait_mean_ms": 0.6262093499390176,
+    "ait_std_ms": 0.00925965760093231,
+    "ait_median_ms": 0.6264654984988738
+  },
+  {
+    "name": "wo_OOD_Head",
+    "total_params": 39363,
+    "trainable_params": 39363,
+    "macs": null,
+    "ait_mean_ms": 4.05774205479247,
+    "ait_std_ms": 0.028807237740651012,
+    "ait_median_ms": 4.051728499689489
+  },
+  {
+    "name": "wo_Reciprocal",
+    "total_params": 38820,
+    "trainable_params": 38820,
+    "macs": null,
+    "ait_mean_ms": 4.215653734972875,
+    "ait_std_ms": 0.263883751616485,
+    "ait_median_ms": 4.167746999883093
+  },
+  {
+    "name": "wo_Threshold",
+    "total_params": 40098,
+    "trainable_params": 40098,
+    "macs": null,
+    "ait_mean_ms": 4.145277099996747,
+    "ait_std_ms": 0.030931743352317607,
+    "ait_median_ms": 4.138574500757386
+  },
+  {
+    "name": "Baseline",
+    "total_params": 12737,
+    "trainable_params": 12737,
+    "macs": null,
+    "ait_mean_ms": 0.6428427649916557,
+    "ait_std_ms": 0.010028450288854561,
+    "ait_median_ms": 0.6431129986594897
+  }
+]

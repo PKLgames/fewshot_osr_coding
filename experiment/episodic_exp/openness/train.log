@@ -1,0 +1,453 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Extracting features...
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 620
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 100 samples
+    Class 1: 100 samples
+    Class 2: 100 samples
+    Class 3: 100 samples
+    Class 4: 100 samples
+    Class 5: 100 samples
+    Class 6: 5 samples
+    Class 7: 5 samples
+    Class 8: 5 samples
+    Class 9: 5 samples
+Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+
+  n_open=1, unknown=[6]
+Real OOD exposure: 1800 samples from classes [6]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=114.71, 10th percentile=67.27
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness/open1/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7522 Total: 1.7522 Acc: 33.19% | Val Loss: 1.7780 Acc: 51.00% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 51.00%)
+Ep  1000/3000 | CE: 1.6815 Total: 3.8109 Acc: 33.57% | Val Loss: 1.9758 Acc: 42.44% | LR: 4.91e-05 cls:0.4
+Ep  1500/3000 | CE: 1.6705 Total: 3.7765 Acc: 34.60% | Val Loss: 2.0326 Acc: 46.56% | LR: 4.67e-05 cls:0.8
+Ep  2000/3000 | CE: 1.6699 Total: 3.7580 Acc: 35.14% | Val Loss: 1.9130 Acc: 48.00% | LR: 4.27e-05 cls:1.0
+Ep  2500/3000 | CE: 1.6649 Total: 3.7151 Acc: 35.85% | Val Loss: 1.9196 Acc: 50.00% | LR: 3.75e-05 cls:1.0
+Ep  3000/3000 | CE: 1.6460 Total: 3.6512 Acc: 35.76% | Val Loss: 1.9328 Acc: 46.56% | LR: 3.15e-05 cls:1.0
+
+Loaded best model (Val Acc: 51.00%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 51.00%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness/open1/episodic_history.json
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 5
+Known scores:   [-3.68, 10.23] mean=0.60
+Unknown scores: [-0.90, 2.00] mean=-0.00
+Mean separation: 0.60 (positive = known higher = good)
+
+Threshold (tau): -2.1695
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 0.00%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   44.07%
+  OSR Score (mean):         69.53%
+  AUROC:                    0.6663
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 5
+Known scores:   [-9.59, -2.02] mean=-4.69
+Unknown scores: [-13.03, -4.08] mean=-6.80
+Mean separation: 2.11 (positive = known higher = good)
+
+Threshold (tau): -8.2364
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 20.00%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   19.72%
+  OSR Score (mean):         57.36%
+  AUROC:                    0.7672
+
+  n_open=2, unknown=[6, 7]
+Real OOD exposure: 3600 samples from classes [6, 7]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=114.71, 10th percentile=67.27
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness/open2/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7578 Total: 1.7578 Acc: 36.24% | Val Loss: 2.1681 Acc: 45.89% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 45.89%)
+Ep  1000/3000 | CE: 1.6842 Total: 3.7992 Acc: 35.20% | Val Loss: 2.1642 Acc: 46.67% | LR: 4.91e-05 cls:0.4
+  -> Best model saved (Val Acc: 46.67%)
+Ep  1500/3000 | CE: 1.6564 Total: 3.7549 Acc: 35.70% | Val Loss: 2.2158 Acc: 47.56% | LR: 4.67e-05 cls:0.8
+  -> Best model saved (Val Acc: 47.56%)
+Ep  2000/3000 | CE: 1.6414 Total: 3.7254 Acc: 35.88% | Val Loss: 2.2525 Acc: 47.22% | LR: 4.27e-05 cls:1.0
+Ep  2500/3000 | CE: 1.6171 Total: 3.6575 Acc: 36.19% | Val Loss: 2.2175 Acc: 48.22% | LR: 3.75e-05 cls:1.0
+  -> Best model saved (Val Acc: 48.22%)
+Ep  3000/3000 | CE: 1.6059 Total: 3.6132 Acc: 37.46% | Val Loss: 2.0967 Acc: 50.44% | LR: 3.15e-05 cls:1.0
+  -> Best model saved (Val Acc: 50.44%)
+
+Loaded best model (Val Acc: 50.44%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 50.44%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness/open2/episodic_history.json/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 10
+Known scores:   [-3.65, 10.25] mean=0.59
+Unknown scores: [-1.90, 2.58] mean=-0.00
+Mean separation: 0.60 (positive = known higher = good)
+
+Threshold (tau): -2.1427
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 0.00%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   40.43%
+  OSR Score (mean):         67.72%
+  AUROC:                    0.6552
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 10
+Known scores:   [-9.59, -2.02] mean=-4.69
+Unknown scores: [-14.43, -4.08] mean=-9.48
+Mean separation: 4.80 (positive = known higher = good)
+
+Threshold (tau): -8.2364
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 60.00%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   23.33%
+  OSR Score (mean):         59.17%
+  AUROC:                    0.7727
+
+  n_open=3, unknown=[6, 7, 8]
+Real OOD exposure: 5400 samples from classes [6, 7, 8]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=114.71, 10th percentile=67.27
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness/open3/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7522 Total: 1.7522 Acc: 35.68% | Val Loss: 1.9312 Acc: 46.44% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 46.44%)
+Ep  1000/3000 | CE: 1.6828 Total: 3.7752 Acc: 35.24% | Val Loss: 1.9050 Acc: 48.67% | LR: 4.91e-05 cls:0.4
+  -> Best model saved (Val Acc: 48.67%)
+Ep  1500/3000 | CE: 1.6592 Total: 3.7252 Acc: 35.36% | Val Loss: 2.1486 Acc: 44.67% | LR: 4.67e-05 cls:0.8
+Ep  2000/3000 | CE: 1.6180 Total: 3.7070 Acc: 36.52% | Val Loss: 2.1483 Acc: 49.11% | LR: 4.27e-05 cls:1.0
+  -> Best model saved (Val Acc: 49.11%)
+Ep  2500/3000 | CE: 1.5857 Total: 3.6598 Acc: 38.48% | Val Loss: 2.1577 Acc: 45.00% | LR: 3.75e-05 cls:1.0
+Ep  3000/3000 | CE: 1.5693 Total: 3.6017 Acc: 39.88% | Val Loss: 2.1057 Acc: 48.11% | LR: 3.15e-05 cls:1.0
+
+Loaded best model (Val Acc: 49.11%, Ep 2000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 49.11%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness/open3/episodic_history.json
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 15
+Known scores:   [-3.72, 10.25] mean=0.60
+Unknown scores: [-4.35, 6.71] mean=-0.04
+Mean separation: 0.64 (positive = known higher = good)
+
+Threshold (tau): -2.1179
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 13.33%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   39.71%
+  OSR Score (mean):         67.35%
+  AUROC:                    0.6343
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 15
+Known scores:   [-9.59, -2.02] mean=-4.69
+Unknown scores: [-14.43, -3.99] mean=-8.18
+Mean separation: 3.49 (positive = known higher = good)
+
+Threshold (tau): -8.2364
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 46.67%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   19.69%
+  OSR Score (mean):         57.34%
+  AUROC:                    0.7499
+
+  n_open=4, unknown=[6, 7, 8, 9]
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=114.71, 10th percentile=67.27
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness/open4/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7565 Total: 1.7565 Acc: 35.46% | Val Loss: 1.8131 Acc: 45.89% | LR: 5.00e-05 cls:0.0
+  -> Best model saved (Val Acc: 45.89%)
+Ep  1000/3000 | CE: 1.6755 Total: 3.8200 Acc: 34.98% | Val Loss: 1.8756 Acc: 45.89% | LR: 4.91e-05 cls:0.4
+  -> Best model saved (Val Acc: 45.89%)
+Ep  1500/3000 | CE: 1.6594 Total: 3.7706 Acc: 36.34% | Val Loss: 1.9412 Acc: 49.44% | LR: 4.67e-05 cls:0.8
+  -> Best model saved (Val Acc: 49.44%)
+Ep  2000/3000 | CE: 1.6501 Total: 3.7631 Acc: 37.13% | Val Loss: 2.1906 Acc: 46.22% | LR: 4.27e-05 cls:1.0
+Ep  2500/3000 | CE: 1.6359 Total: 3.6780 Acc: 38.44% | Val Loss: 2.0869 Acc: 50.78% | LR: 3.75e-05 cls:1.0
+  -> Best model saved (Val Acc: 50.78%)
+Ep  3000/3000 | CE: 1.6256 Total: 3.6409 Acc: 38.72% | Val Loss: 2.0367 Acc: 49.00% | LR: 3.15e-05 cls:1.0
+
+Loaded best model (Val Acc: 50.78%, Ep 2500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 50.78%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness/open4/episodic_history.json
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 20
+Known scores:   [-3.79, 10.43] mean=0.56
+Unknown scores: [-4.35, 6.71] mean=-0.10
+Mean separation: 0.66 (positive = known higher = good)
+
+Threshold (tau): -2.3943
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 15.00%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   30.30%
+  OSR Score (mean):         62.65%
+  AUROC:                    0.5981
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 20
+Known scores:   [-9.59, -2.02] mean=-4.69
+Unknown scores: [-14.43, -3.99] mean=-8.07
+Mean separation: 3.38 (positive = known higher = good)
+
+Threshold (tau): -8.2364
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 45.00%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   17.37%
+  OSR Score (mean):         56.19%
+  AUROC:                    0.6951
+
+Results saved to experiment/episodic_exp/openness/results.json
+
+============================================================
+OPENNESS SWEEP SUMMARY
+============================================================
+    OpenWays      TNR      TPR      OSR
+       open1  95.00%  44.07%  69.53%
+       open2  95.00%  40.43%  67.72%
+       open3  95.00%  39.71%  67.35%
+       open4  95.00%  30.30%  62.65%

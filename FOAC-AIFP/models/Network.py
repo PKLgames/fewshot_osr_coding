@@ -107,7 +107,12 @@ class My_Net(nn.Module):
 
             support_feat,s1= self.encode(support_data.cuda())
             q1,query_feat = self.encode(query_data.cuda())
-            supopen_feat,so1= self.encode(suppopen_data.cuda())
+            # fewshot: suppopen可能为空(开放类样本不足)，跳过encode
+            if suppopen_data.numel() > 0 and suppopen_data.dim() >= 2:
+                supopen_feat,so1= self.encode(suppopen_data.cuda())
+            else:
+                supopen_feat = torch.empty(0, query_feat.shape[-1]).cuda()
+                so1 = torch.empty(0, query_feat.shape[-1]).cuda()
             # fewshot: openset可能为空(未知类样本不足)，跳过encode
             if openset_data.numel() > 0 and openset_data.dim() >= 2:
                 openset_feat,q2 = self.encode(openset_data.cuda())
@@ -128,21 +133,23 @@ class My_Net(nn.Module):
                  return prediction,loss_cls,loss_fake
             loss_cls,loss_fake,prediction = self.task(s1,support_feat,query_feat,q1,openset_feat,support_label.cuda(),cls_label.cuda(),query_label.cuda(),supp_ids.cuda())
             #Task 2: data augmentation with open classes as "known" and query classes as "unknown"
-            # Dynamically compute open class count from supopen_label
-            actual_n_open_ways = supopen_label.max().item() + 1
-            # Map openset_label to contiguous indices [0, actual_n_open_ways-1]
-            unique_open = torch.unique(openset_label)
-            open_to_idx = {v.item(): i for i, v in enumerate(unique_open)}
-            open_query_label = torch.tensor([open_to_idx[l.item()] for l in openset_label],
-                                            dtype=torch.long, device=openset_label.device)
-            # Query samples are "unknown" in Task 2
-            task2_unknown_label = actual_n_open_ways * torch.ones_like(query_label)
-            cls_label_aug = torch.cat([open_query_label, task2_unknown_label])
-            # Use supopen_label for prototype generation
-            loss_cls_aug,loss_aug_fake,_= self.task(so1,supopen_feat,q2,openset_feat,q1,supopen_label.cuda(),cls_label_aug.cuda(),open_query_label,supp_ids.cuda())
-
-
-            return prediction,(loss_cls+loss_cls_aug,loss_fake+loss_aug_fake)
+            # fewshot: 需要suppopen和openset都有数据才能做Task 2角色互换
+            if supopen_feat.numel() > 0 and openset_feat.numel() > 0:
+                # Dynamically compute open class count from supopen_label
+                actual_n_open_ways = supopen_label.max().item() + 1
+                # Map openset_label to contiguous indices [0, actual_n_open_ways-1]
+                unique_open = torch.unique(openset_label)
+                open_to_idx = {v.item(): i for i, v in enumerate(unique_open)}
+                open_query_label = torch.tensor([open_to_idx[l.item()] for l in openset_label],
+                                                dtype=torch.long, device=openset_label.device)
+                # Query samples are "unknown" in Task 2
+                task2_unknown_label = actual_n_open_ways * torch.ones_like(query_label)
+                cls_label_aug = torch.cat([open_query_label, task2_unknown_label])
+                # Use supopen_label for prototype generation
+                loss_cls_aug,loss_aug_fake,_= self.task(so1,supopen_feat,q2,openset_feat,q1,supopen_label.cuda(),cls_label_aug.cuda(),open_query_label,supp_ids.cuda())
+                return prediction,(loss_cls+loss_cls_aug,loss_fake+loss_aug_fake)
+            else:
+                return prediction,(loss_cls,loss_fake)
 
     def task(self,s1,support_feat,query_feat,q1,openset_feat,support_label,cls_label,query_label,supp_ids=None):
         # CIAM: conditional information coupling (query-conditioned support)
@@ -156,7 +163,10 @@ class My_Net(nn.Module):
             supp_protos = self.PAM(aug_supp,support_label)
         else:
             # Simple mean pooling fallback
-            supp_protos = self.gap(aug_supp).squeeze(-1).squeeze(-1)
+            if aug_supp.dim() == 4:
+                supp_protos = self.gap(aug_supp).squeeze(-1).squeeze(-1)
+            else:
+                supp_protos = aug_supp  # already 2D
             out_feats = []
             label = torch.unique(support_label, sorted=False)
             for cls_id in label:
@@ -172,7 +182,10 @@ class My_Net(nn.Module):
             recip_units, fake_center = self.NPM(supp_protos,base_weights,base_open_weights)
         else:
             # Simple fallback: mean of base open weights as fake center
-            fake_center = base_open_weights.mean(dim=0, keepdim=True).unsqueeze(0)  # [1, 1, D]
+            if base_open_weights.dim() > 2:
+                base_open_weights = base_open_weights.reshape(-1, base_open_weights.shape[-1])
+            fake_center = base_open_weights.mean(dim=0, keepdim=True)  # [1, D]
+            fake_center = fake_center.unsqueeze(0)  # [1, 1, D]
 
         cls_protos = torch.cat([supp_protos.unsqueeze(0), fake_center], dim=1)
 
@@ -231,8 +244,10 @@ class My_Net(nn.Module):
             self.weight_base_open = nn.Parameter(-fc_weight * self.args.open_weight_sum_cali, requires_grad=True)
 
     def get_representation(self, base_ids=None):
-        if base_ids is not None and len(base_ids) > 0:
-            base_weights = self.weight_base[base_ids,:]   ## bs*54*D
+        if base_ids is not None and base_ids.numel() > 0:
+            # DataLoader wraps with batch dim; squeeze to ensure 1D indexing
+            base_ids = base_ids.squeeze()
+            base_weights = self.weight_base[base_ids,:]   ## N*D
             base_open_weights = self.weight_base_open[base_ids,:]
         else:
             base_weights = self.weight_base.unsqueeze(0)

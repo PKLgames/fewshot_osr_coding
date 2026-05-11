@@ -25,7 +25,7 @@ train:
   test_times: 200
 
   # ========== Training hyper-parameters ==========
-  epoch: 80
+  epoch: 1
   epochs_pre: 80
   batch_size: 256
   learning_rate: 0.05

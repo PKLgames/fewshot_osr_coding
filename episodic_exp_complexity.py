@@ -22,7 +22,6 @@ import numpy as np
 
 from episodic_trainer import (
     EpisodicFlowClassifier, FeatureExtractor, EpisodeSampler, FeatureCache,
-    TAUDataset,
 )
 
 

@@ -82,6 +82,8 @@ def extract_features(model, dataloader, args, device='cuda'):
             # Open-set features (unknown/novel classes)
             o_data = openset_data.float().squeeze().to(device)
             o_label = openset_label.squeeze().cpu().numpy()
+            if o_data.numel() == 0:
+                continue  # skip empty openset
             if o_data.dim() == 4:
                 o_data = o_data.view(-1, *o_data.shape[2:])
             elif o_data.dim() == 2:

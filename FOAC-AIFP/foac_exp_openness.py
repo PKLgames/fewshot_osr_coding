@@ -103,7 +103,12 @@ def main():
     parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'all'], default='all')
     parser.add_argument('--config', type=str, default=None)
     parser.add_argument('--open_ways', type=int, nargs='*', default=OPEN_WAY_VALUES)
+    parser.add_argument('--quick', action='store_true',
+                        help='Quick mode: only test n_open=1,2')
     cl_args = parser.parse_args()
+
+    if cl_args.quick:
+        cl_args.open_ways = [1, 2]
 
     datasets = ['TAU22', 'TAU19'] if cl_args.dataset == 'all' else [cl_args.dataset]
     all_results = {}

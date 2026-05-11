@@ -1,0 +1,20 @@
+[05/10 05:11:01] start training!
+[05/10 05:11:30] 
+[05/10 05:11:30] epoch 1/1, iter 400:
+[05/10 05:11:30] train_loss: 2.37296
+[05/10 05:11:30] train_acc: 0.511
+[05/10 05:11:30] train_auroc: 0.603
+[05/10 05:11:36] Summary name val_6-way-5-shot_tpr@tnr95 is illegal; using val_6-way-5-shot_tpr_tnr95 instead.
+[05/10 05:11:36] val_6-way-5-shot_acc: 43.444	0.690
+[05/10 05:11:36] val_6-way-5-shot_auroc: 48.601	1.177
+[05/10 05:11:36] val_6-way-5-shot_fscore: 41.901	0.734
+[05/10 05:11:36] val_6-way-5-shot_tpr@tnr95: 3.850	0.569
+[05/10 05:11:36] val_6-way-5-shot_osr: 49.703	0.284
+[05/10 05:11:36] BEST ACC!
+[05/10 05:11:36] BEST Auroc!
+[05/10 05:11:36] BEST Fscore!
+[05/10 05:11:36] BEST OSR Score!
+[05/10 05:11:36] training finished!
+[05/10 05:11:36] ------------------------
+[05/10 05:11:36] the best epoch is 1/1
+[05/10 05:11:36] the best 6-way 5-shot val acc is 43.444

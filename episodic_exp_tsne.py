@@ -19,7 +19,7 @@ import numpy as np
 import torch
 
 from episodic_trainer import (
-    FeatureExtractor, FeatureCache, EpisodicFlowClassifier, TAUDataset,
+    FeatureExtractor, FeatureCache, EpisodicFlowClassifier,
 )
 
 
@@ -47,7 +47,9 @@ def load_trained_classifier(experiment_dir, device='cuda', feature_dim=64,
 
 
 def extract_projected_features(classifier, cache, classes, device='cuda',
-                                 max_per_class=200):
+                                 max_per_class=200, quick=False):
+    if quick:
+        max_per_class = 50
     """Extract features projected through the classifier's feature_adapter."""
     features, labels = [], []
 
@@ -68,7 +70,8 @@ def extract_projected_features(classifier, cache, classes, device='cuda',
     return np.concatenate(features), np.array(labels)
 
 
-def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title=''):
+def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title='',
+              quick=False):
     """Generate t-SNE plot."""
     try:
         from sklearn.manifold import TSNE
@@ -80,7 +83,7 @@ def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title=
         return
 
     # Subsample
-    max_samples = 3000
+    max_samples = 1000 if quick else 3000
     if len(features) > max_samples:
         idx = np.random.choice(len(features), max_samples, replace=False)
         features = features[idx]
@@ -122,10 +125,12 @@ def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title=
 def main():
     parser = argparse.ArgumentParser(description='Episodic t-SNE Visualization')
     parser.add_argument('--experiment_dir', type=str,
-                        default='experiment/yamnet_fewshot_osr22_fewshot')
+                        default='experiment/yamnet_realfewshot_osr24')
     parser.add_argument('--dataset', choices=['TAU22', 'TAU19'], default='TAU22')
     parser.add_argument('--compare_ablation', action='store_true',
                         help='Compare full model vs baseline (no extras)')
+    parser.add_argument('--quick', action='store_true',
+                        help='Quick mode: fewer samples, faster t-SNE')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
     cl_args = parser.parse_args()
@@ -152,10 +157,10 @@ def main():
     train_dataset = TAUDataset(split='train')
     test_dataset = TAUDataset(split='test')
 
-    train_cache = FeatureCache()
+    train_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train',
                                    device, batch_size=64)
-    test_cache = FeatureCache()
+    test_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test',
                                   device, batch_size=64)
 
@@ -167,16 +172,17 @@ def main():
     classifier = load_trained_classifier(cl_args.experiment_dir, device)
     if classifier:
         train_feats, train_labels = extract_projected_features(
-            classifier, train_cache, base_classes, device)
+            classifier, train_cache, base_classes, device, quick=cl_args.quick)
         test_feats, test_labels = extract_projected_features(
-            classifier, test_cache, unknown_classes, device)
+            classifier, test_cache, unknown_classes, device, quick=cl_args.quick)
 
         all_feats = np.concatenate([train_feats, test_feats])
         all_labels = np.concatenate([train_labels, test_labels])
 
         plot_tsne(all_feats, all_labels, base_classes, unknown_classes,
                   os.path.join(save_dir, f'{cl_args.dataset}_full_model.png'),
-                  title=f'{cl_args.dataset} — Full Model (Episodic Trainer)')
+                  title=f'{cl_args.dataset} — Full Model (Episodic Trainer)',
+                  quick=cl_args.quick)
 
     # --- Baseline comparison ---
     if cl_args.compare_ablation:

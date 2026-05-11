@@ -47,7 +47,8 @@ def find_best_checkpoint(experiment_dir):
 
 
 def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
-                      N_way=6, K_shot=5, feature_dim=64, device='cuda'):
+                      N_way=6, K_shot=5, feature_dim=64, device='cuda', quick=False):
+    num_rounds = 3 if quick else 10
     """
     1. Load classifier trained on source
     2. Extract features from target using same backbone
@@ -59,6 +60,7 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
 
     # --- Load trained classifier from source ---
     source_dirs = [
+        f'experiment/yamnet_realfewshot_osr24' if source_name == 'TAU22' else f'experiment/yamnet_realfewshot_osr24_tau19',
         f'experiment/yamnet_fewshot_osr22_fewshot',
         f'experiment/yamnet_fewshot_osr22',
         f'experiment/yamnet_fewshot_osr13',
@@ -106,13 +108,13 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
     target_calib = TargetDataset(split='calib')
     target_test = TargetDataset(split='test')
 
-    train_cache = FeatureCache()
+    train_cache = FeatureCache(dataset_name=target_name.lower())
     train_cache.extract_and_cache(feature_extractor, target_train, 'train', device, batch_size=64)
 
-    calib_cache = FeatureCache()
+    calib_cache = FeatureCache(dataset_name=target_name.lower())
     calib_cache.extract_and_cache(feature_extractor, target_calib, 'calib', device, batch_size=64)
 
-    test_cache = FeatureCache()
+    test_cache = FeatureCache(dataset_name=target_name.lower())
     test_cache.extract_and_cache(feature_extractor, target_test, 'test', device, batch_size=64)
 
     # --- Few-shot evaluation on target ---
@@ -149,7 +151,7 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
                 flow_classifier, test_cache,
                 base_classes, unknown_classes, device)
             osr_results[method] = test_calibrator.evaluate_osr(
-                K_shot=50, num_rounds=10,
+                K_shot=50, num_rounds=num_rounds,
                 method=method, recalibrate_per_round=True)
         except Exception as e:
             print(f"  OSR {method} failed: {e}")
@@ -167,6 +169,8 @@ def main():
     parser.add_argument('--source', choices=['TAU22', 'TAU19'], default=None)
     parser.add_argument('--target', choices=['TAU22', 'TAU19'], default=None)
     parser.add_argument('--all', action='store_true')
+    parser.add_argument('--quick', action='store_true',
+                        help='Quick mode: fewer evaluation rounds')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
     cl_args = parser.parse_args()
@@ -187,7 +191,7 @@ def main():
     for source, target in pairs:
         key = f"{source}->{target}"
         r = cross_domain_eval(source, target, base_classes, unknown_classes,
-                              device=device)
+                              device=device, quick=cl_args.quick)
         if r:
             all_results[key] = r
 

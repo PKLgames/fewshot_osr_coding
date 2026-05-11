@@ -21,6 +21,13 @@ def default_train(train_loader, model, optimizer, writer, iter_counter, args):
             supp_idx, open_idx = supp_idx.long(), open_idx.long()
             #tuple(x.squeeze() for x in (support_data, query_data, suppopen_data, openset_data))
             support_data, query_data, suppopen_data, openset_data = support_data.squeeze(), query_data.squeeze(), suppopen_data.squeeze(), openset_data.squeeze()
+            # fewshot: squeeze可能把batch维去掉导致1D, 需保证所有数据至少2D (batch, time)
+            for _i, d in enumerate([support_data, query_data, suppopen_data, openset_data]):
+                if d.dim() == 1:
+                    if _i == 0: support_data = d.unsqueeze(0)
+                    elif _i == 1: query_data = d.unsqueeze(0)
+                    elif _i == 2: suppopen_data = d.unsqueeze(0)
+                    else: openset_data = d.unsqueeze(0)
             the_label = tuple(x.squeeze() for x in (support_label, query_label, suppopen_label, openset_label))
             the_img = [support_data, query_data,  suppopen_data,openset_data]
   

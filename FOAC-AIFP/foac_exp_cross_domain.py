@@ -126,8 +126,13 @@ def cross_domain_eval(model, target_loader, args, device='cuda'):
                                    torch.zeros_like(openset_label)
             the_label = tuple(x.squeeze() for x in
                               (support_label, query_label, suppopen_label, openset_label_mapped))
-            the_img = tuple(x.squeeze() for x in
-                            (support_data, query_data, suppopen_data, openset_data))
+            the_img = [x.squeeze() for x in
+                            (support_data, query_data, suppopen_data, openset_data)]
+            # fewshot: squeeze可能把batch维去掉导致1D, 需保证至少2D (batch, time)
+            for _i, d in enumerate(the_img):
+                if d.dim() == 1:
+                    the_img[_i] = d.unsqueeze(0)
+            the_img = tuple(the_img)
             supp_idx_dev = supp_idx.long().to(device)
             open_idx_dev = open_idx.long().to(device)
 

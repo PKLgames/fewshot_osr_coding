@@ -1,45 +1,520 @@
 {
   "TAU22": {
+    "full_model": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": true,
+      "results": {
+        "model_TAU22_max_acc.pth": {
+          "acc": 42.022,
+          "auroc": 53.091,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 5.933,
+          "osr": 50.744,
+          "loss": "1.64677"
+        },
+        "model_TAU22_max_osr.pth": {
+          "acc": 42.022,
+          "auroc": 53.091,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 5.933,
+          "osr": 50.744,
+          "loss": "1.64677"
+        },
+        "model_TAU22_max_auroc.pth": {
+          "acc": 42.022,
+          "auroc": 53.091,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 5.933,
+          "osr": 50.744,
+          "loss": "1.64677"
+        },
+        "model_TAU22_max_fscore.pth": {
+          "acc": 42.022,
+          "auroc": 53.091,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 5.933,
+          "osr": 50.744,
+          "loss": "1.64677"
+        }
+      }
+    },
     "wo_CIAM": {
       "use_ciam": false,
       "use_pam": true,
       "use_npm": true,
       "results": {
         "model_TAU22_max_acc.pth": {
-          "acc": 42.091,
-          "auroc": 54.403,
-          "fscore": 43.913,
-          "tnr": 95.0,
-          "tpr": 6.49,
-          "osr": 50.745,
-          "loss": "1.69582"
+          "acc": 41.861,
+          "auroc": 53.119,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 5.975,
+          "osr": 50.765,
+          "loss": "1.64853"
         },
         "model_TAU22_max_osr.pth": {
-          "acc": 42.091,
-          "auroc": 54.403,
-          "fscore": 43.913,
-          "tnr": 95.0,
-          "tpr": 6.49,
-          "osr": 50.745,
-          "loss": "1.69582"
+          "acc": 41.861,
+          "auroc": 53.119,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 5.975,
+          "osr": 50.765,
+          "loss": "1.64853"
         },
         "model_TAU22_max_auroc.pth": {
-          "acc": 42.091,
-          "auroc": 54.403,
-          "fscore": 43.913,
-          "tnr": 95.0,
-          "tpr": 6.49,
-          "osr": 50.745,
-          "loss": "1.69582"
+          "acc": 41.861,
+          "auroc": 53.119,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 5.975,
+          "osr": 50.765,
+          "loss": "1.64853"
         },
         "model_TAU22_max_fscore.pth": {
-          "acc": 42.091,
-          "auroc": 54.403,
-          "fscore": 43.913,
-          "tnr": 95.0,
-          "tpr": 6.49,
-          "osr": 50.745,
-          "loss": "1.69582"
+          "acc": 41.861,
+          "auroc": 53.119,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 5.975,
+          "osr": 50.765,
+          "loss": "1.64853"
+        }
+      }
+    },
+    "wo_PAM": {
+      "use_ciam": true,
+      "use_pam": false,
+      "use_npm": true,
+      "results": {
+        "model_TAU22_max_acc.pth": {
+          "acc": 41.917,
+          "auroc": 53.095,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 6.058,
+          "osr": 50.807,
+          "loss": "1.6503301"
+        },
+        "model_TAU22_max_osr.pth": {
+          "acc": 41.917,
+          "auroc": 53.095,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 6.058,
+          "osr": 50.807,
+          "loss": "1.6503301"
+        },
+        "model_TAU22_max_auroc.pth": {
+          "acc": 41.917,
+          "auroc": 53.095,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 6.058,
+          "osr": 50.807,
+          "loss": "1.6503301"
+        },
+        "model_TAU22_max_fscore.pth": {
+          "acc": 41.917,
+          "auroc": 53.095,
+          "fscore": 50.835,
+          "tnr": 95.556,
+          "tpr": 6.058,
+          "osr": 50.807,
+          "loss": "1.6503301"
+        }
+      }
+    },
+    "wo_NPM": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": false,
+      "results": {
+        "model_TAU22_max_acc.pth": {
+          "acc": 42.1,
+          "auroc": 52.986,
+          "fscore": 50.714,
+          "tnr": 95.556,
+          "tpr": 5.95,
+          "osr": 50.753,
+          "loss": "1.64662"
+        },
+        "model_TAU22_max_osr.pth": {
+          "acc": 42.1,
+          "auroc": 52.986,
+          "fscore": 50.714,
+          "tnr": 95.556,
+          "tpr": 5.95,
+          "osr": 50.753,
+          "loss": "1.64662"
+        },
+        "model_TAU22_max_auroc.pth": {
+          "acc": 42.1,
+          "auroc": 52.986,
+          "fscore": 50.714,
+          "tnr": 95.556,
+          "tpr": 5.95,
+          "osr": 50.753,
+          "loss": "1.64662"
+        },
+        "model_TAU22_max_fscore.pth": {
+          "acc": 42.1,
+          "auroc": 52.986,
+          "fscore": 50.714,
+          "tnr": 95.556,
+          "tpr": 5.95,
+          "osr": 50.753,
+          "loss": "1.64662"
+        }
+      }
+    },
+    "only_NPM": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": true,
+      "results": {
+        "model_TAU22_max_acc.pth": {
+          "acc": 42.017,
+          "auroc": 53.105,
+          "fscore": 50.795,
+          "tnr": 95.556,
+          "tpr": 5.833,
+          "osr": 50.694,
+          "loss": "1.64839"
+        },
+        "model_TAU22_max_osr.pth": {
+          "acc": 42.017,
+          "auroc": 53.105,
+          "fscore": 50.795,
+          "tnr": 95.556,
+          "tpr": 5.833,
+          "osr": 50.694,
+          "loss": "1.64839"
+        },
+        "model_TAU22_max_auroc.pth": {
+          "acc": 42.017,
+          "auroc": 53.105,
+          "fscore": 50.795,
+          "tnr": 95.556,
+          "tpr": 5.833,
+          "osr": 50.694,
+          "loss": "1.64839"
+        },
+        "model_TAU22_max_fscore.pth": {
+          "acc": 42.017,
+          "auroc": 53.105,
+          "fscore": 50.795,
+          "tnr": 95.556,
+          "tpr": 5.833,
+          "osr": 50.694,
+          "loss": "1.64839"
+        }
+      }
+    },
+    "baseline_no_modules": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": false,
+      "results": {
+        "model_TAU22_max_acc.pth": {
+          "acc": 42.083,
+          "auroc": 53.034,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 6.025,
+          "osr": 50.79,
+          "loss": "1.64748"
+        },
+        "model_TAU22_max_osr.pth": {
+          "acc": 42.083,
+          "auroc": 53.034,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 6.025,
+          "osr": 50.79,
+          "loss": "1.64748"
+        },
+        "model_TAU22_max_auroc.pth": {
+          "acc": 42.083,
+          "auroc": 53.034,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 6.025,
+          "osr": 50.79,
+          "loss": "1.64748"
+        },
+        "model_TAU22_max_fscore.pth": {
+          "acc": 42.083,
+          "auroc": 53.034,
+          "fscore": 50.747,
+          "tnr": 95.556,
+          "tpr": 6.025,
+          "osr": 50.79,
+          "loss": "1.64748"
+        }
+      }
+    }
+  },
+  "TAU19": {
+    "full_model": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": true,
+      "results": {
+        "model_TAU19_max_acc.pth": {
+          "acc": 43.139,
+          "auroc": 50.613,
+          "fscore": 49.104,
+          "tnr": 95.556,
+          "tpr": 4.183,
+          "osr": 49.869,
+          "loss": "1.5855701"
+        },
+        "model_TAU19_max_osr.pth": {
+          "acc": 43.139,
+          "auroc": 50.613,
+          "fscore": 49.104,
+          "tnr": 95.556,
+          "tpr": 4.183,
+          "osr": 49.869,
+          "loss": "1.5855701"
+        },
+        "model_TAU19_max_auroc.pth": {
+          "acc": 43.139,
+          "auroc": 50.613,
+          "fscore": 49.104,
+          "tnr": 95.556,
+          "tpr": 4.183,
+          "osr": 49.869,
+          "loss": "1.5855701"
+        },
+        "model_TAU19_max_fscore.pth": {
+          "acc": 43.139,
+          "auroc": 50.613,
+          "fscore": 49.104,
+          "tnr": 95.556,
+          "tpr": 4.183,
+          "osr": 49.869,
+          "loss": "1.5855701"
+        }
+      }
+    },
+    "wo_CIAM": {
+      "use_ciam": false,
+      "use_pam": true,
+      "use_npm": true,
+      "results": {
+        "model_TAU19_max_acc.pth": {
+          "acc": 43.217,
+          "auroc": 50.06,
+          "fscore": 48.7,
+          "tnr": 95.556,
+          "tpr": 4.142,
+          "osr": 49.849,
+          "loss": "1.5904801"
+        },
+        "model_TAU19_max_osr.pth": {
+          "acc": 43.217,
+          "auroc": 50.06,
+          "fscore": 48.7,
+          "tnr": 95.556,
+          "tpr": 4.142,
+          "osr": 49.849,
+          "loss": "1.5904801"
+        },
+        "model_TAU19_max_auroc.pth": {
+          "acc": 43.217,
+          "auroc": 50.06,
+          "fscore": 48.7,
+          "tnr": 95.556,
+          "tpr": 4.142,
+          "osr": 49.849,
+          "loss": "1.5904801"
+        },
+        "model_TAU19_max_fscore.pth": {
+          "acc": 43.217,
+          "auroc": 50.06,
+          "fscore": 48.7,
+          "tnr": 95.556,
+          "tpr": 4.142,
+          "osr": 49.849,
+          "loss": "1.5904801"
+        }
+      }
+    },
+    "wo_PAM": {
+      "use_ciam": true,
+      "use_pam": false,
+      "use_npm": true,
+      "results": {
+        "model_TAU19_max_acc.pth": {
+          "acc": 43.361,
+          "auroc": 49.725,
+          "fscore": 48.391,
+          "tnr": 95.556,
+          "tpr": 4.792,
+          "osr": 50.174,
+          "loss": "1.59081"
+        },
+        "model_TAU19_max_osr.pth": {
+          "acc": 43.361,
+          "auroc": 49.725,
+          "fscore": 48.391,
+          "tnr": 95.556,
+          "tpr": 4.792,
+          "osr": 50.174,
+          "loss": "1.59081"
+        },
+        "model_TAU19_max_auroc.pth": {
+          "acc": 43.361,
+          "auroc": 49.725,
+          "fscore": 48.391,
+          "tnr": 95.556,
+          "tpr": 4.792,
+          "osr": 50.174,
+          "loss": "1.59081"
+        },
+        "model_TAU19_max_fscore.pth": {
+          "acc": 43.361,
+          "auroc": 49.725,
+          "fscore": 48.391,
+          "tnr": 95.556,
+          "tpr": 4.792,
+          "osr": 50.174,
+          "loss": "1.59081"
+        }
+      }
+    },
+    "wo_NPM": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": false,
+      "results": {
+        "model_TAU19_max_acc.pth": {
+          "acc": 42.95,
+          "auroc": 49.706,
+          "fscore": 48.734,
+          "tnr": 95.556,
+          "tpr": 3.992,
+          "osr": 49.774,
+          "loss": "1.58556"
+        },
+        "model_TAU19_max_osr.pth": {
+          "acc": 42.95,
+          "auroc": 49.706,
+          "fscore": 48.734,
+          "tnr": 95.556,
+          "tpr": 3.992,
+          "osr": 49.774,
+          "loss": "1.58556"
+        },
+        "model_TAU19_max_auroc.pth": {
+          "acc": 42.95,
+          "auroc": 49.706,
+          "fscore": 48.734,
+          "tnr": 95.556,
+          "tpr": 3.992,
+          "osr": 49.774,
+          "loss": "1.58556"
+        },
+        "model_TAU19_max_fscore.pth": {
+          "acc": 42.95,
+          "auroc": 49.706,
+          "fscore": 48.734,
+          "tnr": 95.556,
+          "tpr": 3.992,
+          "osr": 49.774,
+          "loss": "1.58556"
+        }
+      }
+    },
+    "only_NPM": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": true,
+      "results": {
+        "model_TAU19_max_acc.pth": {
+          "acc": 43.394,
+          "auroc": 50.188,
+          "fscore": 48.822,
+          "tnr": 95.556,
+          "tpr": 4.525,
+          "osr": 50.04,
+          "loss": "1.58295"
+        },
+        "model_TAU19_max_osr.pth": {
+          "acc": 43.394,
+          "auroc": 50.188,
+          "fscore": 48.822,
+          "tnr": 95.556,
+          "tpr": 4.525,
+          "osr": 50.04,
+          "loss": "1.58295"
+        },
+        "model_TAU19_max_auroc.pth": {
+          "acc": 43.394,
+          "auroc": 50.188,
+          "fscore": 48.822,
+          "tnr": 95.556,
+          "tpr": 4.525,
+          "osr": 50.04,
+          "loss": "1.58295"
+        },
+        "model_TAU19_max_fscore.pth": {
+          "acc": 43.394,
+          "auroc": 50.188,
+          "fscore": 48.822,
+          "tnr": 95.556,
+          "tpr": 4.525,
+          "osr": 50.04,
+          "loss": "1.58295"
+        }
+      }
+    },
+    "baseline_no_modules": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": false,
+      "results": {
+        "model_TAU19_max_acc.pth": {
+          "acc": 43.028,
+          "auroc": 50.173,
+          "fscore": 48.916,
+          "tnr": 95.556,
+          "tpr": 4.042,
+          "osr": 49.799,
+          "loss": "1.5888001"
+        },
+        "model_TAU19_max_osr.pth": {
+          "acc": 43.028,
+          "auroc": 50.173,
+          "fscore": 48.916,
+          "tnr": 95.556,
+          "tpr": 4.042,
+          "osr": 49.799,
+          "loss": "1.5888001"
+        },
+        "model_TAU19_max_auroc.pth": {
+          "acc": 43.028,
+          "auroc": 50.173,
+          "fscore": 48.916,
+          "tnr": 95.556,
+          "tpr": 4.042,
+          "osr": 49.799,
+          "loss": "1.5888001"
+        },
+        "model_TAU19_max_fscore.pth": {
+          "acc": 43.028,
+          "auroc": 50.173,
+          "fscore": 48.916,
+          "tnr": 95.556,
+          "tpr": 4.042,
+          "osr": 49.799,
+          "loss": "1.5888001"
         }
       }
     }

@@ -1,0 +1,402 @@
+{
+  "2w1s": {
+    "acc": 0.7183333720266819,
+    "ci95": 0.03502957550023739,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3156666656024754,
+      "osr_score": 0.6328333268407732,
+      "auroc": 0.5983318028549383,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "2w3s": {
+    "acc": 0.728666704595089,
+    "ci95": 0.03160432198013952,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.2951388886314817,
+      "osr_score": 0.6225694383552763,
+      "auroc": 0.5985372262088478,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "2w5s": {
+    "acc": 0.7846667084097863,
+    "ci95": 0.02615651744539025,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.31815277703572065,
+      "osr_score": 0.6340763825573958,
+      "auroc": 0.5992866527134774,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "2w7s": {
+    "acc": 0.802666711807251,
+    "ci95": 0.02176061056205532,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3151250018272549,
+      "osr_score": 0.632562494953163,
+      "auroc": 0.6000178339763375,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "2w10s": {
+    "acc": 0.7913333773612976,
+    "ci95": 0.023909144210682024,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3114999993471429,
+      "osr_score": 0.6307499937131069,
+      "auroc": 0.5990932506430041,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "3w1s": {
+    "acc": 0.588222237303853,
+    "ci95": 0.03176544076699939,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3154027787502855,
+      "osr_score": 0.6327013834146783,
+      "auroc": 0.5981649334490741,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "3w3s": {
+    "acc": 0.6457777960598469,
+    "ci95": 0.022386199582068212,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.31763888775603843,
+      "osr_score": 0.6338194379175548,
+      "auroc": 0.5989719699074074,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "3w5s": {
+    "acc": 0.677333350777626,
+    "ci95": 0.02115455223548194,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.30770833338610826,
+      "osr_score": 0.6288541607325897,
+      "auroc": 0.597185611882716,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "3w7s": {
+    "acc": 0.6780000168085099,
+    "ci95": 0.02048032966293504,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3026805564411916,
+      "osr_score": 0.6263402722601313,
+      "auroc": 0.5988838297325103,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "3w10s": {
+    "acc": 0.6664444637298584,
+    "ci95": 0.01697543826715942,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3166388890706003,
+      "osr_score": 0.6333194385748356,
+      "auroc": 0.5998229878472223,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "4w1s": {
+    "acc": 0.48416669249534605,
+    "ci95": 0.023930982429172635,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.2939166661177296,
+      "osr_score": 0.6219583270984004,
+      "auroc": 0.5971463105709878,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "4w3s": {
+    "acc": 0.562833362519741,
+    "ci95": 0.021022999727520933,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3015694465721026,
+      "osr_score": 0.6257847173255868,
+      "auroc": 0.5980268706918724,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "4w5s": {
+    "acc": 0.5745000302791595,
+    "ci95": 0.018470133855059447,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3136111102241557,
+      "osr_score": 0.6318055491516134,
+      "auroc": 0.5999172530221193,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "4w7s": {
+    "acc": 0.6311667016148568,
+    "ci95": 0.01704095180357367,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.30963889029808345,
+      "osr_score": 0.6298194391885772,
+      "auroc": 0.5982387584876543,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "4w10s": {
+    "acc": 0.6110000339150429,
+    "ci95": 0.015399969919240785,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.31304166531190275,
+      "osr_score": 0.6315208266954869,
+      "auroc": 0.599507385159465,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "5w1s": {
+    "acc": 0.43213334441185,
+    "ci95": 0.02328389148475459,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3108749997103587,
+      "osr_score": 0.6304374938947148,
+      "auroc": 0.5990247922453704,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "5w3s": {
+    "acc": 0.5213333454728126,
+    "ci95": 0.017277671413943648,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.29083333190064875,
+      "osr_score": 0.62041665998986,
+      "auroc": 0.5972007400977366,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "5w5s": {
+    "acc": 0.5344000142812729,
+    "ci95": 0.015015550479210502,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.313791666488396,
+      "osr_score": 0.6318958272837335,
+      "auroc": 0.5986971423611112,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "5w7s": {
+    "acc": 0.5478666785359383,
+    "ci95": 0.012418669012999673,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3120972221950069,
+      "osr_score": 0.631048605137039,
+      "auroc": 0.5981887894161523,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "5w10s": {
+    "acc": 0.5710666790604592,
+    "ci95": 0.013818851577468542,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.3171944446628913,
+      "osr_score": 0.6335972163709812,
+      "auroc": 0.5992961600437243,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w1s": {
+    "acc": 0.3892222300171852,
+    "ci95": 0.016520866884421094,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.31868055236991494,
+      "osr_score": 0.634340270224493,
+      "auroc": 0.6008012168852881,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w3s": {
+    "acc": 0.4635555624961853,
+    "ci95": 0.014274266186829115,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.30047222157591025,
+      "osr_score": 0.6252361048274906,
+      "auroc": 0.5976651888503086,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w5s": {
+    "acc": 0.5334444537758827,
+    "ci95": 0.011882347746954186,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.29972222095238976,
+      "osr_score": 0.6248611045157304,
+      "auroc": 0.5981383865097736,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w7s": {
+    "acc": 0.5052222299575806,
+    "ci95": 0.010165604870590822,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.31086111106560566,
+      "osr_score": 0.6304305495723384,
+      "auroc": 0.5991262402263374,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  },
+  "6w10s": {
+    "acc": 0.5100000098347663,
+    "ci95": 0.011166289422182991,
+    "osr": {
+      "known_tnr": 0.949999988079071,
+      "unknown_tpr": 0.30861111026606525,
+      "osr_score": 0.6293055491725681,
+      "auroc": 0.5996519643775721,
+      "threshold": "per-round",
+      "num_rounds": 10,
+      "method": "anti_prototype",
+      "recalibrate": true,
+      "per_class_threshold": false,
+      "rectified_prototypes": false
+    }
+  }
+}

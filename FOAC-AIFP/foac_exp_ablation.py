@@ -135,6 +135,8 @@ def main():
                         help='Override config path (e.g. tau22_aligned.yml)')
     parser.add_argument('--configs', type=str, nargs='*', default=None,
                         help='Run only specific ablation configs (e.g. full_model wo_NPM)')
+    parser.add_argument('--quick', action='store_true',
+                        help='Quick mode: fewer test runs (50 instead of 200)')
     args = parser.parse_args()
 
     all_results = {}

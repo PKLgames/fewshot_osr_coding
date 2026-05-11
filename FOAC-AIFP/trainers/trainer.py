@@ -323,9 +323,9 @@ class Train_Manager:
             
             openset_label = support_label.squeeze().max().item() + 1 + torch.zeros_like(openset_label)
             support_data, query_data, suppopen_data, openset_data = support_data.squeeze(), query_data.squeeze(), suppopen_data.squeeze(), openset_data.squeeze()
-            # fewshot: 保证所有数据至少2D (squeeze可能把batch维去掉)
+            # fewshot: squeeze可能把batch维去掉导致1D, 需保证所有数据至少2D (batch, time)
             for _i, d in enumerate([support_data, query_data, suppopen_data, openset_data]):
-                if d.dim() == 1 and d.numel() > 0:
+                if d.dim() == 1:
                     if _i == 0: support_data = d.unsqueeze(0)
                     elif _i == 1: query_data = d.unsqueeze(0)
                     elif _i == 2: suppopen_data = d.unsqueeze(0)

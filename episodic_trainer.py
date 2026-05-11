@@ -1020,8 +1020,10 @@ class FeatureCache:
 
     CACHE_VERSION = 'v22_fewshot_yamnet_normalized'  # set per-dataset in main()
 
-    def __init__(self, cache_dir: str = 'experiment/fewshot_cache'):
+    def __init__(self, cache_dir: str = 'experiment/fewshot_cache',
+                 dataset_name: str = None):
         self.cache_dir = cache_dir
+        self.dataset_name = dataset_name
         os.makedirs(cache_dir, exist_ok=True)
 
         self.features_by_class: Dict[int, torch.Tensor] = {}
@@ -1041,7 +1043,10 @@ class FeatureCache:
                 When provided, features are standardized: (f - mean) / (std + eps).
                 For training split, pass None to auto-compute.
         """
-        cache_path = os.path.join(self.cache_dir, f'{split}_features.pt')
+        if self.dataset_name:
+            cache_path = os.path.join(self.cache_dir, f'{self.dataset_name}_{split}_features.pt')
+        else:
+            cache_path = os.path.join(self.cache_dir, f'{split}_features.pt')
 
         if os.path.exists(cache_path):
             data = torch.load(cache_path, weights_only=True)
@@ -1558,6 +1563,15 @@ class EpisodicFlowClassifier(nn.Module):
     def project(self, x: torch.Tensor) -> torch.Tensor:
         """Apply feature adapter."""
         return self.feature_adapter(x)
+
+    def to_score_space(self, x: torch.Tensor) -> torch.Tensor:
+        """Transform features through the full model pipeline (adapter + flow + distance_head).
+        Used for model-dependent OOD scoring (e.g. feature_mahalanobis)."""
+        x = self.feature_adapter(x)
+        if self.use_flow_transform:
+            x = self.feature_transform(x)
+        x = self.distance_head(x)
+        return x
 
     def adapt_features(self, features: torch.Tensor,
                        prototypes: torch.Tensor):
@@ -2429,7 +2443,6 @@ class EpisodicTrainer:
                     torch.nn.utils.clip_grad_norm_(params_to_clip, 0.5)
 
                 self.optimizer.step()
-                self.optimizer.step()
                 if ep <= self.warmup_episodes:
                     warmup_factor = ep / self.warmup_episodes
                     for pg in self.optimizer.param_groups:
@@ -2710,16 +2723,20 @@ class OSRCalibrator:
     # ---- Feature-space Mahalanobis scoring ----
 
     def compute_feat_stats(self):
-        """Compute per-class means and per-class covariance in 64-dim feature space."""
+        """Compute per-class means and per-class covariance in model-transformed feature space.
+        Uses to_score_space() so that different model variants produce different stats."""
         self.feat_class_means: Dict[int, torch.Tensor] = {}
         self.feat_cov_inv: Dict[int, torch.Tensor] = {}
-        for c_idx, c_id in enumerate(self.base_classes):
-            feats = self.cache.get_class_features(c_id)
-            self.feat_class_means[c_idx] = feats.mean(dim=0).to(self.device)
-            D = feats.size(1)
-            cov = torch.cov(feats.T).to(self.device)
-            cov += 1e-3 * torch.eye(D, device=self.device)
-            self.feat_cov_inv[c_idx] = torch.linalg.inv(cov)
+        self.flow.eval()
+        with torch.no_grad():
+            for c_idx, c_id in enumerate(self.base_classes):
+                feats = self.cache.get_class_features(c_id)
+                feats = self.flow.to_score_space(feats.to(self.device)).cpu()
+                self.feat_class_means[c_idx] = feats.mean(dim=0).to(self.device)
+                D = feats.size(1)
+                cov = torch.cov(feats.T).to(self.device)
+                cov += 1e-3 * torch.eye(D, device=self.device)
+                self.feat_cov_inv[c_idx] = torch.linalg.inv(cov)
 
     def compute_class_variances(self, prototypes: torch.Tensor):
         """osr20a: Compute per-class intra-sample variance for distance normalization."""
@@ -2734,12 +2751,13 @@ class OSRCalibrator:
                                         prototypes: torch.Tensor = None,
                                         batch_size: int = 4096) -> torch.Tensor:
         """Feature-space Mahalanobis OOD score with per-class covariance.
+        Transforms features through model pipeline so results depend on model.
         Higher = more known."""
         N = len(self.feat_class_means)
         all_scores = []
         with torch.no_grad():
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
                 B = batch.size(0)
                 min_dist = torch.full((B,), float('inf'), device=self.device)
                 for c_idx in range(N):
@@ -2753,12 +2771,13 @@ class OSRCalibrator:
     def score_samples_feat_mahalanobis_relative(self, features: torch.Tensor,
                                                   prototypes: torch.Tensor = None,
                                                   batch_size: int = 4096) -> torch.Tensor:
-        """Feature-space Mahalanobis + relative distance hybrid OOD score."""
+        """Feature-space Mahalanobis + relative distance hybrid OOD score.
+        Transforms features through model pipeline so results depend on model."""
         N = len(self.feat_class_means)
         all_scores = []
         with torch.no_grad():
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
                 B = batch.size(0)
                 dists = torch.zeros(B, N, device=self.device)
                 for c_idx in range(N):
@@ -5333,6 +5352,9 @@ class FewShotEvaluator:
 
         all_accs = []
         all_confs = []
+        # AUROC: collect predictions and labels across episodes
+        all_probs = []
+        all_labels = []
 
         with torch.no_grad():
             for _ in tqdm(range(num_episodes), desc=f"{N_way}w{K_shot}s eval"):
@@ -5366,6 +5388,10 @@ class FewShotEvaluator:
                 conf = probs.max(dim=1)[0].mean().item()
                 all_confs.append(conf)
 
+                # Collect for AUROC
+                all_probs.append(probs.cpu().numpy())
+                all_labels.append(episode['query_labels'].cpu().numpy())
+
         results = {
             'mean_acc': np.mean(all_accs),
             'std_acc': np.std(all_accs),
@@ -5376,9 +5402,21 @@ class FewShotEvaluator:
             'num_episodes': num_episodes,
         }
 
+        # Macro-AUROC (one-vs-rest, averaged over classes)
+        try:
+            from sklearn.metrics import roc_auc_score
+            stacked_probs = np.concatenate(all_probs, axis=0)  # (total_Q, N_way)
+            stacked_labels = np.concatenate(all_labels, axis=0)  # (total_Q,)
+            if stacked_probs.shape[1] > 1:
+                results['macro_auroc'] = roc_auc_score(
+                    stacked_labels, stacked_probs, multi_class='ovr', average='macro')
+        except Exception:
+            pass
+
+        auroc_str = f" AUROC={results['macro_auroc']:.4f}" if 'macro_auroc' in results else ""
         print(f"\n  {N_way}-way {K_shot}-shot: "
               f"Acc = {results['mean_acc']:.2%} +/- {results['ci95']:.2%} "
-              f"(conf: {results['mean_confidence']:.2%})")
+              f"(conf: {results['mean_confidence']:.2%}){auroc_str}")
 
         return results
 
@@ -5787,10 +5825,11 @@ def main():
 
     # --- OSR calibration & evaluation ---
     osr_results = {}
-    # osr24b: Only fast baselines + target methods; disable slow methods for speed
-    osr_methods = ['ood_head_extended',       # main baseline (TPR ~49%)
-                   'ood_head_cluster_v2',     # osr24b component (13-dim LR)
-                   'ood_head_fusion_v2']      # osr24b target (14-dim LR = 13 + anti)
+    # Core baselines
+    osr_methods = ['feature_mahalanobis', 'anti_prototype', 'geo_fusion',
+                   'ood_head', 'ood_head_extended',
+                   'ood_head_osr23',
+                   'ood_head_cluster_v2', 'ood_head_fusion_v2']
 
     for method in osr_methods:
         print(f"\n--- OSR {method.upper()} calibration (calib data) ---")
@@ -5809,12 +5848,88 @@ def main():
             threshold=threshold, K_shot=50, num_rounds=10,
             method=method, recalibrate_per_round=True)
 
-    # ============ Disabled slow methods (re-enable after target method validated) ============
-    # TODO: re-enable these for full comparison:
-    #   feature_mahalanobis, anti_prototype, geo_fusion, ood_head,
-    #   ood_head_osr23, per_class_methods, ensemble_anti_oodext,
-    #   anti_prototype_multi, ood_head_extended_v2, ensemble_adaptive,
-    #   cluster_boundary, ensemble_cluster
+    # ============ osr20a/osr22 legacy methods for full comparison ============
+
+    # osr20a winner: anti_prototype with per-class threshold
+    per_class_methods = ['anti_prototype', 'ood_head_extended', 'ood_head_osr23']
+    for method in per_class_methods:
+        tag = f"{method}_per_class"
+        print(f"\n--- OSR {tag.upper()} calibration (calib data) ---")
+        calibrator = OSRCalibrator(
+            trainer.flow_classifier, calib_cache,
+            base_classes, unknown_classes, device,
+            train_cache=train_cache)
+        calibrator.calibrate(target_fpr=0.05, K_shot=50, method=method)
+
+        print(f"\n--- OSR {tag.upper()} evaluation (test data, per-class threshold) ---")
+        test_calibrator = OSRCalibrator(
+            trainer.flow_classifier, test_cache,
+            base_classes, unknown_classes, device,
+            train_cache=train_cache)
+        osr_results[tag] = test_calibrator.evaluate_osr(
+            K_shot=50, num_rounds=10,
+            method=method, recalibrate_per_round=True,
+            use_per_class_threshold=True)
+
+    # osr20b: Ensemble anti_prototype + ood_head_extended
+    print(f"\n--- OSR ENSEMBLE_ANTI_OODEXT calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_anti_oodext')
+
+    print(f"\n--- OSR ENSEMBLE_ANTI_OODEXT evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['ensemble_anti_oodext'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='ensemble_anti_oodext', recalibrate_per_round=True)
+
+    # osr22b: Extended OOD head v2 (calib-set GMM cluster features)
+    print(f"\n--- OSR OOD_HEAD_EXTENDED_V2 calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ood_head_extended_v2')
+
+    print(f"\n--- OSR OOD_HEAD_EXTENDED_V2 evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['ood_head_extended_v2'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='ood_head_extended_v2', recalibrate_per_round=True)
+
+    # osr22d: cluster_boundary
+    print(f"\n--- OSR CLUSTER_BOUNDARY calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='cluster_boundary')
+
+    print(f"\n--- OSR CLUSTER_BOUNDARY evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['cluster_boundary'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='cluster_boundary', recalibrate_per_round=True)
+
+    # osr22d: ensemble_cluster (three-way)
+    print(f"\n--- OSR ENSEMBLE_CLUSTER calibration (calib data) ---")
+    calibrator = OSRCalibrator(
+        trainer.flow_classifier, calib_cache,
+        base_classes, unknown_classes, device)
+    calibrator.calibrate(target_fpr=0.05, K_shot=50, method='ensemble_cluster')
+
+    print(f"\n--- OSR ENSEMBLE_CLUSTER evaluation (test data) ---")
+    test_calibrator = OSRCalibrator(
+        trainer.flow_classifier, test_cache,
+        base_classes, unknown_classes, device)
+    osr_results['ensemble_cluster'] = test_calibrator.evaluate_osr(
+        K_shot=50, num_rounds=10,
+        method='ensemble_cluster', recalibrate_per_round=True)
 
     # Summary comparison
     print(f"\n{'='*70}")
