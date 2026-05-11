@@ -352,7 +352,7 @@ class Train_Manager:
                     
         return (supplabel_numpy, querylabel_numpy, open_label), cosine_probs,loss
 
-    def eval_fsl_nplus1(self,labels, probs):
+    def eval_fsl_nplus1(self, labels, probs, num_rounds=10):
         supp_label, query_label, open_label = labels
         num_query = query_label.shape[0]
         supp_label = supp_label.view()
@@ -360,15 +360,40 @@ class Train_Manager:
 
         known_scores = np.max(all_probs[:num_query,:-1], axis=-1)
         unknown_scores = np.max(all_probs[num_query:,:-1], axis=-1)
-        auroc_result,_,_,fscore= calc_auroc(known_scores,unknown_scores)
+        auroc_result,_,_,fscore = calc_auroc(known_scores, unknown_scores)
 
-        # --- TPR@TNR95% and OSR Score (matching episodic trainer metric) ---
-        sorted_known = np.sort(known_scores)
-        idx95 = min(int(len(sorted_known) * 0.05), len(sorted_known) - 1)
-        threshold_95 = sorted_known[idx95]
-        tnr = float(np.mean(known_scores >= threshold_95))
-        tpr = float(np.mean(unknown_scores < threshold_95))
-        osr_score = (tnr + tpr) / 2.0
+        # --- TPR@TNR95% with calib/eval split (no self-calibration) ---
+        # Split known query scores into calib(50%) + eval(50%), 10 rounds,
+        # to avoid measuring TNR on the same data used for threshold calibration.
+        n_known = len(known_scores)
+        if n_known >= 6:
+            tnrs, tprs, osrs = [], [], []
+            rng = np.random.RandomState(42)
+            for _ in range(num_rounds):
+                perm = rng.permutation(n_known)
+                n_calib = n_known // 2
+                calib_idx, eval_idx = perm[:n_calib], perm[n_calib:]
+
+                sorted_calib = np.sort(known_scores[calib_idx])
+                idx95 = min(int(len(sorted_calib) * 0.05), len(sorted_calib) - 1)
+                threshold_95 = sorted_calib[idx95]
+
+                tnr = float(np.mean(known_scores[eval_idx] >= threshold_95))
+                tpr = float(np.mean(unknown_scores < threshold_95))
+                tnrs.append(tnr)
+                tprs.append(tpr)
+                osrs.append((tnr + tpr) / 2.0)
+            tnr = float(np.mean(tnrs))
+            tpr = float(np.mean(tprs))
+            osr_score = float(np.mean(osrs))
+        else:
+            # Fallback: too few known samples to split
+            sorted_known = np.sort(known_scores)
+            idx95 = min(int(len(sorted_known) * 0.05), len(sorted_known) - 1)
+            threshold_95 = sorted_known[idx95]
+            tnr = float(np.mean(known_scores >= threshold_95))
+            tpr = float(np.mean(unknown_scores < threshold_95))
+            osr_score = (tnr + tpr) / 2.0
 
         # assert all_probs.shape[-1] == 6
         num_query = query_label.shape[0]
@@ -553,18 +578,44 @@ def mahalanobis_min_score(features, class_means, covs_inv):
     return -min_dist
 
 
-def compute_tpr_at_tnr(known_scores, unknown_scores, target_tnr=0.95):
-    """Compute TPR at fixed TNR.
+def compute_tpr_at_tnr(known_scores, unknown_scores, target_tnr=0.95, num_rounds=10):
+    """Compute TPR at fixed TNR with calib/eval split.
+
+    Splits known scores into calibration (50%) and evaluation (50%) halves,
+    repeats for num_rounds with different random splits, returns mean metrics.
+    This avoids measuring TNR on the same data used for threshold calibration.
+
     Returns (tnr, tpr, osr_score)
     """
-    sorted_known, _ = known_scores.sort()
-    idx = min(int(len(sorted_known) * (1 - target_tnr)), len(sorted_known) - 1)
-    threshold = sorted_known[idx].item()
+    n_known = len(known_scores)
+    if n_known < 6:
+        # Fallback: too few samples
+        sorted_known, _ = known_scores.sort()
+        idx = min(int(len(sorted_known) * (1 - target_tnr)), len(sorted_known) - 1)
+        threshold = sorted_known[idx].item()
+        tnr = (known_scores >= threshold).float().mean().item()
+        tpr = (unknown_scores < threshold).float().mean().item()
+        return tnr, tpr, (tnr + tpr) / 2
 
-    tnr = (known_scores >= threshold).float().mean().item()
-    tpr = (unknown_scores < threshold).float().mean().item()
-    osr_score = (tnr + tpr) / 2
-    return tnr, tpr, osr_score
+    tnrs, tprs, osrs = [], [], []
+    rng = np.random.RandomState(42)
+    for _ in range(num_rounds):
+        perm = rng.permutation(n_known)
+        n_calib = n_known // 2
+        calib_idx = perm[:n_calib]
+        eval_idx = perm[n_calib:]
+
+        calib_sorted, _ = known_scores[calib_idx].sort()
+        idx = min(int(len(calib_sorted) * (1 - target_tnr)), len(calib_sorted) - 1)
+        threshold = calib_sorted[idx].item()
+
+        tnr = (known_scores[eval_idx] >= threshold).float().mean().item()
+        tpr = (unknown_scores < threshold).float().mean().item()
+        tnrs.append(tnr)
+        tprs.append(tpr)
+        osrs.append((tnr + tpr) / 2)
+
+    return float(np.mean(tnrs)), float(np.mean(tprs)), float(np.mean(osrs))
 
 
 def run_osr_eval(net, args, logger=None):
