@@ -34,6 +34,62 @@
     FOAC-AIFP/tau22_aligned/  (model_TAU22_max_{acc,osr,auroc,fscore}.pth)
     FOAC-AIFP/tau19_aligned/  (model_TAU19_max_{acc,osr,auroc,fscore}.pth)
 
+  【FOAC-AIFP 消融实验】(ResNet18 backbone, 6-way 5-shot, 80 epochs, TNR评估已修复)
+    6组合 (CIAM/PAM/NPM on/off) × 2数据集, TNR修复后重测 (calib/eval分半)
+    注: OSR Score = (TPR+TNR)/2, TNR 不再恒等 95.556%
+
+    TAU22 消融 (max_acc checkpoint — 最优分类):
+                                             ACC      AUROC     OSR      F1      TPR     TNR
+      full_model                            44.83     46.87    50.00    46.23    6.44    93.56
+      wo_CIAM                               44.92     46.95    49.86    46.34    6.19    93.53
+      wo_PAM                                44.96     47.09    49.97    46.34    6.40    93.54
+      wo_NPM                                45.07     47.14    49.83    46.51    6.21    93.45
+      only_NPM                              44.84     47.21    49.79    46.23    6.11    93.47
+      baseline_no_modules                   45.08     47.16    49.86    46.15    6.24    93.49
+      消融区分度: ACC spread=0.25pp  AUROC spread=0.34pp  OSR spread=0.21pp
+      → 所有组件 on/off 几乎无影响, full_model 与 baseline_no_modules ACC差仅0.25pp
+
+    TAU22 消融 (max_auroc checkpoint — 最优OSR, max_fscore同值):
+                                             ACC      AUROC     OSR      F1      TPR     TNR
+      full_model                            41.88     52.97    50.37    50.83    7.40    93.35
+      wo_CIAM                               41.89     53.17    50.35    50.89    7.34    93.35
+      wo_PAM                                42.06     53.03    50.36    50.84    7.30    93.43
+      wo_NPM                                42.17     52.98    50.38    50.73    7.29    93.46
+      only_NPM                              41.94     53.11    50.34    50.99    7.29    93.39
+      baseline_no_modules                   42.21     53.07    50.38    50.87    7.35    93.41
+      max_acc→max_auroc 代价: ACC↓~3pp 换 AUROC↑~6pp  TPR↑~1pp
+
+    TAU19 消融 (max_acc checkpoint):
+                                             ACC      AUROC     OSR      F1      TPR     TNR
+      full_model                            45.62     46.33    48.34    46.30    3.21    93.47
+      wo_CIAM                               45.74     45.90    48.82    45.75    4.10    93.54
+      wo_PAM                                46.05     46.44    48.41    46.31    3.17    93.65
+      wo_NPM                                45.61     45.17    48.49    44.96    3.58    93.41
+      only_NPM                              45.34     45.45    48.31    45.83    3.13    93.49
+      baseline_no_modules                   45.84     44.48    48.33    45.05    3.21    93.46
+      TAU19 vs TAU22: ACC相似(~45-46%), AUROC低~2pp, TPR低~3pp
+
+    TAU19 消融 (max_auroc checkpoint):
+                                             ACC      AUROC     OSR      F1      TPR     TNR
+      full_model                            43.10     50.28    49.43    48.98    5.12    93.74
+      wo_CIAM                               43.42     50.36    49.33    49.01    4.96    93.70
+      wo_PAM                                43.27     50.27    49.36    48.95    5.18    93.55
+      wo_NPM                                43.32     49.75    49.21    48.67    4.77    93.66
+      only_NPM                              43.07     50.06    49.27    49.00    4.96    93.58
+      baseline_no_modules                   43.89     49.69    48.99    48.90    4.42    93.57
+
+    关键发现:
+      1. OSR 能力极弱: TPR=3-7% (TAU22) / 3-5% (TAU19), AUROC≈45-53% (随机≈50%)
+      2. 消融无区分度: 6配置间 ACC spread=0.25pp, OSR spread=0.21pp
+         → CIAM/PAM/NPM 三个组件的 on/off 对性能几乎无影响
+      3. 与 Episodic Trainer 差距 (TAU22 max_auroc 为例):
+         FOAC-AIFP:      ACC=41.9%  AUROC=53.0%  TPR=7.4%  OSR=50.4%
+         Episodic full:  ACC=54.4%  OSR=72.7%  (fusion_v2)
+         → Episodic OSR 领先 22pp, ACC 领先 13pp
+      4. TNR 修复有效: 72个数据点→31个不同TNR值 (93.34-93.78%), 不再恒等
+    Checkpoint: FOAC-AIFP/tau{22,19}_aligned_ablation/{config}/model_{TAU22,TAU19}_max_*.pth
+    修复记录: 2026-05-11 方案C (calib/eval分半) 修复 eval_fsl_nplus1 + compute_tpr_at_tnr
+
 【Episodic Trainer】(YAMNet backbone, 6-way 5-shot, Q=15 fewshot)
   TAU22 osr24 (best@ep5000, val_acc=57.44%):
     Few-shot ACC: 6w1s=40.70±1.89%  6w5s=51.04±1.33%  6w10s=52.94±1.06%
@@ -370,6 +426,8 @@ G. 扩展实验 ── 脚本已创建
 ================================================================================
 
   1. FOAC-AIFP 基线已完成 (TAU22 best@ep78, TAU19 已完成)
+     - TNR 硬编码 Bug 已修复 (2026-05-11): eval_fsl_nplus1 + compute_tpr_at_tnr
+     - 消融数据已重测 (--test_only), TNR 不再恒等 95.556%
   2. 两套系统 backbone 不同 (ResNet18 vs YAMNet)，论文中不能直接对比
   3. 参考论文用了 3 个数据集，目前仅 2 个同域数据集
   4. SOTA 对比方法 (FEAT, MET 等) 需引入外部代码
@@ -496,3 +554,106 @@ G. 扩展实验 ── 脚本已创建
     b) AUROC 曲线绘制脚本: 单图对比全部6种OSR方法的ROC曲线
     c) 雷达图/热力图: 多维度 (Acc/AUROC/OSR/AIT/Params) 综合对比
   建议: 新增 paper_tables.py 用于统一制表
+
+
+================================================================================
+十、FOAC-AIFP OSR 评估 TNR 硬编码修复方案 (2026-05-11)
+================================================================================
+
+  问题: FOAC-AIFP 消融实验所有 72 个数据点 TNR 恒为 95.556%, 原因是
+        eval_fsl_nplus1() 用测试集自身校准阈值再测 TNR, 形成自循环。
+
+  根因定位 (trainers/trainer.py):
+    L355-371  eval_fsl_nplus1():
+      sorted_known = np.sort(known_scores)                    # 测试集已知类分数排序
+      idx95 = min(int(len(sorted_known) * 0.05), ...)         # 取第5百分位
+      threshold_95 = sorted_known[idx95]                      # 阈值 = 测试集自身分位数
+      tnr = float(np.mean(known_scores >= threshold_95))      # TNR 永远 ≈ 95.556%
+      → 阈值从测试集自身而来, TNR 变成纯数学结果 (1 - int(N*0.05)/N), 与模型无关
+      → N=45 时 TNR=43/45=95.556%, 所有配置/checkpoint 完全一致
+
+    L556-567  compute_tpr_at_tnr(): 同样逻辑, 用于 run_osr_eval()
+      但 run_osr_eval 的已知类样本量大(N=数千), 所以 95%分位 ≈ 95.0%(基本准确)
+
+  对比 Episodic Trainer 的正确做法:
+    - 校准集 (calib.csv) → 拟合 threshold (TNR=95%)
+    - 测试集 (evaluate.csv) → 应用 threshold, 测量真实 TNR
+    - TNR 会有自然波动 (因为校准集 ≠ 测试集, 真实分布有差异)
+
+  ── 修复方案 ──
+
+  方案 A: 修复 eval_fsl_nplus1 — 支持集校准 (最小改动, 推荐)
+  ────────────────────────────────────────────
+  原理: 每个 episode 有 support/query/open 三组数据。
+        用 support set 的已知类分数校准阈值, 用 query set 测量 TNR。
+  步骤:
+    1. compute_feats() 额外返回 support set 的 softmax 分数
+       → 需要 net() 前向时额外输出 support_data 的分类概率
+    2. eval_fsl_nplus1() 接收 support_scores, query_scores, open_scores
+    3. 在 support_scores 上取第5百分位作为 threshold
+    4. 在 query_scores 上测量 TNR (会自然偏离 95%)
+  改动文件:
+    - trainers/trainer.py: compute_feats() 返回 support probs
+    - trainers/trainer.py: eval_fsl_nplus1() 签名 + 逻辑
+    - trainers/trainer.py: run_test_fsl() 传参适配
+  优点: 最小改动(~20行), 不破坏现有 per-episode 评估协议
+  缺点: support set 样本少 (6类×5shot=30), 阈值估计噪声大
+
+  方案 B: 扩展 run_osr_eval 覆盖全部6种 OSR 方法 (推荐作为补充)
+  ────────────────────────────────────────────
+  原理: run_osr_eval 已有正确的 calib/test 分离 (L570-686),
+        但仅支持 2 种 OSR 方法 (anti_prototype, mahalanobis)。
+        扩展为 6 种方法, 消融脚本从此函数获取 OSR 指标。
+  步骤:
+    1. 扩展 run_osr_eval 支持全部 6 种 OSR 方法:
+       anti_prototype, feature_mahalanobis, ood_head_osr23,
+       ood_head_extended_v2, ood_head_cluster_v2, ood_head_fusion_v2
+    2. OOD head 类方法需要:
+       a) 在 calib set 上拟合 GMM (osr23) + 训练逻辑回归权重 (osr24b)
+       b) 在 test set 上推理 OOD score
+       c) per-round recalibration 测 TPR@TNR95
+    3. 修改 foac_exp_ablation.py run_single_ablation():
+       训练完成后调用 run_osr_eval() 获取 OSR 指标,
+       替代 eval_fsl_nplus1 的 tnr/tpr/osr_score
+    4. AUROC 保留 eval_fsl_nplus1 的结果 (其 AUROC 计算无 self-calibration 问题)
+  改动文件:
+    - trainers/trainer.py: run_osr_eval() 扩展 2→6 方法
+    - foac_exp_ablation.py: run_single_ablation() 调用 run_osr_eval
+    - 可能需要从 episodic_trainer 移植 GMM+logreg 训练代码
+  优点: 与 Episodic Trainer 评估协议完全一致 (calib/test 分离)
+  缺点: OOD head 方法需训练 osr24b 逻辑回归头, 增加复杂度
+  工作量: ~80行
+
+  方案 C: eval_fsl_nplus1 内做 calib/eval 随机分半 (折中, 最快)
+  ────────────────────────────────────────────
+  原理: 将 query set 的已知类样本随机分成 calib(50%) + eval(50%),
+        在 calib 上校准阈值, 在 eval 上测量 TNR。
+        重复 10 轮随机分割, 取均值。
+  步骤:
+    1. 修改 eval_fsl_nplus1, 新增 num_rounds=10 参数
+    2. 每轮随机打乱 known_scores, 前一半校准阈值, 后一半测量 TNR/TPR
+    3. 返回 10 轮 TNR/TPR/OSR 的均值 ± 标准差
+  改动文件:
+    - trainers/trainer.py: eval_fsl_nplus1() (~15行)
+  优点: 不需要 support set 改造, 不需要 run_osr_eval, 最快实现
+  缺点: 样本量减半, query 已知类数量本就不多 (6类×Q=~45个), 方差增大
+  工作量: ~15行
+
+  ── 推荐执行路径 ──
+  1. 先实施方案 C (最快, ~15行), 让 TNR 立即变为真实测量值
+  2. 再实施方案 B (扩展 run_osr_eval 到 6 方法), 使评估协议与 Episodic 完全对齐
+  3. 方案 A 可选 (support set 样本太少, 阈值噪声大)
+  4. 重跑 FP1: cd /coding/FOAC-AIFP && python foac_exp_ablation.py --test_only --dataset all
+
+  ── 执行状态 (2026-05-11) ──
+  ✅ 方案 C 已实施: eval_fsl_nplus1 + compute_tpr_at_tnr 均已修复
+  ✅ FP1 已重跑 (--test_only): 新数据已写入 experiment/foac_exp/ablation/results.json
+  ✅ 修复验证通过: TNR 从1个唯一值→31个, 范围 93.34-93.78%
+  ⬜ 方案 B 待实施: 扩展 run_osr_eval 到6种OSR方法 (使评估协议与Episodic完全对齐)
+
+  ── 验证标准 ──
+  修复后:
+    - TNR 在不同配置/checkpoint 间应有自然波动 (如 93-97% 范围)
+    - TNR 不再恒等于 95.556%
+    - OSR Score 产生区分度 (不同消融配置间应有 >2pp 差异)
+    - AUROC 不变 (当前 calc_auroc 无 self-calibration 问题, 无需修改)
