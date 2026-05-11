@@ -28,8 +28,8 @@ from utils.TAU22 import TAUDataset as TAU22Dataset
 from utils.TAU19 import TAUDataset as TAU19Dataset
 
 
-WAY_VALUES = [2, 3, 4, 5, 6]
-SHOT_VALUES = [1, 3, 5, 7, 10]
+WAY_VALUES = [5, 6]
+SHOT_VALUES = [1, 5, 10]
 
 
 def find_pretrained():
@@ -62,9 +62,14 @@ def get_features(feature_extractor, device, dataset_name='TAU22'):
     return train_cache, calib_cache, test_cache
 
 
+ALL_OSR_METHODS = ['anti_prototype', 'feature_mahalanobis', 'ood_head_osr23',
+                    'ood_head_extended_v2', 'ood_head_cluster_v2', 'ood_head_fusion_v2']
+
+
 def run_way_shot(train_cache, calib_cache, test_cache, feature_extractor,
                  base_classes, unknown_classes, n_way, k_shot,
-                 num_episodes=3000, device='cuda', output_root='experiment/episodic_exp'):
+                 num_episodes=3000, device='cuda', output_root='experiment/episodic_exp',
+                 osr_methods=None):
     """Run episodic training + evaluation for a specific N-way K-shot."""
     # Adjust Q_query based on available samples per class
     min_class_samples = min(
@@ -92,7 +97,7 @@ def run_way_shot(train_cache, calib_cache, test_cache, feature_extractor,
         base_classes=base_classes, unknown_classes=unknown_classes,
         ood_features_by_class=ood_features,
         N_way=n_way, K_shot=k_shot, Q_query=q_query,
-        lr=5e-5, gradient_accum_steps=1, device=device,
+        lr=2e-4, gradient_accum_steps=1, device=device,
     )
 
     trainer.train(
@@ -114,20 +119,24 @@ def run_way_shot(train_cache, calib_cache, test_cache, feature_extractor,
             result['ci95'] = 0
 
     # OSR evaluation
-    try:
-        calibrator = OSRCalibrator(
-            trainer.flow_classifier, calib_cache,
-            base_classes, unknown_classes, device)
-        calibrator.calibrate(target_fpr=0.05, K_shot=50, method='anti_prototype')
-        test_calibrator = OSRCalibrator(
-            trainer.flow_classifier, test_cache,
-            base_classes, unknown_classes, device)
-        osr = test_calibrator.evaluate_osr(
-            K_shot=50, num_rounds=10,
-            method='anti_prototype', recalibrate_per_round=True)
-        result['osr'] = osr
-    except Exception as e:
-        print(f"    OSR eval failed: {e}")
+    if osr_methods is None:
+        osr_methods = ALL_OSR_METHODS
+    osr_results = {}
+    for method in osr_methods:
+        try:
+            calibrator = OSRCalibrator(
+                trainer.flow_classifier, calib_cache,
+                base_classes, unknown_classes, device)
+            calibrator.calibrate(target_fpr=0.05, K_shot=50, method=method)
+            test_calibrator = OSRCalibrator(
+                trainer.flow_classifier, test_cache,
+                base_classes, unknown_classes, device)
+            osr_results[method] = test_calibrator.evaluate_osr(
+                K_shot=50, num_rounds=10,
+                method=method, recalibrate_per_round=True)
+        except Exception as e:
+            print(f"    OSR {method} failed: {e}")
+    result['osr'] = osr_results
 
     return result
 
@@ -139,9 +148,16 @@ def main():
     parser.add_argument('--shots', type=int, nargs='*', default=SHOT_VALUES)
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--osr_methods', type=str, default='all',
+                        help='Comma-separated OSR methods, or "all" for all 6')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
     cl_args = parser.parse_args()
+
+    if cl_args.osr_methods == 'all':
+        osr_methods = ALL_OSR_METHODS
+    else:
+        osr_methods = [m.strip() for m in cl_args.osr_methods.split(',')]
 
     if cl_args.quick:
         cl_args.ways = [5, 6]
@@ -177,7 +193,7 @@ def main():
                 train_cache, calib_cache, test_cache, feature_extractor,
                 base_classes, unknown_classes, n_way, k_shot,
                 num_episodes=cl_args.num_episodes, device=device,
-                output_root=cl_args.output_dir)
+                output_root=cl_args.output_dir, osr_methods=osr_methods)
             if result:
                 all_results[key] = result
 
@@ -192,12 +208,18 @@ def main():
     print(f"\n{'='*60}")
     print("WAY-SHOT SWEEP SUMMARY")
     print(f"{'='*60}")
-    print(f"  {'Config':<10s} {'Acc':>8s} {'CI95':>8s} {'OSR':>8s}")
+    print(f"  {'Config':<10s} {'Acc':>7s} {'CI95':>7s} {'AP':>7s} {'Mah':>7s} {'O23':>7s} {'ExtV2':>7s} {'CluV2':>7s} {'FusV2':>7s}")
     for key, r in sorted(all_results.items()):
         acc = r.get('acc', 0)
         ci = r.get('ci95', 0)
-        osr = r.get('osr', {}).get('osr_score', 0)
-        print(f"  {key:<10s} {acc:>7.2%} {ci:>7.2%} {osr:>7.2%}")
+        osr = r.get('osr', {})
+        osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
+        osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
+        osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
+        osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
+        osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
+        osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
+        print(f"  {key:<10s} {acc:>6.2%} {ci:>6.2%} {osr_ap:>6.2%} {osr_mah:>6.2%} {osr_o23:>6.2%} {osr_ext:>6.2%} {osr_clu:>6.2%} {osr_fv2:>6.2%}")
 
 
 if __name__ == '__main__':

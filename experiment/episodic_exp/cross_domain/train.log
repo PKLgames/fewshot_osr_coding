@@ -1,231 +1,0 @@
-
-============================================================
-Cross-Domain: TAU22 -> TAU19
-============================================================
-  Loading classifier from: experiment/yamnet_realfewshot_osr24/fewshot_final.pth
-FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
-FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_realfewshot_osr24/base_feature_extractor.pth
-  Extracting features from TAU19...
-Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_fewshot_yamnet_normalized)
-  Classes: [0, 1, 2, 3, 4, 5]
-    Class 0: 5000 samples
-    Class 1: 5000 samples
-    Class 2: 5000 samples
-    Class 3: 5000 samples
-    Class 4: 5000 samples
-    Class 5: 5000 samples
-Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_fewshot_yamnet_normalized)
-  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    Class 0: 100 samples
-    Class 1: 100 samples
-    Class 2: 100 samples
-    Class 3: 100 samples
-    Class 4: 100 samples
-    Class 5: 100 samples
-    Class 6: 5 samples
-    Class 7: 5 samples
-    Class 8: 5 samples
-    Class 9: 5 samples
-Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_fewshot_yamnet_normalized)
-  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    Class 0: 1800 samples
-    Class 1: 1800 samples
-    Class 2: 1800 samples
-    Class 3: 1800 samples
-    Class 4: 1800 samples
-    Class 5: 1800 samples
-    Class 6: 1800 samples
-    Class 7: 1800 samples
-    Class 8: 1800 samples
-    Class 9: 1800 samples
-6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   1%|          | 1/100 [00:00<00:36,  2.74it/s]6w1s eval:  14%|█▍        | 14/100 [00:00<00:02, 38.05it/s]6w1s eval:  27%|██▋       | 27/100 [00:00<00:01, 63.46it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:00, 82.01it/s]6w1s eval:  53%|█████▎    | 53/100 [00:00<00:00, 95.03it/s]6w1s eval:  66%|██████▌   | 66/100 [00:00<00:00, 104.02it/s]6w1s eval:  79%|███████▉  | 79/100 [00:00<00:00, 110.56it/s]6w1s eval:  92%|█████████▏| 92/100 [00:01<00:00, 114.85it/s]6w1s eval: 100%|██████████| 100/100 [00:01<00:00, 86.49it/s]
-
-  6-way 1-shot: Acc = 39.43% +/- 2.12% (conf: 82.60%)
-  Base 1-shot: Acc=39.43% +/- 2.12%
-6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  12%|█▏        | 12/100 [00:00<00:00, 114.27it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:00, 119.94it/s]6w5s eval:  38%|███▊      | 38/100 [00:00<00:00, 121.94it/s]6w5s eval:  51%|█████     | 51/100 [00:00<00:00, 122.64it/s]6w5s eval:  64%|██████▍   | 64/100 [00:00<00:00, 123.29it/s]6w5s eval:  77%|███████▋  | 77/100 [00:00<00:00, 123.46it/s]6w5s eval:  90%|█████████ | 90/100 [00:00<00:00, 123.18it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 122.04it/s]
-
-  6-way 5-shot: Acc = 52.39% +/- 1.25% (conf: 84.44%)
-  Base 5-shot: Acc=52.39% +/- 1.25%
-4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:  15%|█▌        | 15/100 [00:00<00:00, 149.44it/s]4w1s eval:  30%|███       | 30/100 [00:00<00:00, 147.99it/s]4w1s eval:  45%|████▌     | 45/100 [00:00<00:00, 146.99it/s]4w1s eval:  60%|██████    | 60/100 [00:00<00:00, 147.56it/s]4w1s eval:  75%|███████▌  | 75/100 [00:00<00:00, 146.79it/s]4w1s eval:  90%|█████████ | 90/100 [00:00<00:00, 145.54it/s]4w1s eval: 100%|██████████| 100/100 [00:00<00:00, 146.23it/s]
-
-  4-way 1-shot: Acc = 37.43% +/- 2.14% (conf: 79.16%)
-  Novel 1-shot: Acc=37.43% +/- 2.14%
-4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:  15%|█▌        | 15/100 [00:00<00:00, 148.13it/s]4w5s eval:  30%|███       | 30/100 [00:00<00:00, 148.41it/s]4w5s eval:  45%|████▌     | 45/100 [00:00<00:00, 148.86it/s]4w5s eval:  60%|██████    | 60/100 [00:00<00:00, 147.75it/s]4w5s eval:  75%|███████▌  | 75/100 [00:00<00:00, 147.98it/s]4w5s eval:  90%|█████████ | 90/100 [00:00<00:00, 147.39it/s]4w5s eval: 100%|██████████| 100/100 [00:00<00:00, 148.06it/s]
-
-  4-way 5-shot: Acc = 45.00% +/- 1.28% (conf: 73.14%)
-  Novel 5-shot: Acc=45.00% +/- 1.28%
-
-======================================================================
-OSR Calibration (ANTI_PROTOTYPE)
-======================================================================
-Prototypes: torch.Size([6, 64]) from 6 base classes
-Computing feature-space statistics...
-Known samples:   600
-Unknown samples: 20
-Known scores:   [-3.71, 10.35] mean=0.59
-Unknown scores: [-4.35, 6.71] mean=-0.11
-Mean separation: 0.70 (positive = known higher = good)
-
-Threshold (tau): -2.1866
-Known accepted (TNR): 95.00%
-Unknown detected (TPR): 15.00%
-
-======================================================================
-OSR Evaluation (ANTI_PROTOTYPE)
-Mode: per-round recalibration (TNR-fixed at 95%)
-======================================================================
-
-Results over 10 rounds:
-  Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   29.13%
-  OSR Score (mean):         62.07%
-  AUROC:                    0.5976
-
-======================================================================
-OSR Calibration (FEATURE_MAHALANOBIS)
-======================================================================
-Prototypes: torch.Size([6, 64]) from 6 base classes
-Computing feature-space statistics...
-Known samples:   600
-Unknown samples: 20
-Known scores:   [-9.59, -2.02] mean=-4.69
-Unknown scores: [-14.43, -3.99] mean=-8.07
-Mean separation: 3.38 (positive = known higher = good)
-
-Threshold (tau): -8.2364
-Known accepted (TNR): 95.00%
-Unknown detected (TPR): 45.00%
-
-======================================================================
-OSR Evaluation (FEATURE_MAHALANOBIS)
-Mode: per-round recalibration (TNR-fixed at 95%)
-======================================================================
-
-Results over 10 rounds:
-  Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   17.37%
-  OSR Score (mean):         56.19%
-  AUROC:                    0.6951
-
-============================================================
-Cross-Domain: TAU19 -> TAU22
-============================================================
-  Loading classifier from: experiment/yamnet_realfewshot_osr24_tau19/fewshot_final.pth
-FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
-FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_realfewshot_osr24_tau19/base_feature_extractor.pth
-  Extracting features from TAU22...
-使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
-索引映射构建完成，总样本数: 30000
-使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
-索引映射构建完成，总样本数: 620
-使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
-索引映射构建完成，总样本数: 18000
-Loading cached features from experiment/fewshot_cache/train_features.pt (version: v22_fewshot_yamnet_normalized)
-  Classes: [0, 1, 2, 3, 4, 5]
-    Class 0: 5000 samples
-    Class 1: 5000 samples
-    Class 2: 5000 samples
-    Class 3: 5000 samples
-    Class 4: 5000 samples
-    Class 5: 5000 samples
-Loading cached features from experiment/fewshot_cache/calib_features.pt (version: v22_fewshot_yamnet_normalized)
-  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    Class 0: 100 samples
-    Class 1: 100 samples
-    Class 2: 100 samples
-    Class 3: 100 samples
-    Class 4: 100 samples
-    Class 5: 100 samples
-    Class 6: 5 samples
-    Class 7: 5 samples
-    Class 8: 5 samples
-    Class 9: 5 samples
-Loading cached features from experiment/fewshot_cache/test_features.pt (version: v22_fewshot_yamnet_normalized)
-  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    Class 0: 1800 samples
-    Class 1: 1800 samples
-    Class 2: 1800 samples
-    Class 3: 1800 samples
-    Class 4: 1800 samples
-    Class 5: 1800 samples
-    Class 6: 1800 samples
-    Class 7: 1800 samples
-    Class 8: 1800 samples
-    Class 9: 1800 samples
-6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 121.71it/s]6w1s eval:  27%|██▋       | 27/100 [00:00<00:00, 128.48it/s]6w1s eval:  41%|████      | 41/100 [00:00<00:00, 130.73it/s]6w1s eval:  55%|█████▌    | 55/100 [00:00<00:00, 132.02it/s]6w1s eval:  69%|██████▉   | 69/100 [00:00<00:00, 132.29it/s]6w1s eval:  83%|████████▎ | 83/100 [00:00<00:00, 132.45it/s]6w1s eval:  97%|█████████▋| 97/100 [00:00<00:00, 132.89it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 131.65it/s]
-
-  6-way 1-shot: Acc = 39.24% +/- 1.70% (conf: 57.27%)
-  Base 1-shot: Acc=39.24% +/- 1.70%
-6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  14%|█▍        | 14/100 [00:00<00:00, 131.79it/s]6w5s eval:  28%|██▊       | 28/100 [00:00<00:00, 131.62it/s]6w5s eval:  42%|████▏     | 42/100 [00:00<00:00, 131.77it/s]6w5s eval:  56%|█████▌    | 56/100 [00:00<00:00, 132.30it/s]6w5s eval:  70%|███████   | 70/100 [00:00<00:00, 132.33it/s]6w5s eval:  84%|████████▍ | 84/100 [00:00<00:00, 132.60it/s]6w5s eval:  98%|█████████▊| 98/100 [00:00<00:00, 132.65it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 132.37it/s]
-
-  6-way 5-shot: Acc = 50.97% +/- 1.13% (conf: 61.12%)
-  Base 5-shot: Acc=50.97% +/- 1.13%
-4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:  17%|█▋        | 17/100 [00:00<00:00, 160.15it/s]4w1s eval:  34%|███▍      | 34/100 [00:00<00:00, 160.34it/s]4w1s eval:  51%|█████     | 51/100 [00:00<00:00, 160.45it/s]4w1s eval:  68%|██████▊   | 68/100 [00:00<00:00, 160.24it/s]4w1s eval:  85%|████████▌ | 85/100 [00:00<00:00, 160.29it/s]4w1s eval: 100%|██████████| 100/100 [00:00<00:00, 160.49it/s]
-
-  4-way 1-shot: Acc = 38.20% +/- 1.92% (conf: 63.32%)
-  Novel 1-shot: Acc=38.20% +/- 1.92%
-4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:  16%|█▌        | 16/100 [00:00<00:00, 158.32it/s]4w5s eval:  32%|███▏      | 32/100 [00:00<00:00, 158.52it/s]4w5s eval:  48%|████▊     | 48/100 [00:00<00:00, 158.46it/s]4w5s eval:  64%|██████▍   | 64/100 [00:00<00:00, 158.27it/s]4w5s eval:  80%|████████  | 80/100 [00:00<00:00, 157.83it/s]4w5s eval:  96%|█████████▌| 96/100 [00:00<00:00, 157.79it/s]4w5s eval: 100%|██████████| 100/100 [00:00<00:00, 158.01it/s]
-
-  4-way 5-shot: Acc = 45.60% +/- 1.43% (conf: 68.73%)
-  Novel 5-shot: Acc=45.60% +/- 1.43%
-
-======================================================================
-OSR Calibration (ANTI_PROTOTYPE)
-======================================================================
-Prototypes: torch.Size([6, 64]) from 6 base classes
-Computing feature-space statistics...
-Known samples:   600
-Unknown samples: 20
-Known scores:   [-3.69, 10.31] mean=0.61
-Unknown scores: [-4.35, 6.71] mean=-0.09
-Mean separation: 0.70 (positive = known higher = good)
-
-Threshold (tau): -2.1616
-Known accepted (TNR): 95.00%
-Unknown detected (TPR): 15.00%
-
-======================================================================
-OSR Evaluation (ANTI_PROTOTYPE)
-Mode: per-round recalibration (TNR-fixed at 95%)
-======================================================================
-
-Results over 10 rounds:
-  Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   30.07%
-  OSR Score (mean):         62.54%
-  AUROC:                    0.5982
-
-======================================================================
-OSR Calibration (FEATURE_MAHALANOBIS)
-======================================================================
-Prototypes: torch.Size([6, 64]) from 6 base classes
-Computing feature-space statistics...
-Known samples:   600
-Unknown samples: 20
-Known scores:   [-9.59, -2.02] mean=-4.69
-Unknown scores: [-14.43, -3.99] mean=-8.07
-Mean separation: 3.38 (positive = known higher = good)
-
-Threshold (tau): -8.2364
-Known accepted (TNR): 95.00%
-Unknown detected (TPR): 45.00%
-
-======================================================================
-OSR Evaluation (FEATURE_MAHALANOBIS)
-Mode: per-round recalibration (TNR-fixed at 95%)
-======================================================================
-
-Results over 10 rounds:
-  Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   17.37%
-  OSR Score (mean):         56.19%
-  AUROC:                    0.6951
-
-Results saved to experiment/episodic_exp/cross_domain/results.json
-
-============================================================
-CROSS-DOMAIN SUMMARY
-============================================================
-  Direction         Base5s  Novel5s      OSR
-  TAU22->TAU19     52.39%  45.00%  62.07%
-  TAU19->TAU22     50.97%  45.60%  62.54%

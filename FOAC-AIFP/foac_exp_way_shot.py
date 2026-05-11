@@ -28,8 +28,8 @@ from datasets import dataloaders
 
 
 # Sweep configurations
-WAY_VALUES = [2, 3, 4, 5, 6]
-SHOT_VALUES = [1, 3, 5, 7, 10]
+WAY_VALUES = [5, 6]
+SHOT_VALUES = [1, 5, 10]
 
 
 def load_config(config_path):
@@ -81,8 +81,9 @@ def run_way_shot_config(args, n_way, k_shot):
 
     train_func = partial(C2_Net_train.default_train, train_loader=train_loader)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = My_Net(args=args, mode='train')
-    model = model.to('cuda')
+    model = model.to(device)
 
     if os.path.exists(args.pretrained_model_path):
         full_params = torch.load(args.pretrained_model_path, weights_only=False)
@@ -99,8 +100,8 @@ def run_way_shot_config(args, n_way, k_shot):
     ckpt_path = os.path.join(save_dir, f'model_{args.dataset}_max_acc.pth')
     if os.path.exists(ckpt_path):
         state_dict = torch.load(ckpt_path, weights_only=False)
-        model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
-        model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
+        model.weight_base.data.copy_(state_dict['weight_base'].to(device))
+        model.weight_base_open.data.copy_(state_dict['weight_base_open'].to(device))
         model.load_state_dict(state_dict, strict=False)
         result, loss = tm.run_test_fsl(model, eval_loader)
         best_result = {

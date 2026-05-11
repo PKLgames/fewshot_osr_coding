@@ -176,6 +176,11 @@ class My_Net(nn.Module):
             supp_protos = torch.cat(out_feats, dim=0)
 
         base_weights,base_open_weights = self.get_representation(supp_ids)
+        # Ensure base weights are 2D (squeeze may produce 0D/1D when base_ids has 1 element)
+        if base_weights.dim() != 2:
+            base_weights = base_weights.reshape(-1, base_weights.shape[-1])
+        if base_open_weights.dim() != 2:
+            base_open_weights = base_open_weights.reshape(-1, base_open_weights.shape[-1])
 
         # NPM: open-set prototype generation
         if self.use_npm and self.NPM is not None:
@@ -187,7 +192,15 @@ class My_Net(nn.Module):
             fake_center = base_open_weights.mean(dim=0, keepdim=True)  # [1, D]
             fake_center = fake_center.unsqueeze(0)  # [1, 1, D]
 
+        # Ensure supp_protos is 2D and fake_center is 3D before concatenation
+        if supp_protos.dim() != 2:
+            supp_protos = supp_protos.reshape(-1, supp_protos.shape[-1])
+        if fake_center.dim() != 3:
+            fake_center = fake_center.reshape(1, 1, -1)
         cls_protos = torch.cat([supp_protos.unsqueeze(0), fake_center], dim=1)
+        # Ensure q1 is 2D before unsqueeze
+        if q1.dim() != 2:
+            q1 = q1.reshape(-1, q1.shape[-1])
 
         query_score = self.metric(cls_protos,q1.unsqueeze(0)).squeeze()
         # fewshot: openset_feat可能为空
@@ -245,8 +258,10 @@ class My_Net(nn.Module):
 
     def get_representation(self, base_ids=None):
         if base_ids is not None and base_ids.numel() > 0:
-            # DataLoader wraps with batch dim; squeeze to ensure 1D indexing
+            # DataLoader wraps with batch dim; squeeze batch dim only, keep at least 1D
             base_ids = base_ids.squeeze()
+            if base_ids.dim() == 0:
+                base_ids = base_ids.unsqueeze(0)  # prevent 0D scalar
             base_weights = self.weight_base[base_ids,:]   ## N*D
             base_open_weights = self.weight_base_open[base_ids,:]
         else:

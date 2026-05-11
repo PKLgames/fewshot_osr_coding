@@ -51,7 +51,9 @@ def load_config(config_path):
     return args
 
 
-def extract_features(model, dataloader, args, device='cuda'):
+def extract_features(model, dataloader, args, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     """Extract features from dataloader, grouped by class."""
     model.eval()
     features = []
@@ -181,8 +183,9 @@ def main():
 
     # --- Full model ---
     print("\n=== Full Model t-SNE ===")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = My_Net(args=args, mode='train')
-    model = model.to('cuda')
+    model = model.to(device)
 
     ckpt_path = cl_args.ckpt
     if ckpt_path is None:
@@ -195,9 +198,9 @@ def main():
         print(f"No checkpoint found at {ckpt_path}")
         return
 
-    state_dict = torch.load(ckpt_path, map_location='cuda', weights_only=False)
-    model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
-    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
+    state_dict = torch.load(ckpt_path, map_location=device, weights_only=False)
+    model.weight_base.data.copy_(state_dict['weight_base'].to(device))
+    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to(device))
     model.load_state_dict(state_dict, strict=False)
 
     test_loader = dataloaders.meta_test_dataloader(args)
@@ -212,21 +215,21 @@ def main():
     if cl_args.compare_ablation:
         print("\n=== Baseline (no NPM) t-SNE ===")
         model_baseline = My_Net(args=args, mode='train', use_npm=False)
-        model_baseline = model_baseline.to('cuda')
+        model_baseline = model_baseline.to(device)
 
         # Try to load baseline ablation checkpoint
         baseline_ckpt = os.path.join(
             args.save_folder + '_ablation/wo_NPM',
             f'model_{dataset}_max_acc.pth')
         if os.path.exists(baseline_ckpt):
-            state = torch.load(baseline_ckpt, map_location='cuda')
-            model_baseline.weight_base = state['weight_base'].to('cuda')
-            model_baseline.weight_base_open = state['weight_base_open'].to('cuda')
+            state = torch.load(baseline_ckpt, map_location=device)
+            model_baseline.weight_base = state['weight_base'].to(device)
+            model_baseline.weight_base_open = state['weight_base_open'].to(device)
             model_baseline.load_state_dict(state, strict=False)
         else:
             print(f"  No baseline checkpoint found, using same weights (feature comparison only)")
-            model_baseline.weight_base = state_dict['weight_base'].to('cuda')
-            model_baseline.weight_base_open = state_dict['weight_base_open'].to('cuda')
+            model_baseline.weight_base = state_dict['weight_base'].to(device)
+            model_baseline.weight_base_open = state_dict['weight_base_open'].to(device)
             model_baseline.load_state_dict(state_dict, strict=False)
 
         features_bl, labels_bl, splits_bl = extract_features(

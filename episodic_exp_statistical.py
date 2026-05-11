@@ -130,9 +130,13 @@ def plot_cd_diagram(avg_ranks, n_methods, n_datasets, cd, method_names, save_pat
 
 def main():
     parser = argparse.ArgumentParser(description='Episodic Statistical Tests')
-    parser.add_argument('--results', type=str, default=None)
+    parser.add_argument('--results', type=str, default=None,
+                        help='Path to results JSON (e.g. ablation/results.json)')
+    parser.add_argument('--mode', type=str, default='config',
+                        choices=['config', 'osr'],
+                        help='config=compare ablation configs, osr=compare OSR methods')
     parser.add_argument('--metric', type=str, default='acc',
-                        choices=['acc', 'osr_score', 'auroc'])
+                        choices=['acc', 'osr_score', 'auroc', 'tpr'])
     parser.add_argument('--alpha', type=float, default=0.05)
     parser.add_argument('--manual', action='store_true')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
@@ -140,37 +144,89 @@ def main():
     cl_args = parser.parse_args()
 
     if cl_args.manual:
-        # Replace with actual experiment results
-        method_names = ['Full Model', 'w/o Flow', 'w/o OOD Head',
-                        'w/o Reciprocal', 'w/o Threshold', 'Baseline']
-        dataset_names = ['TAU22', 'TAU19']
-        results_matrix = np.array([
-            [74.0, 72.0, 70.0, 68.0, 71.0, 65.0],
-            [43.0, 41.0, 39.0, 37.0, 40.0, 35.0],
-        ])
+        if cl_args.mode == 'osr':
+            method_names = ['anti_prototype', 'mahalanobis', 'osr23',
+                            'extended_v2', 'cluster_v2', 'fusion_v2']
+            dataset_names = ['TAU22_full', 'TAU22_woFlow', 'TAU22_woOOD',
+                            'TAU22_woRecip', 'TAU22_woThresh', 'TAU22_baseline',
+                            'TAU19_full', 'TAU19_woFlow', 'TAU19_woOOD',
+                            'TAU19_woRecip', 'TAU19_woThresh', 'TAU19_baseline']
+            results_matrix = np.array([
+                [65.0, 70.0, 72.0, 72.0, 72.0, 75.0],
+                [63.0, 68.0, 72.0, 72.0, 72.0, 75.0],
+                [63.0, 68.0, 72.0, 72.0, 72.0, 75.0],
+                [63.0, 68.0, 72.0, 72.0, 72.0, 75.0],
+                [63.0, 68.0, 72.0, 72.0, 72.0, 75.0],
+                [63.0, 68.0, 72.0, 72.0, 72.0, 75.0],
+                [50.0, 70.0, 84.0, 84.0, 83.0, 93.0],
+                [50.0, 70.0, 84.0, 84.0, 83.0, 93.0],
+                [50.0, 70.0, 84.0, 84.0, 83.0, 93.0],
+                [50.0, 70.0, 84.0, 84.0, 83.0, 93.0],
+                [50.0, 70.0, 84.0, 84.0, 83.0, 93.0],
+                [50.0, 70.0, 84.0, 84.0, 83.0, 93.0],
+            ])
+        else:
+            method_names = ['Full Model', 'w/o Flow', 'w/o OOD Head',
+                            'w/o Reciprocal', 'w/o Threshold', 'Baseline']
+            dataset_names = ['TAU22', 'TAU19']
+            results_matrix = np.array([
+                [74.0, 72.0, 70.0, 68.0, 71.0, 65.0],
+                [43.0, 41.0, 39.0, 37.0, 40.0, 35.0],
+            ])
     elif cl_args.results:
         with open(cl_args.results) as f:
             data = json.load(f)
 
-        dataset_names = list(data.keys())
-        method_names = list(data[dataset_names[0]].keys())
-        metric = cl_args.metric
+        if cl_args.mode == 'osr':
+            # Build (n_conditions × n_osr_methods) matrix
+            # data[dataset][config].osr[method] → extract metric
+            osr_method_names = ['anti_prototype', 'feature_mahalanobis',
+                               'ood_head_osr23', 'ood_head_extended_v2',
+                               'ood_head_cluster_v2', 'ood_head_fusion_v2']
+            method_names = ['anti_proto', 'mahalanobis', 'osr23',
+                            'extended_v2', 'cluster_v2', 'fusion_v2']
+            metric_key = cl_args.metric  # osr_score, auroc, or tpr
 
-        results_matrix = []
-        for ds in dataset_names:
-            row = []
-            for method in method_names:
-                r = data[ds][method]
-                # Try to extract the metric
-                val = 0
-                if metric == 'acc':
-                    val = r.get('base_5shot', {}).get('mean_acc', 0) * 100
-                elif metric == 'osr_score':
-                    osr = r.get('osr', {})
-                    val = max(v.get('osr_score', 0) for v in osr.values()) * 100 if osr else 0
-                row.append(val)
-            results_matrix.append(row)
-        results_matrix = np.array(results_matrix)
+            dataset_names = []
+            matrix_rows = []
+            for ds_name, configs in sorted(data.items()):
+                for cfg_name, cfg_data in sorted(configs.items()):
+                    osr = cfg_data.get('osr', {})
+                    row = []
+                    for m in osr_method_names:
+                        val = osr.get(m, {}).get(metric_key, 0)
+                        # osr_score and tpr are fractions, auroc is already 0-1
+                        row.append(val * 100 if metric_key in ('osr_score', 'tpr') else val * 100)
+                    if any(v > 0 for v in row):
+                        matrix_rows.append(row)
+                        dataset_names.append(f"{ds_name}_{cfg_name}")
+            results_matrix = np.array(matrix_rows)
+        else:
+            # Original config-comparison mode
+            dataset_names = list(data.keys())
+            method_names = list(data[dataset_names[0]].keys())
+            metric = cl_args.metric
+
+            results_matrix = []
+            for ds in dataset_names:
+                row = []
+                for method in method_names:
+                    r = data[ds][method]
+                    val = 0
+                    if metric == 'acc':
+                        val = r.get('base_5shot', {}).get('mean_acc', 0) * 100
+                    elif metric == 'osr_score':
+                        osr = r.get('osr', {})
+                        val = max(v.get('osr_score', 0) for v in osr.values()) * 100 if osr else 0
+                    elif metric == 'auroc':
+                        osr = r.get('osr', {})
+                        val = max(v.get('auroc', 0) for v in osr.values()) * 100 if osr else 0
+                    elif metric == 'tpr':
+                        osr = r.get('osr', {})
+                        val = max(v.get('unknown_tpr', 0) for v in osr.values()) * 100 if osr else 0
+                    row.append(val)
+                results_matrix.append(row)
+            results_matrix = np.array(results_matrix)
     else:
         print("Provide --results JSON or --manual")
         return
@@ -181,14 +237,15 @@ def main():
     save_dir = os.path.join(cl_args.output_dir, 'statistical')
     os.makedirs(save_dir, exist_ok=True)
 
-    save_path = os.path.join(save_dir, 'results.json')
+    suffix = 'osr' if cl_args.mode == 'osr' else 'config'
+    save_path = os.path.join(save_dir, f'results_{suffix}.json')
     with open(save_path, 'w') as f:
         json.dump(test_results, f, indent=2)
 
     plot_cd_diagram(
         test_results['avg_ranks'], len(method_names), len(dataset_names),
         test_results['critical_difference'], method_names,
-        os.path.join(save_dir, 'cd_diagram.png'))
+        os.path.join(save_dir, f'cd_diagram_{suffix}.png'))
 
 
 if __name__ == '__main__':

@@ -55,7 +55,9 @@ def load_config(config_path):
     return args
 
 
-def extract_features_per_class(model, dataloader, device='cuda'):
+def extract_features_per_class(model, dataloader, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     """Extract features grouped by class from a dataloader."""
     model.eval()
     features_by_class = {}
@@ -100,7 +102,9 @@ def extract_features_per_class(model, dataloader, device='cuda'):
     return features_by_class
 
 
-def cross_domain_eval(model, target_loader, args, device='cuda'):
+def cross_domain_eval(model, target_loader, args, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     """
     Evaluate model trained on source domain using target domain data.
     Uses the model's built-in evaluation protocol.
@@ -207,8 +211,9 @@ def run_cross_domain(source, target):
     print(f"{'='*60}")
 
     # Load source model (best checkpoint)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = My_Net(args=src_args, mode='train')
-    model = model.to('cuda')
+    model = model.to(device)
 
     # Initialize representation from pretrained backbone first
     if os.path.exists(src_args.pretrained_model_path):
@@ -225,9 +230,9 @@ def run_cross_domain(source, target):
         return None
 
     print(f"  Loading: {ckpt_path}")
-    state_dict = torch.load(ckpt_path, map_location='cuda', weights_only=False)
-    model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
-    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
+    state_dict = torch.load(ckpt_path, map_location=device, weights_only=False)
+    model.weight_base.data.copy_(state_dict['weight_base'].to(device))
+    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to(device))
     model.load_state_dict(state_dict, strict=False)
 
     # Evaluate on target domain

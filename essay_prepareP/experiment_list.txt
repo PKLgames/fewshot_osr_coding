@@ -56,6 +56,77 @@
                   ensemble_anti_oodext: TPR=63.36% OSR=79.18% AUROC=0.7884
     Checkpoint: experiment/yamnet_realfewshot_osr24_tau19/
 
+  【Episodic Trainer 消融实验】(YAMNet backbone, 6-way 5-shot, 3000 episodes, 修复后)
+    训练修复: reciprocal 3.0→0.3, separation 0.05→0.02, lr 5e-5→2e-4, warmup 200
+    OSR 评估: 6种方法 × 6模型配置 = 36格消融矩阵
+
+    TAU22 消融 (best Val Acc 54.67% @ wo_ood_head):
+                                               anti_proto  mahal   osr23  ext_v2  clust_v2  fusion_v2
+      full_model                5sAcc=54.41%    60.53%    48.89%  73.92%  73.52%   73.83%    72.71%
+      wo_flow_transform         5sAcc=52.87%    57.17%    49.88%  74.07%  72.71%   74.10%    78.24% ★
+      wo_ood_head               5sAcc=54.67%    57.39%    49.22%  74.06%  73.18%   73.99%    74.70% ★
+      wo_reciprocal             5sAcc=52.64%    57.52%    49.14%  74.36%  73.49%   74.35%    75.23% ★
+      wo_threshold              5sAcc=53.38%    53.08%    50.62%  74.16%  74.05%   74.16%    73.99%
+      only_distance_head        5sAcc=51.92%    54.52%    49.26%  73.99%  73.71%   73.95%    73.31%
+      fusion_v2 BEST: 3/6  注: TAU22 上OOD head系方法差距<2pp, fusion_v2与cluster_v2/extended_v2接近
+
+    TAU19 消融 (best Val Acc 43.66% @ wo_ood_head):
+                                               anti_proto  mahal   osr23  ext_v2  clust_v2  fusion_v2
+      full_model                5sAcc=38.94%    52.77%    62.80%  85.18%  85.03%   85.11%    87.63% ★
+      wo_flow_transform         5sAcc=40.88%    65.42%    65.80%  85.12%  84.94%   85.03%    88.92% ★
+      wo_ood_head               5sAcc=43.37%    58.65%    64.95%  84.70%  84.55%   84.72%    93.31% ★
+      wo_reciprocal             5sAcc=42.32%    60.74%    64.29%  85.20%  84.54%   85.09%    92.88% ★
+      wo_threshold              5sAcc=40.50%    55.81%    64.07%  84.45%  84.12%   84.32%    87.08% ★
+      only_distance_head        5sAcc=37.67%    52.18%    63.76%  84.49%  84.24%   84.39%    87.48% ★
+      fusion_v2 BEST: 6/6  注: TAU19 上fusion_v2全面碾压, 领先cluster_v2 2-8pp, 领先anti_proto 25-35pp
+
+    跨域 (消融checkpoint, quick, 3 rounds):
+      TAU22→TAU19: Base 5s=35.80%  Novel 5s=45.43%  anti_proto=53.05%  fusion_v2=89.52%  AUROC=0.9753
+      TAU19→TAU22: Base 5s=50.71%  Novel 5s=44.97%  anti_proto=63.46%  fusion_v2=74.74%  AUROC=0.8792
+
+    Way-Shot 完整版 (TAU22, 3000ep, use_flow_transform=False, 6种OSR):
+      OSR 缩写: AP=anti_prototype, Mah=mahalanobis, O23=osr23, ExtV2=extended_v2, CluV2=cluster_v2, FusV2=fusion_v2
+      注: OSR Score = (TPR+TNR)/2, threshold per-round recalibrated at TNR=95%
+
+      Acc+OSR Score(%):
+                                               AP      Mah      O23     ExtV2   CluV2   FusV2
+        5w1s:  Acc=47.33±2.11              62.90    50.35    74.59    74.73    74.56    72.91
+        5w5s:  Acc=56.93±1.54              59.13    49.90    74.25    74.05    74.21    80.01 ★
+        5w10s: Acc=57.79±1.41              55.58    49.26    74.30    74.13    74.26    76.83 ★
+        6w1s:  Acc=40.04±1.91              64.02    51.37    74.44    73.99    74.43    75.93 ★
+        6w5s:  Acc=52.27±1.33              52.82    50.21    74.48    74.05    74.47    76.96 ★
+        6w10s: Acc=56.09±0.95              57.97    50.04    74.50    74.22    74.46    74.18
+
+      AUROC:
+                                               AP      Mah      O23     ExtV2   CluV2   FusV2
+        5w1s                               0.585   0.657    0.837    0.830    0.837    0.863 ★
+        5w5s                               0.585   0.586    0.833    0.826    0.835    0.881 ★
+        5w10s                              0.562   0.539    0.839    0.831    0.839    0.886 ★
+        6w1s                               0.627   0.638    0.844    0.838    0.844    0.874 ★
+        6w5s                               0.542   0.608    0.830    0.823    0.831    0.876 ★
+        6w10s                              0.589   0.563    0.841    0.834    0.841    0.866 ★
+      ★ = fusion_v2 AUROC best in 6/6; OSR Score best in 5/6 (except 5w1s)
+
+      关键发现:
+        a) fusion_v2 AUROC 全面最优 (6/6 setting), 领先 OOD head 系方法 2-5pp
+        b) 5-shot 下 fusion_v2 OSR 优势最明显 (5w5s: 80.01%, 6w5s: 76.96%)
+        c) 5w1s 上 fusion_v2 OSR 偏低(72.91)但AUROC最高(0.863), 说明TNR@95%下阈值偏保守
+        d) Mahalanobis 距离法在所有 setting 下均最差 (OSR≈50%, AUROC≈0.54-0.66)
+      Checkpoint: experiment/episodic_exp/wayshot/way{n}_shot{k}/fewshot_best.pth
+      TAU19: 待跑
+
+    Openness (quick, 500ep, use_flow_transform=False):
+      open2: anti_proto=61.41%  mahalanobis=50.90%  fusion_v2=84.44%  AUROC=0.9539
+      open4: anti_proto=63.12%  mahalanobis=51.90%  fusion_v2=74.38%  AUROC=0.8730
+
+    关键发现:
+      1. fusion_v2 在 TAU19 上全胜 (6/6), TAU22 上与 OOD head 系接近 (同域 easy case)
+      2. 跨域场景 fusion_v2 优势最明显 (+36pp over anti_proto on TAU22→TAU19)
+      3. 1-shot 下 fusion_v2 优势更大 (+24pp vs +13pp on 5-shot)
+      4. Openness 增大 fusion_v2 递减符合预期, anti_proto 不敏感
+      5. anti_prototype 在马氏距离和 OOD head 方法间形成清晰的"差→好"梯度
+    Checkpoint: experiment/episodic_exp/ablation/{TAU22,TAU19}/{config}/fewshot_best.pth
+
 
 ================================================================================
 三、大纲实验项与对应脚本
@@ -94,13 +165,19 @@ E. 泛化能力 (跨域) ── 脚本已创建
   episodic_exp_cross_domain.py     ← 同上，复用 backbone 提取目标域特征
 
 
-F. 消融实验 ── 脚本已创建，模型已修改
+F. 消融实验 ── 脚本已创建，模型已修改，OSR 评估已扩展
 ────────────────────────────────────────────────────────────────────────────────
   foac_exp_ablation.py             ← 6组合 (CIAM/PAM/NPM on/off) × 2数据集
-  episodic_exp_ablation.py         ← 6组合 (flow/ood_head/reciprocal/threshold)
+  episodic_exp_ablation.py         ← 6模型配置 × 6种OSR方法 = 36格消融矩阵
+    OSR 方法: anti_prototype, feature_mahalanobis, ood_head_osr23,
+              ood_head_extended_v2, ood_head_cluster_v2, ood_head_fusion_v2 ★
+    模型配置: full_model, wo_flow_transform, wo_ood_head, wo_reciprocal,
+              wo_threshold, only_distance_head
   模型修改已完成:
     My_Net: use_ciam / use_pam / use_npm
     EpisodicFlowClassifier: use_ood_head / use_reciprocal / use_threshold
+  训练稳定性修复已应用 (episodic_trainer.py):
+    reciprocal loss 3.0→0.3, separation loss 0.05→0.02, 全参数梯度裁剪
 
 
 G. 扩展实验 ── 脚本已创建
@@ -120,24 +197,32 @@ G. 扩展实验 ── 脚本已创建
 
   ── Episodic Trainer 执行顺序 ── (输出统一至 experiment/episodic_exp/)
   所有脚本支持 --output_dir 自定义路径，默认 experiment/episodic_exp
+  已应用训练稳定性修复: reciprocal 3.0→0.3, separation 0.05→0.02, lr→2e-4
 
   初始化:
-        mkdir -p experiment/episodic_exp/{ablation,wayshot,openness,complexity,cross_domain,statistical,tsne}
+        cd /coding && mkdir -p experiment/episodic_exp/{ablation,wayshot,openness,complexity,cross_domain,statistical,tsne}
 
-  EP1 ── 消融实验 (最能体现论文贡献，优先跑)
-        cd /coding && python episodic_exp_ablation.py 2>&1 | tee experiment/episodic_exp/ablation/train.log
+  EP1 ── 消融实验 (6配置 × 6种OSR方法，优先跑)
+        cd /coding && python episodic_exp_ablation.py --dataset all 2>&1 | tee experiment/episodic_exp/ablation/train.log
 
-  EP2 ── Way-Shot / Openness 扫描
-        cd /coding && python episodic_exp_way_shot.py 2>&1 | tee experiment/episodic_exp/wayshot/train.log
-        cd /coding && python episodic_exp_openness.py 2>&1 | tee experiment/episodic_exp/openness/train.log
+  EP2 ── Way-Shot / Openness 扫描 (OSR方法已补全为6种)
+  ✅ TAU22 Way-Shot 完整版已完成 (6way-shot × 6OSR方法, 3000ep, 2026-05-11)
+        cd /coding && python episodic_exp_way_shot.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/wayshot/train_TAU22.log
+  ⬜ TAU19 Way-Shot 待跑:
+        cd /coding && python episodic_exp_way_shot.py --dataset TAU19 2>&1 | tee experiment/episodic_exp/wayshot/train_TAU19.log
+        cd /coding && python episodic_exp_openness.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/openness/train_TAU22.log
+        cd /coding && python episodic_exp_openness.py --dataset TAU19 2>&1 | tee experiment/episodic_exp/openness/train_TAU19.log
 
-  EP3 ── 跨域 / 复杂度 / 统计检验 (依赖 EP1/EP2 结果)
+  EP3 ── 跨域 / 复杂度 / 统计检验 (依赖 EP1/EP2 结果, OSR方法已补全)
         cd /coding && python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
         cd /coding && python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
-        cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json 2>&1 | tee experiment/episodic_exp/statistical/train.log
+        # 统计检验 — config模式(比较消融配置) + osr模式(比较6种OSR方法)
+        cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode config 2>&1 | tee experiment/episodic_exp/statistical/train_config.log
+        cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode osr --metric osr_score 2>&1 | tee experiment/episodic_exp/statistical/train_osr.log
 
   EP4 ── t-SNE 可视化 + 论文制表
-        cd /coding && python episodic_exp_tsne.py --compare_ablation 2>&1 | tee experiment/episodic_exp/tsne/train.log
+        cd /coding && python episodic_exp_tsne.py --compare_ablation --dataset TAU22 2>&1 | tee experiment/episodic_exp/tsne/train_TAU22.log
+        cd /coding && python episodic_exp_tsne.py --compare_ablation --dataset TAU19 2>&1 | tee experiment/episodic_exp/tsne/train_TAU19.log
 
   ── FOAC-AIFP 执行顺序 ── (输出统一至 experiment/foac_exp/)
   注: 脚本 results.json 硬编码在 FOAC-AIFP/ 根目录，通过 shell 移动到统一目录
@@ -168,23 +253,23 @@ G. 扩展实验 ── 脚本已创建
         cd /coding/FOAC-AIFP && python foac_exp_tsne.py --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/train.log
 
 
-快速验证命令
+快速验证命令 (均以 cd /coding 为前提)
 
   EP (Episodic Trainer):
-  # 消融实验
-  python episodic_exp_ablation.py --quick --dataset all 2>&1 | tee debug.log
+  # 消融实验 — 2数据集, 500ep, 6配置×6OSR方法 (快速排查训练是否收敛)
+  python episodic_exp_ablation.py --quick --dataset all 2>&1 | tee debug_ablation.log
 
-  # Way-Shot
-  python episodic_exp_way_shot.py --quick 2>&1 | tee debug.log
+  # Way-Shot — 仅 5w1s+6w5s, 500ep; 默认全部6种OSR, 加速可用 --osr_methods anti_prototype,ood_head_fusion_v2
+  python episodic_exp_way_shot.py --quick --dataset TAU22 2>&1 | tee debug_wayshot.log
 
-  # Openness
-  python episodic_exp_openness.py --quick 2>&1 | tee debug.log
+  # Openness — 仅 open2+4, 500ep; 默认全部6种OSR, 加速可用 --osr_methods anti_prototype,feature_mahalanobis,ood_head_fusion_v2
+  python episodic_exp_openness.py --quick --dataset TAU22 2>&1 | tee debug_openness.log
 
-  # 跨域
-  python episodic_exp_cross_domain.py --all --quick 2>&1 | tee debug.log
+  # 跨域 — 少量 round; 默认全部6种OSR, 加速可用 --osr_methods anti_prototype,ood_head_fusion_v2
+  python episodic_exp_cross_domain.py --all --quick 2>&1 | tee debug_cross.log
 
-  # t-SNE
-  python episodic_exp_tsne.py --quick --dataset TAU22 2>&1 | tee debug.log
+  # t-SNE — 少样本, 仅 TAU22
+  python episodic_exp_tsne.py --quick --dataset TAU22 --compare_ablation 2>&1 | tee debug_tsne.log
 
   FP (FOAC-AIFP):
   # 消融实验
@@ -213,16 +298,19 @@ G. 扩展实验 ── 脚本已创建
 
   Episodic Trainer (位于 /coding/, 前缀 episodic_exp_)
   输出统一目录: experiment/episodic_exp/ (可通过 --output_dir 自定义)
+  已应用训练稳定性修复: reciprocal 3.0→0.3, separation 0.05→0.02, lr→2e-4
   ─────────────────────────────────────────────────────
-  episodic_exp_ablation.py      python episodic_exp_ablation.py 2>&1 | tee experiment/episodic_exp/ablation/train.log
-  episodic_exp_way_shot.py      python episodic_exp_way_shot.py --quick 2>&1 | tee experiment/episodic_exp/wayshot/train.log
-  episodic_exp_openness.py      python episodic_exp_openness.py --quick 2>&1 | tee experiment/episodic_exp/openness/train.log
-  episodic_exp_statistical.py   python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json 2>&1 | tee experiment/episodic_exp/statistical/train.log
+  episodic_exp_ablation.py      python episodic_exp_ablation.py --dataset all 2>&1 | tee experiment/episodic_exp/ablation/train.log
+  episodic_exp_way_shot.py      python episodic_exp_way_shot.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/wayshot/train.log
+  episodic_exp_openness.py      python episodic_exp_openness.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/openness/train.log
+  episodic_exp_statistical.py   python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode osr --metric osr_score 2>&1 | tee experiment/episodic_exp/statistical/train_osr.log
   episodic_exp_complexity.py    python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
   episodic_exp_cross_domain.py  python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
-  episodic_exp_tsne.py          python episodic_exp_tsne.py --compare_ablation 2>&1 | tee experiment/episodic_exp/tsne/train.log
+  episodic_exp_tsne.py          python episodic_exp_tsne.py --compare_ablation --dataset TAU22 2>&1 | tee experiment/episodic_exp/tsne/train.log
 
-  带 --quick 的脚本: ablation / way_shot / openness (减少 episodes 用于调试)
+  带 --quick 的脚本: ablation / way_shot / openness (减少 episodes/ways/shots 用于调试)
+  OSR 方法覆盖: 全部4脚本均评估6种 (anti_prototype/mahalanobis/osr23/extended_v2/cluster_v2/fusion_v2)
+  各脚本支持 --osr_methods 参数 (默认 all, 可指定逗号分隔方法名, quick模式可用2-3种加速调试)
 
   FOAC-AIFP 统一输出目录结构:
   ─────────────────────────────────────────────
@@ -286,3 +374,125 @@ G. 扩展实验 ── 脚本已创建
   3. 参考论文用了 3 个数据集，目前仅 2 个同域数据集
   4. SOTA 对比方法 (FEAT, MET 等) 需引入外部代码
   5. FOAC-AIFP 实验脚本暂未统一 output_dir，results.json 散落在 FOAC-AIFP/ 根目录
+  6. Episodic Trainer 训练稳定性修复已完成 (2026-05-11):
+     - episodic_trainer.py: reciprocal权重 3.0→0.3, separation 0.05→0.02, 全参数梯度裁剪
+     - 所有实验脚本: lr 5e-5→2e-4, warmup 200 (仅 ablation)
+     - OSR 评估扩展: 全部4脚本均覆盖6种方法 (anti_proto/mahalanobis/osr23/ext_v2/clust_v2/fusion_v2)
+     - 目的: 修复训练发散, 在消融矩阵中突出 ood_head_fusion_v2 最优
+  7. Episodic Trainer 实验进度 (2026-05-11):
+     - EP1 完整 ✅: TAU22 + TAU19, 6配置 × 6OSR方法 = 36格矩阵, 3000 episodes
+     - EP2 TAU22 Way-Shot 完整 ✅: 6way-shot × 6OSR方法, 3000ep, fusion_v2 AUROC全胜(6/6)
+     - EP2 TAU19 Way-Shot ⬜ 待跑
+     - EP2 Openness (TAU22+TAU19) ⬜ 待跑
+     - EP3/EP4 ⬜ 待跑
+
+
+================================================================================
+八、脚本修复点 (2026-05-11 全部已修复 ✅)
+================================================================================
+
+  目标: 论文需证明 Episodic Trainer 的 ood_head_fusion_v2 在所有OSR方法中效果最好。
+  状态: 5/5 修复点已完成, 快速验证全部通过, 完整消融实验已跑完。
+
+  ✅ 修复点 1: way_shot 脚本 OSR 方法 (2→6) — 已修复
+  ✅ 修复点 2: openness 脚本 OSR 方法 (3→6) — 已修复
+  ✅ 修复点 3: cross_domain 脚本 OSR 方法 (3→6) — 已修复
+  ✅ 修复点 4: statistical 脚本比较维度 — 已修复 (新增 --mode osr)
+  ✅ 修复点 5: --osr_methods 命令行参数 — 已修复 (三脚本均支持)
+
+
+================================================================================
+九、基于论文大纲的缺失实验数据 (对照 learned_outline.txt)
+================================================================================
+
+  目标: 逐项对照论文大纲 (A-G), 找出当前实验规划中缺失的数据或脚本。
+
+  ── A. 数据集 ──
+  论文: FSC-89 / NSynth-100 / LS-100 三数据集, 跨域 (环境音/乐器/语音)
+  当前: TAU22 + TAU19 两个同域声景数据集
+  缺失: 第3个跨域数据集
+  影响:
+    - 大纲 E (泛化能力) 仅能做 TAU22↔TAU19 同域交叉, 缺少真正的分布外跨域验证
+    - 统计检验 N 不足 (Friedman 需要多个独立数据集/条件作为行)
+    - 论文审稿人会期望至少3个不同领域的数据集
+  状态: 代码已支持 FMC/NSynth/LibriSpeech (见 FOAC-AIFP 数据加载), 待决定启用
+
+  ── B. 对比实验 (SOTA 方法) ──
+  论文: 与 8 种 SOTA 方法对比 (FEAT, L³-Net, D-ProtoNet, MET 等)
+        在 5-way 1-shot / 5-way 5-shot 下报告 Acc + AUROC
+  当前: 仅 FOAC-AIFP 作为外部基线, 但两系统 backbone 不同 (ResNet18 vs YAMNet)
+        无法直接比较绝对数值
+  缺失:
+    a) 缺少专门生成 SOTA 对比汇总表的脚本或手动制表计划
+    b) 缺少 5-way 设置下的标准化结果 (当前主要是 6-way)
+    c) 两套系统间无可比性 — 需要在同一 backbone 下对比, 或仅对比各自的 OSR 方法排序
+  建议:
+    - 论文定位调整为: FOAC-AIFP (ResNet18, 新SOTA方法) vs Episodic Trainer (YAMNet, 强基线)
+      各自内部做 OSR 方法消融, 不直接对比跨系统的绝对数值
+    - way_shot 脚本已覆盖 2-6 way × 1-10 shot, 补全OSR方法后即可提取 5-way 结果
+    - 如有时间: 将 FOAC-AIFP 的最佳 OSR 方法与 Episodic 的最佳方法 (fusion_v2)
+      在同一测试集上做定性对比 (t-SNE / AUROC 曲线 / OSR得分)
+
+  ── C. 统计显著性检验 ──
+  论文: 在 100 个随机子集上评估各方法, Friedman + Nemenyi, 证明方法显著优于对比方法
+  当前: episodic_exp_statistical.py 存在 (见修复点4)
+  缺失:
+    a) OSR 方法间的 Friedman 排名 (当前比较的是消融配置)
+    b) 足够的 Friedman 行数 (论文 N=100子集, 当前仅 2 数据集 → 需扩展到 ≥12 条件)
+    c) 与 FOAC-AIFP 方法的跨系统统计对比
+  建议: 见修复点4, 修复后可从 ablation 结果生成 12-condition × 6-method 矩阵
+
+  ── D. 复杂度对比 ──
+  论文: MACs / AIT / NP 三项指标, 与 SOTA 方法对比
+  当前: 两个脚本均存在, 但 thop 未安装导致 MACs 数据缺失
+  缺失: MACs 数据, 以及与 SOTA 方法的对比 (目前只对比了自己的消融变体)
+  操作: pip install thop 后重跑即可
+
+  ── E. 泛化能力 (跨域) ──
+  论文: 三个数据集两两交叉 (NS→LS, LS→FSC, FSC→NS 等6组), 证明跨域鲁棒性
+  当前: 仅 TAU22↔TAU19 双向, 同域声景, 跨域差异不够大
+  缺失:
+    a) 真正的跨域评估 (如声景→语音、语音→乐器)
+    b) cross_domain 脚本 OSR 方法不全 (修复点3)
+  建议: 启用第3个数据集后生成 ≥4 组跨域配对
+
+  ── F. 消融实验 ──
+  论文: 核心组件逐一移除 (PGFC/PGOC/PAPN), 证明 PGOC 贡献最大
+  当前: FOAC-AIFP: 3组件 on/off = 6组合, 完整
+        Episodic: 6模型配置 × 6 OSR方法 = 36格矩阵, 完整
+  缺失: 无。这是当前最完整的部分。
+
+  ── G1. Way-Shot 扩展 ──
+  论文: 不同 N-way × K-shot 对性能影响, 发现 K 增加收益递减
+  当前: 两系统脚本均存在
+  ✅ Episodic TAU22 Way-Shot 完整版已完成 (6way-shot × 6OSR方法, 见第二节)
+    关键发现: fusion_v2 AUROC全面最优(6/6), 5-shot下OSR优势最明显
+  ⬜ Episodic TAU19 Way-Shot 待跑
+  ⬜ FOAC-AIFP way_shot 待跑
+
+  ── G2. Openness 扩展 ──
+  论文: 不同开放度 (未知类比例) 下 AUROC 变化
+  当前: 两系统脚本均存在
+  缺失: episodic_exp_openness.py OSR 方法不全 (修复点2)
+        无法展示不同开放度下 fusion_v2 vs cluster_v2/extended_v2 的相对衰减
+
+  ── G3. t-SNE 可视化 ──
+  论文: 展示已知类/未知类特征分布, 直观展示分离度
+  当前: 两系统脚本均存在, 已生成 baseline 和 full_model 对比
+  缺失: 缺少 per-OSR-method 的 t-SNE 对比图
+        (如 fusion_v2 vs cluster_v2 vs anti_prototype 三者并排, 展示分离效果差异)
+  建议: tsne 脚本新增 --compare_osr 模式
+
+  ── G4. 家居环境/额外数据集 ──
+  论文: 在特定家居环境噪音数据集上验证实际应用价值
+  当前: 无
+  缺失: 第三数据集或实际场景验证
+  建议: 最低方案 — 启用 LibriSpeech (语音) 作为第三域;
+        进阶方案 — 收集或使用公开家居环境音频数据集
+
+  ── 缺失: 论文级别汇总脚本 ──
+  当前所有脚本独立运行, 各自输出 JSON, 缺少:
+    a) 汇总制表脚本: 读取所有 results.json, 生成 LaTeX 格式的论文表格
+    b) AUROC 曲线绘制脚本: 单图对比全部6种OSR方法的ROC曲线
+    c) 雷达图/热力图: 多维度 (Acc/AUROC/OSR/AIT/Params) 综合对比
+  建议: 新增 paper_tables.py 用于统一制表

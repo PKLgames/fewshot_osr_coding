@@ -124,7 +124,8 @@ def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
         unknown_classes=unknown_classes,
         ood_features_by_class=ood_features,
         N_way=N_way, K_shot=K_shot, Q_query=Q_query,
-        lr=5e-5, gradient_accum_steps=1,
+        lr=2e-4, gradient_accum_steps=1,
+        warmup_episodes=200,
         device=device,
     )
 
@@ -150,7 +151,15 @@ def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
 
     # OSR evaluation
     osr_results = {}
-    for method in ['anti_prototype', 'feature_mahalanobis']:
+    osr_methods = [
+        'anti_prototype',
+        'feature_mahalanobis',
+        'ood_head_osr23',
+        'ood_head_extended_v2',
+        'ood_head_cluster_v2',
+        'ood_head_fusion_v2',
+    ]
+    for method in osr_methods:
         try:
             calibrator = mod.OSRCalibrator(
                 trainer.flow_classifier, calib_cache,
@@ -220,18 +229,26 @@ def main():
     print(f"\n{'='*80}")
     print("ABLATION SUMMARY")
     print(f"{'='*80}")
+    osr_methods_short = ['anti_proto', 'mahalanobis', 'osr23', 'ext_v2', 'cluster_v2', 'fusion_v2']
     for dataset in all_results:
         print(f"\n  Dataset: {dataset}")
-        print(f"  {'Config':<25s} {'BaseAcc':>8s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s}")
+        # Header
+        header = f"  {'Config':<25s} {'Base5s':>7s}"
+        for m in osr_methods_short:
+            header += f" {m:>10s}"
+        print(header)
         for name, r in all_results[dataset].items():
             acc = r.get('base_5shot', {}).get('mean_acc', 0)
             osr = r.get('osr', {})
-            # Get best OSR method
-            best_osr = max(osr.values(), key=lambda x: x.get('osr_score', 0)) if osr else {}
-            print(f"  {name:<25s} {acc:>7.2%} "
-                  f"{best_osr.get('known_tnr', 0):>7.2%} "
-                  f"{best_osr.get('unknown_tpr', 0):>7.2%} "
-                  f"{best_osr.get('osr_score', 0):>7.2%}")
+            row = f"  {name:<25s} {acc:>6.2%}"
+            # Map to short names in same order as osr_methods list
+            osr_keys = ['anti_prototype', 'feature_mahalanobis',
+                        'ood_head_osr23', 'ood_head_extended_v2',
+                        'ood_head_cluster_v2', 'ood_head_fusion_v2']
+            for ok in osr_keys:
+                v = osr.get(ok, {})
+                row += f" {v.get('osr_score', 0):>9.2%}"
+            print(row)
 
 
 if __name__ == '__main__':

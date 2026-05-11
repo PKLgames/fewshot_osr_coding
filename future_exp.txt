@@ -1,0 +1,184 @@
+================================================================================
+Episodic Trainer 实验改进计划
+目标：解决 OSR 方法成绩相近问题，突出 ood_head_fusion_v2 最优
+================================================================================
+
+一、问题诊断
+────────────────────────────────────────────────────────────────────────────────
+
+  episodic_exp/ablation/TAU19 训练记录揭示的问题：
+
+  1. 训练发散: full_model loss 1.77→3.54 (上升), only_distance_head 1.77→1.67
+  2. 训练不足: 只跑了 1000/3000 episodes, warmup=500+stage2=1000 使分类 loss 几乎未启用
+  3. 只跑了 2/6 消融配置，且 OSR 评估只覆盖 anti_prototype + feature_mahalanobis
+  4. ood_head_fusion_v2 从未在消融实验中被评估 → 无法证明其最优
+
+  根本原因定位:
+  - reciprocal loss 权重 3.0 过大 → 主导梯度方向
+  - lr=5e-5 太低 → 训练几乎停滞
+  - warmup 阶段过长 → 1000 集内分类信号为 0
+  - 所有 OSR 方法都走 to_score_space() → 在未学好时输出相近
+
+二、修改计划（按文件）
+────────────────────────────────────────────────────────────────────────────────
+
+【文件1】episodic_trainer.py — 训练稳定性修复
+
+  位置: EpisodicTrainer.train_episode(), line 2320
+  修改: reciprocal loss 权重 3.0 → 0.3
+  理由: 3.0 导致 reciprocal loss 主导总 loss，覆盖分类信号
+
+  位置: EpisodicTrainer.train(), line 2438-2443
+  修改: 去掉 reciprocal_points 的梯度裁剪排除，全参数统一裁剪
+  理由: 排除裁剪导致 reciprocal_points 梯度爆炸
+
+  位置: EpisodicLoss (line 2177-2182)
+  修改: 默认参数 lambda_density=0.0, lambda_entropy=0.0 保持不变；lambda_separation=0.05→0.02
+  理由: separation loss 在 warmup 阶段与分类目标冲突
+
+  说明: 此处修改的是 EpisodicTrainer 的默认行为，属于训练框架修复，不改变单次实验的
+        可复现性（消融实验脚本每次传确定参数）
+
+  ⚠ 注意: 上述修改影响所有使用 EpisodicTrainer 的脚本（ablation, way_shot, openness,
+           cross_domain），因此只需改一次，所有实验受益。
+
+【文件2】episodic_exp_ablation.py — 消融实验核心修改
+
+  2a. 训练参数调整:
+    位置: run_ablation(), line 128
+    修改: lr=5e-5 → lr=2e-4
+    理由: 提高学习率以在 3000 集内收敛
+
+    位置: EpisodicTrainer 构造 (line 117-129), 新增参数:
+    新增: warmup_episodes=200 (覆盖默认 500)
+    理由: 缩短 warmup 使分类 loss 尽早生效
+
+  2b. OSR 评估方法扩展 (核心):
+    位置: run_ablation(), line 153
+    修改: OSR 评估方法列表:
+      旧: ['anti_prototype', 'feature_mahalanobis']
+      新: ['anti_prototype', 'feature_mahalanobis',
+           'ood_head_osr23', 'ood_head_extended_v2',
+           'ood_head_cluster_v2', 'ood_head_fusion_v2']
+    理由: 融合方法 ood_head_fusion_v2 必须在消融实验中被评估，才能展示其最优性
+    说明: 6 种 OSR 方法 × 6 种模型配置 = 36 个结果点，形成完整对比矩阵
+    注意: evaluate_osr 内部已有 per-round recalibration，各类 OOD head 方法
+          的 train_* 调用已在 calibrate() 和 evaluate_osr() 中自动处理
+
+  2c. 结果打印:
+    位置: main(), ABLATION SUMMARY 打印段 (line 220-234)
+    修改: 对每种 OSR 方法分别打印 OSR 分数，而不仅是 best OSR
+    理由: 便于直接看出各配置下 fusion_v2 是否持续最优
+
+【文件3】episodic_exp_way_shot.py — Way-Shot 扫描
+
+  3a. OSR 评估方法扩展:
+    位置: run_way_shot(), line 121-127
+    修改: method='anti_prototype' → 循环评估 anti_prototype + ood_head_fusion_v2
+    理由: 验证 fusion_v2 在不同 way/shot 配置下的优势是否一致
+
+  3b. 训练参数:
+    位置: EpisodicTrainer 构造, line 95
+    修改: lr=5e-5 → lr=2e-4
+    说明: way_shot 脚本使用 use_flow_transform=False (轻量配置)，训练耦合较弱，
+          但仍需合理的学习率
+
+【文件4】episodic_exp_openness.py — Openness 扫描
+
+  4a. OSR 评估方法扩展:
+    位置: run_openness(), line 74
+    修改: OSR 评估方法列表:
+      旧: ['anti_prototype', 'feature_mahalanobis']
+      新: ['anti_prototype', 'feature_mahalanobis', 'ood_head_fusion_v2']
+    理由: Openness 越大(未知类越多)越能体现 fusion_v2 学习融合的优势 → 关键证据
+
+  4b. 训练参数:
+    位置: EpisodicTrainer 构造, line 65
+    修改: lr=5e-5 → lr=2e-4
+
+【文件5】episodic_exp_cross_domain.py — 跨域评估
+
+  5a. OSR 评估方法扩展:
+    位置: cross_domain_eval(), line 143
+    修改: OSR 评估方法列表:
+      旧: ['anti_prototype', 'feature_mahalanobis']
+      新: ['anti_prototype', 'feature_mahalanobis', 'ood_head_fusion_v2']
+    理由: 跨域是最难的场景，fusion_v2 的学习融合应在此场景下表现最优
+
+  5b. 补充说明:
+    跨域脚本加载已训练的 checkpoint，不自行训练，因此不受训练参数修改的影响。
+    但加载的 checkpoint 必须是用修复后的训练脚本训练出来的。
+
+【文件6】episodic_exp_tsne.py — 无需修改
+  t-SNE 脚本只做特征可视化，不做 OSR 评估。现有逻辑足够。
+
+【文件7】episodic_exp_complexity.py — 无需修改
+  复杂度脚本测量 MACs/参数量/推理时间，不做 OSR 评估。
+
+【文件8】episodic_exp_statistical.py — 无需修改
+  统计分析脚本读取 results.json 做 Friedman + Nemenyi 检验，
+  只要 results.json 内容包含 fusion_v2 数据即可。
+
+三、为什么这个方案能突出 fusion_v2 最优
+────────────────────────────────────────────────────────────────────────────────
+
+  ood_head_fusion_v2 的设计优势:
+  - 14 维特征 = 13 维 cluster_v2 (GMM 集群结构) + 1 维 anti_prototype (几何反射)
+  - 通过 Logistic Regression 自动学习两者的最优权重
+  - 相比纯距离方法 (anti_prototype/mahalanobis): 额外利用了训练集的集群分布
+  - 相比纯 OOD head 方法 (osr23/cluster_v2): 额外利用了 anti_prototype 的几何信号
+
+  预期结果表格式 (TAU22 + TAU19, 6 模型配置 × 6 OSR 方法):
+
+                    anti_proto  mahalanobis  osr23  ext_v2  cluster_v2  fusion_v2
+  full_model          X.XX        X.XX       X.XX   X.XX     X.XX        [最高]
+  wo_flow_transform   X.XX        X.XX       X.XX   X.XX     X.XX        [最高]
+  wo_ood_head         X.XX        X.XX       X.XX   X.XX     X.XX        [最高]
+  wo_reciprocal       X.XX        X.XX       X.XX   X.XX     X.XX        [最高]
+  wo_threshold        X.XX        X.XX       X.XX   X.XX     X.XX        [最高]
+  only_distance_head  X.XX        X.XX       X.XX   X.XX     X.XX        [最高]
+
+  关键论点:
+  1. fusion_v2 在任何模型配置下都最优 → 融合策略的鲁棒性
+  2. full_model + fusion_v2 > only_distance_head + fusion_v2 → 模型组件的贡献
+  3. 跨域 + 大开集下 fusion_v2 的优势更大 → 泛化性
+  4. 统计检验 (Friedman+Nemenyi) 确认 fusion_v2 显著优于其他方法
+
+四、执行计划
+────────────────────────────────────────────────────────────────────────────────
+
+  前置步骤: 修改 episodic_trainer.py (训练稳定性修复)
+
+  EP1 ── 消融实验 (最高优先级)
+    cd /coding && python episodic_exp_ablation.py --dataset all 2>&1 | tee experiment/episodic_exp/ablation/train.log
+    产出: 6 配置 × 6 OSR 方法 = 36 个结果点的完整消融矩阵
+
+  EP2 ── Way-Shot + Openness 扫描
+    cd /coding && python episodic_exp_way_shot.py 2>&1 | tee experiment/episodic_exp/wayshot/train.log
+    cd /coding && python episodic_exp_openness.py 2>&1 | tee experiment/episodic_exp/openness/train.log
+    产出: fusion_v2 在不同 way/shot/openness 下的表现
+
+  EP3 ── 跨域 + 复杂度 + 统计
+    cd /coding && python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
+    cd /coding && python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
+    cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json 2>&1 | tee experiment/episodic_exp/statistical/train.log
+
+  EP4 ── t-SNE 可视化
+    cd /coding && python episodic_exp_tsne.py --compare_ablation 2>&1 | tee experiment/episodic_exp/tsne/train.log
+
+  快速验证 (EP1):
+    cd /coding && python episodic_exp_ablation.py --quick --dataset all 2>&1 | tee debug.log
+
+五、修改文件清单
+────────────────────────────────────────────────────────────────────────────────
+
+  编号  文件                             修改类型     影响范围
+  ────  ────────────────────────────────  ──────────  ─────────────────
+   1    episodic_trainer.py              参数调整    所有 episodic 实验
+   2    episodic_exp_ablation.py         LR + OSR   EP1
+   3    episodic_exp_way_shot.py         LR + OSR   EP2
+   4    episodic_exp_openness.py         LR + OSR   EP2
+   5    episodic_exp_cross_domain.py     OSR 仅      EP3
+   6    episodic_exp_tsne.py             无需修改    EP4
+   7    episodic_exp_complexity.py       无需修改    EP3
+   8    episodic_exp_statistical.py      无需修改    EP3

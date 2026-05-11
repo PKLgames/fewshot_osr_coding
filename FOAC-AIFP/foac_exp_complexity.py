@@ -51,7 +51,9 @@ def count_parameters(model):
     return total, trainable
 
 
-def measure_macs(model, args, device='cuda'):
+def measure_macs(model, args, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     """
     Estimate MACs using thop if available, otherwise use manual estimation.
     """
@@ -99,7 +101,9 @@ def estimate_macs_manual(model, args):
     return total_macs
 
 
-def measure_inference_time(model, args, device='cuda', n_runs=100, warmup=20):
+def measure_inference_time(model, args, device=None, n_runs=100, warmup=20):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     """
     Measure average inference time (AIT) per episode.
     """
@@ -136,16 +140,19 @@ def measure_inference_time(model, args, device='cuda', n_runs=100, warmup=20):
     with torch.no_grad():
         for _ in range(warmup):
             _ = model(the_img, the_label, supp_idx, open_idx, test=True)
-    torch.cuda.synchronize()
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
 
     # Measure
     times = []
     with torch.no_grad():
         for _ in range(n_runs):
-            torch.cuda.synchronize()
+            if device.type == 'cuda':
+                torch.cuda.synchronize()
             t0 = time.perf_counter()
             _ = model(the_img, the_label, supp_idx, open_idx, test=True)
-            torch.cuda.synchronize()
+            if device.type == 'cuda':
+                torch.cuda.synchronize()
             t1 = time.perf_counter()
             times.append(t1 - t0)
 
@@ -164,7 +171,8 @@ def analyze_model(args, name, use_ciam=True, use_pam=True, use_npm=True):
 
     model = My_Net(args=args, mode='train',
                    use_ciam=use_ciam, use_pam=use_pam, use_npm=use_npm)
-    model = model.to('cuda')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
 
     # Load pretrained weights if available
     if os.path.exists(args.pretrained_model_path):

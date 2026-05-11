@@ -58,7 +58,7 @@ def load_config(config_path):
     return args
 
 
-def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm):
+def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm, test_only=False):
     """Run one ablation configuration and return results."""
     # Override save folder for this ablation
     base_save = args.save_folder.rstrip('/')
@@ -74,6 +74,8 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm):
     print(f"  Save to: {args.save_folder}")
     print(f"{'='*60}")
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     # Data loaders
     train_loader = dataloaders.meta_train_dataloader(args)
     eval_loader = dataloaders.meta_test_dataloader(args)
@@ -82,7 +84,7 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm):
     # Model with ablation flags
     model = My_Net(args=args, mode='train',
                    use_ciam=use_ciam, use_pam=use_pam, use_npm=use_npm)
-    model = model.to('cuda')
+    model = model.to(device)
 
     # Load pretrained backbone
     if os.path.exists(args.pretrained_model_path):
@@ -91,9 +93,11 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm):
         model.load_state_dict(state_dict, strict=False)
         model.init_representation(full_params)
 
-    # Train
     tm = trainer.Train_Manager(args, train_func=train_func)
-    tm.train(model, eval_loader)
+    if not test_only:
+        tm.train(model, eval_loader)
+    else:
+        print("  --test_only: skipping training, evaluating existing checkpoints")
 
     # Test
     model.eval()
@@ -107,8 +111,8 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm):
             if not os.path.exists(ckpt_path):
                 continue
             state_dict = torch.load(ckpt_path, weights_only=False)
-            model.weight_base.data.copy_(state_dict['weight_base'].to('cuda'))
-            model.weight_base_open.data.copy_(state_dict['weight_base_open'].to('cuda'))
+            model.weight_base.data.copy_(state_dict['weight_base'].to(device))
+            model.weight_base_open.data.copy_(state_dict['weight_base_open'].to(device))
             model.load_state_dict(state_dict, strict=False)
             result, loss = tm.run_test_fsl(model, eval_loader)
             acc, auroc, fscore, tnr, tpr, osr_score = result
@@ -137,6 +141,8 @@ def main():
                         help='Run only specific ablation configs (e.g. full_model wo_NPM)')
     parser.add_argument('--quick', action='store_true',
                         help='Quick mode: fewer test runs (50 instead of 200)')
+    parser.add_argument('--test_only', action='store_true',
+                        help='Skip training, only evaluate existing checkpoints')
     args = parser.parse_args()
 
     all_results = {}
@@ -163,7 +169,7 @@ def main():
                 continue
             # Reload config fresh each run
             run_cfg = load_config(config_path)
-            results = run_single_ablation(run_cfg, name, use_ciam, use_pam, use_npm)
+            results = run_single_ablation(run_cfg, name, use_ciam, use_pam, use_npm, test_only=args.test_only)
             all_results[dataset][name] = {
                 'use_ciam': use_ciam, 'use_pam': use_pam, 'use_npm': use_npm,
                 'results': {k: {kk: (vv[0] if isinstance(vv, tuple) else vv)

@@ -30,6 +30,10 @@ from utils.TAU22 import TAUDataset as TAU22Dataset
 from utils.TAU19 import TAUDataset as TAU19Dataset
 
 
+ALL_OSR_METHODS = ['anti_prototype', 'feature_mahalanobis', 'ood_head_osr23',
+                    'ood_head_extended_v2', 'ood_head_cluster_v2', 'ood_head_fusion_v2']
+
+
 def get_dataset_cls(name):
     return TAU22Dataset if name == 'TAU22' else TAU19Dataset
 
@@ -47,8 +51,9 @@ def find_best_checkpoint(experiment_dir):
 
 
 def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
-                      N_way=6, K_shot=5, feature_dim=64, device='cuda', quick=False):
-    num_rounds = 3 if quick else 10
+                      N_way=6, K_shot=5, feature_dim=64, device='cuda', quick=False,
+                      osr_methods=None):
+    num_rounds = 3 if quick else 5
     """
     1. Load classifier trained on source
     2. Extract features from target using same backbone
@@ -139,8 +144,10 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
             print(f"  Novel {k}-shot eval failed: {e}")
 
     # --- OSR evaluation on target ---
+    if osr_methods is None:
+        osr_methods = ALL_OSR_METHODS
     osr_results = {}
-    for method in ['anti_prototype', 'feature_mahalanobis']:
+    for method in osr_methods:
         try:
             calibrator = OSRCalibrator(
                 flow_classifier, calib_cache,
@@ -171,9 +178,16 @@ def main():
     parser.add_argument('--all', action='store_true')
     parser.add_argument('--quick', action='store_true',
                         help='Quick mode: fewer evaluation rounds')
+    parser.add_argument('--osr_methods', type=str, default='all',
+                        help='Comma-separated OSR methods, or "all" for all 6')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
     cl_args = parser.parse_args()
+
+    if cl_args.osr_methods == 'all':
+        osr_methods = ALL_OSR_METHODS
+    else:
+        osr_methods = [m.strip() for m in cl_args.osr_methods.split(',')]
 
     if cl_args.all:
         pairs = [('TAU22', 'TAU19'), ('TAU19', 'TAU22')]
@@ -191,7 +205,7 @@ def main():
     for source, target in pairs:
         key = f"{source}->{target}"
         r = cross_domain_eval(source, target, base_classes, unknown_classes,
-                              device=device, quick=cl_args.quick)
+                              device=device, quick=cl_args.quick, osr_methods=osr_methods)
         if r:
             all_results[key] = r
 
@@ -206,15 +220,20 @@ def main():
     print(f"\n{'='*60}")
     print("CROSS-DOMAIN SUMMARY")
     print(f"{'='*60}")
-    print(f"  {'Direction':<15s} {'Base5s':>8s} {'Novel5s':>8s} {'OSR':>8s}")
+    print(f"  {'Direction':<15s} {'Base5s':>7s} {'Novel5s':>7s} {'AP':>6s} {'Mah':>6s} {'O23':>6s} {'ExtV2':>6s} {'CluV2':>6s} {'FusV2':>6s}")
     for key, r in all_results.items():
         fs = r.get('fewshot', {})
         base5 = fs.get('base_5shot', {}).get('mean_acc', 0)
         novel5 = fs.get('novel_5shot', {}).get('mean_acc', 0)
         osr = r.get('osr', {})
-        best_osr = max(osr.values(), key=lambda x: x.get('osr_score', 0)) if osr else {}
-        print(f"  {key:<15s} {base5:>7.2%} {novel5:>7.2%} "
-              f"{best_osr.get('osr_score', 0):>7.2%}")
+        osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
+        osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
+        osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
+        osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
+        osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
+        osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
+        print(f"  {key:<15s} {base5:>6.2%} {novel5:>6.2%} "
+              f"{osr_ap:>5.2%} {osr_mah:>5.2%} {osr_o23:>5.2%} {osr_ext:>5.2%} {osr_clu:>5.2%} {osr_fv2:>5.2%}")
 
 
 if __name__ == '__main__':

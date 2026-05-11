@@ -26,7 +26,9 @@ from utils.TAU22 import TAUDataset as TAU22Dataset
 from utils.TAU19 import TAUDataset as TAU19Dataset
 
 
-OPEN_WAY_VALUES = [1, 2, 3, 4]
+OPEN_WAY_VALUES = [2, 4]
+ALL_OSR_METHODS = ['anti_prototype', 'feature_mahalanobis', 'ood_head_osr23',
+                    'ood_head_extended_v2', 'ood_head_cluster_v2', 'ood_head_fusion_v2']
 
 
 def find_pretrained():
@@ -39,7 +41,8 @@ def find_pretrained():
 
 def run_openness(train_cache, calib_cache, test_cache, feature_extractor,
                  base_classes, all_unknown, n_open, N_way=6, K_shot=5,
-                 num_episodes=3000, device='cuda', output_root='experiment/episodic_exp'):
+                 num_episodes=3000, device='cuda', output_root='experiment/episodic_exp',
+                 osr_methods=None):
     """Run with a subset of unknown classes."""
     unknown_classes = all_unknown[:n_open]
     experiment_dir = f'{output_root}/openness/open{n_open}'
@@ -62,7 +65,7 @@ def run_openness(train_cache, calib_cache, test_cache, feature_extractor,
         base_classes=base_classes, unknown_classes=unknown_classes,
         ood_features_by_class=ood_features,
         N_way=N_way, K_shot=K_shot, Q_query=15,
-        lr=5e-5, gradient_accum_steps=1, device=device,
+        lr=2e-4, gradient_accum_steps=1, device=device,
     )
 
     trainer.train(
@@ -70,8 +73,10 @@ def run_openness(train_cache, calib_cache, test_cache, feature_extractor,
         num_val_episodes=10, save_dir=experiment_dir, resume=True)
 
     # Evaluate OSR with all methods
+    if osr_methods is None:
+        osr_methods = ALL_OSR_METHODS
     osr_results = {}
-    for method in ['anti_prototype', 'feature_mahalanobis']:
+    for method in osr_methods:
         try:
             calibrator = OSRCalibrator(
                 trainer.flow_classifier, calib_cache,
@@ -96,9 +101,16 @@ def main():
     parser.add_argument('--open_ways', type=int, nargs='*', default=OPEN_WAY_VALUES)
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--osr_methods', type=str, default='all',
+                        help='Comma-separated OSR methods, or "all" for all 6')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
     cl_args = parser.parse_args()
+
+    if cl_args.osr_methods == 'all':
+        osr_methods = ALL_OSR_METHODS
+    else:
+        osr_methods = [m.strip() for m in cl_args.osr_methods.split(',')]
 
     if cl_args.quick:
         cl_args.open_ways = [2, 4]
@@ -137,7 +149,7 @@ def main():
             train_cache, calib_cache, test_cache, feature_extractor,
             base_classes, all_unknown, n_open,
             num_episodes=cl_args.num_episodes, device=device,
-            output_root=cl_args.output_dir)
+            output_root=cl_args.output_dir, osr_methods=osr_methods)
         if r:
             all_results[f'open{n_open}'] = r
 
@@ -152,14 +164,16 @@ def main():
     print(f"\n{'='*60}")
     print("OPENNESS SWEEP SUMMARY")
     print(f"{'='*60}")
-    print(f"  {'OpenWays':>10s} {'TNR':>8s} {'TPR':>8s} {'OSR':>8s}")
+    print(f"  {'OpenWays':>10s} {'AP':>7s} {'Mah':>7s} {'O23':>7s} {'ExtV2':>7s} {'CluV2':>7s} {'FusV2':>7s}")
     for key, r in sorted(all_results.items()):
         osr = r.get('osr', {})
-        best = max(osr.values(), key=lambda x: x.get('osr_score', 0)) if osr else {}
-        print(f"  {key:>10s} "
-              f"{best.get('known_tnr', 0):>7.2%} "
-              f"{best.get('unknown_tpr', 0):>7.2%} "
-              f"{best.get('osr_score', 0):>7.2%}")
+        osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
+        osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
+        osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
+        osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
+        osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
+        osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
+        print(f"  {key:>10s} {osr_ap:>6.2%} {osr_mah:>6.2%} {osr_o23:>6.2%} {osr_ext:>6.2%} {osr_clu:>6.2%} {osr_fv2:>6.2%}")
 
 
 if __name__ == '__main__':

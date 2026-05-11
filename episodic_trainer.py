@@ -2178,7 +2178,7 @@ class EpisodicTrainer:
             N_way=self.N_way,
             lambda_density=0.0,
             lambda_entropy=0.0,
-            lambda_separation=0.05,
+            lambda_separation=0.02,
         )
 
         # Optimizer & scheduler (T_max = episodes after warmup)
@@ -2317,7 +2317,7 @@ class EpisodicTrainer:
         if scale_cls > 0 and self.flow_classifier.use_reciprocal and hasattr(self.flow_classifier, 'reciprocal_points') and query_labels.max() < self.flow_classifier.num_max_classes:
             L_reciprocal = self.flow_classifier.compute_reciprocal_loss(
                 query_feats, prototypes, query_labels)
-            loss = loss + 3.0 * L_reciprocal
+            loss = loss + 0.3 * L_reciprocal
 
         # Skip episode if loss is NaN/Inf
         if not torch.isfinite(loss):
@@ -2435,10 +2435,8 @@ class EpisodicTrainer:
 
             # Step optimizer at end of accumulation cycle
             if ep % accum_steps == 0 or ep == num_episodes:
-                # Gradient clipping: exclude reciprocal_points to allow them to train
-                reciprocal = getattr(self.flow_classifier, 'reciprocal_points', None)
-                params_to_clip = [p for p in self.flow_classifier.parameters()
-                                 if p is not reciprocal]
+                # Gradient clipping: all parameters including reciprocal_points
+                params_to_clip = list(self.flow_classifier.parameters())
                 if params_to_clip:
                     torch.nn.utils.clip_grad_norm_(params_to_clip, 0.5)
 
@@ -2798,27 +2796,40 @@ class OSRCalibrator:
     def score_anti_prototype_all(self, features: torch.Tensor,
                                   prototypes: torch.Tensor,
                                   batch_size: int = 4096) -> torch.Tensor:
-        """Anti-prototype OOD score. Higher = more known."""
+        """Anti-prototype OOD score in model-transformed space. Higher = more known."""
         self.flow.eval()
         all_scores = []
         with torch.no_grad():
+            # Transform prototypes once
+            transformed_protos = self.flow.to_score_space(prototypes)
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
-                scores = self.flow.score_anti_prototype(batch, prototypes)
-                all_scores.append(scores.cpu())
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
+                # Inline anti-prototype scoring in transformed space
+                feat_center = batch.mean(dim=0, keepdim=True)
+                anti_protos = 2 * feat_center - transformed_protos
+                dist_proto = torch.cdist(batch, transformed_protos, p=2).min(dim=1).values
+                dist_anti = torch.cdist(batch, anti_protos, p=2).min(dim=1).values
+                all_scores.append((-dist_proto + dist_anti).cpu())
         return torch.cat(all_scores)
 
     def score_anti_prototype_enhanced(self, features: torch.Tensor,
                                        prototypes: torch.Tensor,
                                        batch_size: int = 4096) -> torch.Tensor:
-        """Enhanced anti-prototype OOD score. Higher = more known."""
+        """Enhanced anti-prototype OOD score in model-transformed space. Higher = more known."""
         self.flow.eval()
         all_scores = []
         with torch.no_grad():
+            transformed_protos = self.flow.to_score_space(prototypes)
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
-                scores = self.flow.score_anti_prototype_enhanced(batch, prototypes)
-                all_scores.append(scores.cpu())
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
+                # Enhanced: confidence-weighted center
+                feat_norms = (batch ** 2).sum(dim=1, keepdim=True).sqrt()
+                weights = feat_norms / (feat_norms.sum() + 1e-8)
+                feat_center = (batch * weights).sum(dim=0, keepdim=True)
+                anti_protos = 2 * feat_center - transformed_protos
+                dist_proto = torch.cdist(batch, transformed_protos, p=2).min(dim=1).values
+                dist_anti = torch.cdist(batch, anti_protos, p=2).min(dim=1).values
+                all_scores.append((-dist_proto + dist_anti).cpu())
         return torch.cat(all_scores)
 
     # ---- Reciprocal point scoring ----
@@ -2826,14 +2837,19 @@ class OSRCalibrator:
     def score_samples_reciprocal(self, features: torch.Tensor,
                                   prototypes: torch.Tensor,
                                   batch_size: int = 4096) -> torch.Tensor:
-        """Reciprocal point OOD score. Higher = more known."""
+        """Reciprocal point OOD score in transformed space. Higher = more known."""
         self.flow.eval()
         all_scores = []
         with torch.no_grad():
+            transformed_protos = self.flow.to_score_space(prototypes)
+            N = prototypes.shape[0]
+            R = self.flow.reciprocal_points[:N]
+            transformed_R = self.flow.to_score_space(R)
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
-                scores = self.flow.score_reciprocal(batch, prototypes)
-                all_scores.append(scores.cpu())
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
+                dist_proto = torch.cdist(batch, transformed_protos, p=2).min(dim=1).values
+                dist_R = torch.cdist(batch, transformed_R, p=2).min(dim=1).values
+                all_scores.append((-dist_proto + dist_R).cpu())
         return torch.cat(all_scores)
 
     # ---- osr20a: Variance-normalized anti-prototype ----
@@ -2841,20 +2857,19 @@ class OSRCalibrator:
     def score_anti_proto_var_norm(self, features: torch.Tensor,
                                    prototypes: torch.Tensor,
                                    batch_size: int = 4096) -> torch.Tensor:
-        """osr20a: Anti-prototype with variance-normalized distance.
-        score = (-dist_proto + dist_anti) / var(nearest_class)
-        Accounts for different class spreads in feature space."""
+        """osr20a: Anti-prototype with variance-normalized distance in transformed space.
+        score = (-dist_proto + dist_anti) / var(nearest_class)"""
         self.flow.eval()
         all_scores = []
         with torch.no_grad():
+            transformed_protos = self.flow.to_score_space(prototypes)
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
                 feat_center = batch.mean(dim=0, keepdim=True)
-                anti_protos = 2 * feat_center - prototypes
-                dists_proto = torch.cdist(batch, prototypes, p=2)  # (B, N)
+                anti_protos = 2 * feat_center - transformed_protos
+                dists_proto = torch.cdist(batch, transformed_protos, p=2)
                 dists_anti = torch.cdist(batch, anti_protos, p=2)
-                # Per-sample: use nearest class variance
-                nearest_class = dists_proto.argmin(dim=1)  # (B,)
+                nearest_class = dists_proto.argmin(dim=1)
                 min_dist_proto = dists_proto.min(dim=1).values
                 min_dist_anti = dists_anti.min(dim=1).values
                 if self.class_variances is not None:
@@ -2872,19 +2887,17 @@ class OSRCalibrator:
     def score_anti_proto_cosine(self, features: torch.Tensor,
                                  prototypes: torch.Tensor,
                                  batch_size: int = 4096) -> torch.Tensor:
-        """osr20a: Anti-prototype with cosine distance.
-        Captures directional relationships in feature space."""
+        """osr20a: Anti-prototype with cosine distance in transformed space."""
         self.flow.eval()
         all_scores = []
         with torch.no_grad():
+            transformed_protos = self.flow.to_score_space(prototypes)
             for i in range(0, len(features), batch_size):
-                batch = features[i:i+batch_size].to(self.device)
+                batch = self.flow.to_score_space(features[i:i+batch_size].to(self.device))
                 feat_center = batch.mean(dim=0, keepdim=True)
-                anti_protos = 2 * feat_center - prototypes
-                # Cosine distance = 1 - cosine_similarity
-                cos_proto = F.cosine_similarity(batch.unsqueeze(1), prototypes.unsqueeze(0), dim=2)
+                anti_protos = 2 * feat_center - transformed_protos
+                cos_proto = F.cosine_similarity(batch.unsqueeze(1), transformed_protos.unsqueeze(0), dim=2)
                 cos_anti = F.cosine_similarity(batch.unsqueeze(1), anti_protos.unsqueeze(0), dim=2)
-                # Higher = more known: close to proto (high cos_sim), far from anti (low cos_sim)
                 scores = cos_proto.max(dim=1).values - cos_anti.min(dim=1).values
                 all_scores.append(scores.cpu())
         return torch.cat(all_scores)
