@@ -1,0 +1,42 @@
+
+  Analyzing: Full_Model
+thop not installed. Install with: pip install thop
+    Params: 15,983,434 total, 14,867,146 trainable
+    MACs: 14,840,512
+    AIT: 12.92 +/- 0.22 ms
+
+  Analyzing: wo_CIAM
+thop not installed. Install with: pip install thop
+    Params: 14,929,738 total, 13,813,450 trainable
+    MACs: 13,791,936
+    AIT: 11.56 +/- 0.08 ms
+
+  Analyzing: wo_PAM
+thop not installed. Install with: pip install thop
+    Params: 15,719,879 total, 14,603,591 trainable
+    MACs: 14,577,856
+    AIT: 12.58 +/- 0.11 ms
+
+  Analyzing: wo_NPM
+thop not installed. Install with: pip install thop
+    Params: 13,619,530 total, 12,503,242 trainable
+    MACs: 12,481,216
+    AIT: 11.96 +/- 0.05 ms
+
+  Analyzing: Baseline
+thop not installed. Install with: pip install thop
+    Params: 12,302,279 total, 11,185,991 trainable
+    MACs: 11,169,984
+    AIT: 11.34 +/- 0.06 ms
+
+Complexity results saved to foac_exp_complexity_results.json
+
+================================================================================
+COMPLEXITY COMPARISON
+================================================================================
+  Model                      Params           MACs      AIT(ms)
+  Full_Model             15,983,434     14,840,512        12.92
+  wo_CIAM                14,929,738     13,791,936        11.56
+  wo_PAM                 15,719,879     14,577,856        12.58
+  wo_NPM                 13,619,530     12,481,216        11.96
+  Baseline               12,302,279     11,169,984        11.34

@@ -1,0 +1,41 @@
+
+Friedman-Nemenyi Test
+  Methods: 6, Datasets: 12
+
+  Per-dataset ranks:
+  Dataset             anti_proto    mahalanobis          osr23    extended_v2     cluster_v2      fusion_v2
+  TAU19_full_model            6.0            5.0            2.0            4.0            3.0            1.0
+  TAU19_only_distance_head            6.0            5.0            2.0            4.0            3.0            1.0
+  TAU19_wo_flow_transform            6.0            5.0            2.0            4.0            3.0            1.0
+  TAU19_wo_ood_head            6.0            5.0            3.0            4.0            2.0            1.0
+  TAU19_wo_reciprocal            6.0            5.0            2.0            4.0            3.0            1.0
+  TAU19_wo_threshold            6.0            5.0            2.0            4.0            3.0            1.0
+  TAU22_full_model            5.0            6.0            1.0            3.0            2.0            4.0
+  TAU22_only_distance_head            5.0            6.0            1.0            3.0            2.0            4.0
+  TAU22_wo_flow_transform            5.0            6.0            3.0            4.0            2.0            1.0
+  TAU22_wo_ood_head            5.0            6.0            2.0            4.0            3.0            1.0
+  TAU22_wo_reciprocal            5.0            6.0            2.0            4.0            3.0            1.0
+  TAU22_wo_threshold            5.0            6.0            2.0            3.0            1.0            4.0
+  Average                   5.50           5.50           2.00           3.75           2.50           1.75
+
+  Friedman chi-square: 49.2857
+  p-value: 0.000000
+  Significant: YES
+
+  Nemenyi CD: 3.0780
+    anti_proto                vs mahalanobis              : |0.00| 
+    anti_proto                vs osr23                    : |3.50| ***
+    anti_proto                vs extended_v2              : |1.75| 
+    anti_proto                vs cluster_v2               : |3.00| 
+    anti_proto                vs fusion_v2                : |3.75| ***
+    mahalanobis               vs osr23                    : |3.50| ***
+    mahalanobis               vs extended_v2              : |1.75| 
+    mahalanobis               vs cluster_v2               : |3.00| 
+    mahalanobis               vs fusion_v2                : |3.75| ***
+    osr23                     vs extended_v2              : |1.75| 
+    osr23                     vs cluster_v2               : |0.50| 
+    osr23                     vs fusion_v2                : |0.25| 
+    extended_v2               vs cluster_v2               : |1.25| 
+    extended_v2               vs fusion_v2                : |2.00| 
+    cluster_v2                vs fusion_v2                : |0.75| 
+CD diagram saved to experiment/episodic_exp/statistical/cd_diagram_osr.png

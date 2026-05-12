@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Full_Model",
+    "total_params": 15983434,
+    "trainable_params": 14867146,
+    "macs": 14840512,
+    "ait_mean_ms": 12.923180809957557,
+    "ait_std_ms": 0.22496730037487925,
+    "ait_median_ms": 12.841706498875283
+  },
+  {
+    "name": "wo_CIAM",
+    "total_params": 14929738,
+    "trainable_params": 13813450,
+    "macs": 13791936,
+    "ait_mean_ms": 11.559473159722984,
+    "ait_std_ms": 0.0826382669943772,
+    "ait_median_ms": 11.542668496986153
+  },
+  {
+    "name": "wo_PAM",
+    "total_params": 15719879,
+    "trainable_params": 14603591,
+    "macs": 14577856,
+    "ait_mean_ms": 12.581545869979891,
+    "ait_std_ms": 0.11190437723954888,
+    "ait_median_ms": 12.538085000414867
+  },
+  {
+    "name": "wo_NPM",
+    "total_params": 13619530,
+    "trainable_params": 12503242,
+    "macs": 12481216,
+    "ait_mean_ms": 11.960219029861037,
+    "ait_std_ms": 0.04815569751764605,
+    "ait_median_ms": 11.954438999964623
+  },
+  {
+    "name": "Baseline",
+    "total_params": 12302279,
+    "trainable_params": 11185991,
+    "macs": 11169984,
+    "ait_mean_ms": 11.337935689953156,
+    "ait_std_ms": 0.061789073918967055,
+    "ait_median_ms": 11.331283498293487
+  }
+]

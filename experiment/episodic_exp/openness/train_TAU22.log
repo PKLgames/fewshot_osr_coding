@@ -1,0 +1,770 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Extracting features...
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_train_pro_1s.pt
+索引映射构建完成，总样本数: 30000
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
+索引映射构建完成，总样本数: 620
+使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
+索引映射构建完成，总样本数: 18000
+Loading cached features from experiment/fewshot_cache/tau22_train_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 5000 samples
+Loading cached features from experiment/fewshot_cache/tau22_calib_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 100 samples
+    Class 1: 100 samples
+    Class 2: 100 samples
+    Class 3: 100 samples
+    Class 4: 100 samples
+    Class 5: 100 samples
+    Class 6: 5 samples
+    Class 7: 5 samples
+    Class 8: 5 samples
+    Class 9: 5 samples
+Loading cached features from experiment/fewshot_cache/tau22_test_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1800 samples
+    Class 1: 1800 samples
+    Class 2: 1800 samples
+    Class 3: 1800 samples
+    Class 4: 1800 samples
+    Class 5: 1800 samples
+    Class 6: 1800 samples
+    Class 7: 1800 samples
+    Class 8: 1800 samples
+    Class 9: 1800 samples
+
+  n_open=2, unknown=[6, 7]
+Real OOD exposure: 3600 samples from classes [6, 7]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=114.71, 10th percentile=67.27
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness/open2/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7525 Total: 1.7525 Acc: 34.66% | Val Loss: 1.8914 Acc: 50.89% | LR: 2.00e-04 cls:0.0
+  -> Best model saved (Val Acc: 50.89%)
+Ep  1000/3000 | CE: 1.6537 Total: 2.2707 Acc: 37.37% | Val Loss: 2.0377 Acc: 51.44% | LR: 1.97e-04 cls:0.4
+  -> Best model saved (Val Acc: 51.44%)
+Ep  1500/3000 | CE: 1.6218 Total: 2.2211 Acc: 38.52% | Val Loss: 1.9740 Acc: 51.89% | LR: 1.87e-04 cls:0.8
+  -> Best model saved (Val Acc: 51.89%)
+Ep  2000/3000 | CE: 1.5158 Total: 2.1117 Acc: 44.59% | Val Loss: 1.9875 Acc: 52.56% | LR: 1.71e-04 cls:1.0
+  -> Best model saved (Val Acc: 52.56%)
+Ep  2500/3000 | CE: 1.4438 Total: 2.0102 Acc: 47.51% | Val Loss: 1.9897 Acc: 52.33% | LR: 1.50e-04 cls:1.0
+Ep  3000/3000 | CE: 1.3838 Total: 1.9335 Acc: 50.49% | Val Loss: 1.8402 Acc: 52.89% | LR: 1.26e-04 cls:1.0
+  -> Best model saved (Val Acc: 52.89%)
+
+Loaded best model (Val Acc: 52.89%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 52.89%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness/open2/episodic_history.json
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 10
+Known scores:   [-0.27, 0.99] mean=0.17
+Unknown scores: [-0.32, 0.29] mean=0.01
+Mean separation: 0.16 (positive = known higher = good)
+
+Threshold (tau): -0.1055
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 10.00%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   24.54%
+  OSR Score (mean):         59.77%
+  AUROC:                    0.6843
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 10
+Known scores:   [-9.20, -1.12] mean=-3.34
+Unknown scores: [-6.43, -2.77] mean=-4.31
+Mean separation: 0.97 (positive = known higher = good)
+
+Threshold (tau): -7.0509
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 0.00%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   4.83%
+  OSR Score (mean):         49.92%
+  AUROC:                    0.6042
+
+======================================================================
+OSR Calibration (OOD_HEAD_OSR23)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
+  osr23 GMM: fitting on calib set (600 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr23a: n_unknown=200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
+  osr23e Mixup: 10 real → 200 total unknown
+    L1 C=0.01: CV-AUROC=0.9949
+    L1 C=0.05: CV-AUROC=0.9992
+    L1 C=0.10: CV-AUROC=0.9998
+    L1 C=0.50: CV-AUROC=1.0000
+    L1 C=1.00: CV-AUROC=1.0000
+  osr23d: Best L1 C=0.50 (CV-AUROC=1.0000)
+  osr23 weights (9/13 non-zero):
+                min_dist: -0.8231
+              dist_ratio: +0.0000 *
+             softmax_max: +0.0000 *
+                 entropy: +0.2665
+               feat_norm: +0.3546
+                2nd_dist: -1.3410
+               score_gap: -1.2948
+          dist_to_center: -0.2560
+         proto_score_var: -0.0669
+         norm_dist_ratio: -0.0359
+           cluster_mahal: -4.5897
+        cluster_post_max: +0.0000 *
+             cluster_ent: +0.0000 *
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.8926)
+Mean separation: 0.94 (positive = known higher = good)
+
+Threshold (tau): 0.8926
+
+======================================================================
+OSR Evaluation (OOD_HEAD_OSR23)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
+  osr23 GMM: fitting on calib set (10800 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr23a: n_unknown=3600 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
+    L1 C=0.01: CV-AUROC=0.9379
+    L1 C=0.05: CV-AUROC=0.9422
+    L1 C=0.10: CV-AUROC=0.9434
+    L1 C=0.50: CV-AUROC=0.9440
+    L1 C=1.00: CV-AUROC=0.9441
+  osr23d: Best L1 C=1.00 (CV-AUROC=0.9441)
+  osr23 weights (13/13 non-zero):
+                min_dist: -2.2763
+              dist_ratio: -0.8087
+             softmax_max: -0.4277
+                 entropy: +1.4738
+               feat_norm: +3.2738
+                2nd_dist: -2.1255
+               score_gap: -0.5392
+          dist_to_center: +0.1327
+         proto_score_var: +2.1196
+         norm_dist_ratio: +1.0994
+           cluster_mahal: -0.1553
+        cluster_post_max: -0.1276
+             cluster_ent: -0.3333
+  Calib TNR: 95.00%  TPR: 76.75%  (threshold=0.1724)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   76.82%
+  OSR Score (mean):         85.91%
+  AUROC:                    0.9454
+
+======================================================================
+OSR Calibration (OOD_HEAD_EXTENDED_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training extended OOD head v2 (13-dim with GMM clusters)...
+  Fitting GMM with 12 components on 600 samples...
+  GMM converged: True
+  Extended OOD head v2 weights:
+                min_dist: -0.7581
+              dist_ratio: -0.0178
+             softmax_max: -0.4307
+                 entropy: -0.0086
+               feat_norm: +0.9678
+                2nd_dist: -1.1439
+               score_gap: -1.0341
+          dist_to_center: -0.3976
+         proto_score_var: -0.2912
+         norm_dist_ratio: -0.3965
+           cluster_mahal: -3.0234
+        cluster_post_max: +0.0005
+             cluster_ent: -0.0008
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.9472)
+Mean separation: 0.98 (positive = known higher = good)
+
+Threshold (tau): 0.9472
+
+======================================================================
+OSR Evaluation (OOD_HEAD_EXTENDED_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training extended OOD head v2 (13-dim with GMM clusters)...
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Extended OOD head v2 weights:
+                min_dist: -2.3415
+              dist_ratio: -0.8551
+             softmax_max: -0.3949
+                 entropy: +1.3947
+               feat_norm: +3.2342
+                2nd_dist: -2.0602
+               score_gap: -0.6066
+          dist_to_center: +0.2073
+         proto_score_var: +2.0093
+         norm_dist_ratio: +1.1241
+           cluster_mahal: -0.1552
+        cluster_post_max: -0.1323
+             cluster_ent: -0.3377
+  Calib TNR: 95.00%  TPR: 76.72%  (threshold=0.1729)
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   76.71%
+  OSR Score (mean):         85.85%
+  AUROC:                    0.9433
+
+======================================================================
+OSR Calibration (OOD_HEAD_CLUSTER_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr24b OOD head (13-dim with train-set GMM clusters)...
+  osr23 GMM: fitting on calib set (600 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b OOD head weights:
+                min_dist: -0.7581
+              dist_ratio: -0.0178
+             softmax_max: -0.4307
+                 entropy: -0.0086
+               feat_norm: +0.9678
+                2nd_dist: -1.1439
+               score_gap: -1.0341
+          dist_to_center: -0.3976
+         proto_score_var: -0.2912
+         norm_dist_ratio: -0.3965
+           cluster_mahal: -3.0234
+        cluster_post_max: +0.0005
+             cluster_ent: -0.0008
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.9472)
+Mean separation: 0.98 (positive = known higher = good)
+
+Threshold (tau): 0.9472
+
+======================================================================
+OSR Evaluation (OOD_HEAD_CLUSTER_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b OOD head (13-dim with train-set GMM clusters)...
+  osr23 GMM: fitting on calib set (10800 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b OOD head weights:
+                min_dist: -2.3402
+              dist_ratio: -0.8549
+             softmax_max: -0.3953
+                 entropy: +1.3939
+               feat_norm: +3.2345
+                2nd_dist: -2.0591
+               score_gap: -0.6065
+          dist_to_center: +0.2048
+         proto_score_var: +2.0090
+         norm_dist_ratio: +1.1233
+           cluster_mahal: -0.1552
+        cluster_post_max: -0.1321
+             cluster_ent: -0.3376
+  Calib TNR: 95.00%  TPR: 76.75%  (threshold=0.1729)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   76.81%
+  OSR Score (mean):         85.91%
+  AUROC:                    0.9454
+
+======================================================================
+OSR Calibration (OOD_HEAD_FUSION_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (600 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -0.7939
+              dist_ratio: -0.0281
+             softmax_max: -0.3888
+                 entropy: -0.0818
+               feat_norm: +0.9922
+                2nd_dist: -1.2088
+               score_gap: -1.1023
+          dist_to_center: -0.4092
+         proto_score_var: -0.2310
+         norm_dist_ratio: -0.4310
+           cluster_mahal: -2.8992
+        cluster_post_max: -0.0034
+             cluster_ent: +0.0029
+        anti_proto_score: -0.4099 ← NEW
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.9489)
+Mean separation: 0.98 (positive = known higher = good)
+
+Threshold (tau): 0.9357
+
+======================================================================
+OSR Evaluation (OOD_HEAD_FUSION_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (10800 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -2.8983
+              dist_ratio: -2.2046
+             softmax_max: -0.8226
+                 entropy: -1.0523
+               feat_norm: +6.1155
+                2nd_dist: -2.8043
+               score_gap: -1.5285
+          dist_to_center: -2.7487
+         proto_score_var: +0.7996
+         norm_dist_ratio: +2.0059
+           cluster_mahal: -0.1151
+        cluster_post_max: -0.0622
+             cluster_ent: -0.3068
+        anti_proto_score: -2.3233 ← NEW
+  Calib TNR: 95.00%  TPR: 80.25%  (threshold=0.1479)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   83.92%
+  OSR Score (mean):         89.46%
+  AUROC:                    0.9735
+
+  n_open=4, unknown=[6, 7, 8, 9]
+Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Initializing Curriculum OOD Sampler (3-level progressive training).../usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
+  GMM train log-likelihood: mean=114.71, 10th percentile=67.27
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness/open4/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 6-way 5-shot
+Base classes:     [0, 1, 2, 3, 4, 5]
+Unknown classes:  [6, 7, 8, 9]
+Episodes:         3000
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/3000 | CE: 1.7377 Total: 1.7377 Acc: 35.99% | Val Loss: 2.0662 Acc: 47.67% | LR: 2.00e-04 cls:0.0
+  -> Best model saved (Val Acc: 47.67%)
+Ep  1000/3000 | CE: 1.6519 Total: 2.2620 Acc: 35.69% | Val Loss: 2.1009 Acc: 47.00% | LR: 1.97e-04 cls:0.4
+Ep  1500/3000 | CE: 1.6153 Total: 2.2152 Acc: 36.57% | Val Loss: 2.1771 Acc: 47.00% | LR: 1.87e-04 cls:0.8
+Ep  2000/3000 | CE: 1.5583 Total: 2.1482 Acc: 40.46% | Val Loss: 1.9891 Acc: 50.22% | LR: 1.71e-04 cls:1.0
+  -> Best model saved (Val Acc: 50.22%)
+Ep  2500/3000 | CE: 1.5305 Total: 2.0862 Acc: 41.08% | Val Loss: 2.2321 Acc: 48.33% | LR: 1.50e-04 cls:1.0
+Ep  3000/3000 | CE: 1.5206 Total: 2.0543 Acc: 42.09% | Val Loss: 1.9411 Acc: 51.33% | LR: 1.26e-04 cls:1.0
+  -> Best model saved (Val Acc: 51.33%)
+
+Loaded best model (Val Acc: 51.33%, Ep 3000)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 51.33%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness/open4/episodic_history.json
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 20
+Known scores:   [-0.73, 1.42] mean=0.17
+Unknown scores: [-0.31, 0.38] mean=0.02
+Mean separation: 0.15 (positive = known higher = good)
+
+Threshold (tau): -0.3950
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 0.00%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   10.43%
+  OSR Score (mean):         52.72%
+  AUROC:                    0.5985
+
+======================================================================
+OSR Calibration (FEATURE_MAHALANOBIS)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Known samples:   600
+Unknown samples: 20
+Known scores:   [-9.00, -1.01] mean=-3.34
+Unknown scores: [-7.41, -2.08] mean=-4.09
+Mean separation: 0.75 (positive = known higher = good)
+
+Threshold (tau): -7.0512
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 5.00%
+
+======================================================================
+OSR Evaluation (FEATURE_MAHALANOBIS)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   4.78%
+  OSR Score (mean):         49.89%
+  AUROC:                    0.5734
+
+======================================================================
+OSR Calibration (OOD_HEAD_OSR23)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
+  osr23 GMM: fitting on calib set (600 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr23a: n_unknown=200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
+  osr23e Mixup: 20 real → 200 total unknown
+    L1 C=0.01: CV-AUROC=0.9778
+    L1 C=0.05: CV-AUROC=0.9961
+    L1 C=0.10: CV-AUROC=0.9972
+    L1 C=0.50: CV-AUROC=0.9987
+    L1 C=1.00: CV-AUROC=0.9982
+  osr23d: Best L1 C=0.50 (CV-AUROC=0.9987)
+  osr23 weights (6/13 non-zero):
+                min_dist: +0.0000 *
+              dist_ratio: -0.7340
+             softmax_max: +0.0000 *
+                 entropy: -1.1729
+               feat_norm: +0.0074
+                2nd_dist: +0.0000 *
+               score_gap: +0.0000 *
+          dist_to_center: -0.8926
+         proto_score_var: +0.0000 *
+         norm_dist_ratio: +1.1661
+           cluster_mahal: -8.0019
+        cluster_post_max: +0.0000 *
+             cluster_ent: +0.0000 *
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.7760)
+Mean separation: 0.82 (positive = known higher = good)
+
+Threshold (tau): 0.7760
+
+======================================================================
+OSR Evaluation (OOD_HEAD_OSR23)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
+  osr23 GMM: fitting on calib set (10800 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr23a: n_unknown=7200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
+    L1 C=0.01: CV-AUROC=0.8234
+    L1 C=0.05: CV-AUROC=0.8309
+    L1 C=0.10: CV-AUROC=0.8318
+    L1 C=0.50: CV-AUROC=0.8320
+    L1 C=1.00: CV-AUROC=0.8320
+  osr23d: Best L1 C=0.50 (CV-AUROC=0.8320)
+  osr23 weights (13/13 non-zero):
+                min_dist: -0.4298
+              dist_ratio: -0.5593
+             softmax_max: +0.4362
+                 entropy: -0.7101
+               feat_norm: +0.6495
+                2nd_dist: -0.5171
+               score_gap: -0.3446
+          dist_to_center: -0.2632
+         proto_score_var: -0.4317
+         norm_dist_ratio: +0.4892
+           cluster_mahal: -0.2015
+        cluster_post_max: -0.1009
+             cluster_ent: -0.3239
+  Calib TNR: 95.00%  TPR: 54.07%  (threshold=0.1999)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   53.50%
+  OSR Score (mean):         74.25%
+  AUROC:                    0.8390
+
+======================================================================
+OSR Calibration (OOD_HEAD_EXTENDED_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training extended OOD head v2 (13-dim with GMM clusters)...
+  Fitting GMM with 12 components on 600 samples...
+  GMM converged: True
+  Extended OOD head v2 weights:
+                min_dist: +0.3980
+              dist_ratio: -0.3476
+             softmax_max: -0.6121
+                 entropy: -1.8929
+               feat_norm: -0.3806
+                2nd_dist: +0.3150
+               score_gap: +0.0363
+          dist_to_center: -1.4101
+         proto_score_var: +0.2042
+         norm_dist_ratio: +1.3188
+           cluster_mahal: -5.7947
+        cluster_post_max: -0.1250
+             cluster_ent: +0.1733
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.6871)
+Mean separation: 0.86 (positive = known higher = good)
+
+Threshold (tau): 0.6871
+
+======================================================================
+OSR Evaluation (OOD_HEAD_EXTENDED_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training extended OOD head v2 (13-dim with GMM clusters)...
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Extended OOD head v2 weights:
+                min_dist: -0.4416
+              dist_ratio: -0.5704
+             softmax_max: +0.4601
+                 entropy: -0.7850
+               feat_norm: +0.6549
+                2nd_dist: -0.4678
+               score_gap: -0.3603
+          dist_to_center: -0.2925
+         proto_score_var: -0.5265
+         norm_dist_ratio: +0.4937
+           cluster_mahal: -0.2038
+        cluster_post_max: -0.1135
+             cluster_ent: -0.3374
+  Calib TNR: 95.00%  TPR: 54.04%  (threshold=0.1986)
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+  Fitting GMM with 12 components on 10800 samples...
+  GMM converged: True
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   51.30%
+  OSR Score (mean):         73.15%
+  AUROC:                    0.8277
+
+======================================================================
+OSR Calibration (OOD_HEAD_CLUSTER_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr24b OOD head (13-dim with train-set GMM clusters)...
+  osr23 GMM: fitting on calib set (600 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b OOD head weights:
+                min_dist: +0.3980
+              dist_ratio: -0.3476
+             softmax_max: -0.6121
+                 entropy: -1.8929
+               feat_norm: -0.3806
+                2nd_dist: +0.3150
+               score_gap: +0.0363
+          dist_to_center: -1.4100
+         proto_score_var: +0.2042
+         norm_dist_ratio: +1.3188
+           cluster_mahal: -5.7947
+        cluster_post_max: -0.1250
+             cluster_ent: +0.1733
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.6871)
+Mean separation: 0.86 (positive = known higher = good)
+
+Threshold (tau): 0.6871
+
+======================================================================
+OSR Evaluation (OOD_HEAD_CLUSTER_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b OOD head (13-dim with train-set GMM clusters)...
+  osr23 GMM: fitting on calib set (10800 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b OOD head weights:
+                min_dist: -0.4416
+              dist_ratio: -0.5704
+             softmax_max: +0.4601
+                 entropy: -0.7850
+               feat_norm: +0.6549
+                2nd_dist: -0.4678
+               score_gap: -0.3603
+          dist_to_center: -0.2925
+         proto_score_var: -0.5265
+         norm_dist_ratio: +0.4937
+           cluster_mahal: -0.2038
+        cluster_post_max: -0.1135
+             cluster_ent: -0.3374
+  Calib TNR: 95.00%  TPR: 54.04%  (threshold=0.1986)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   53.46%
+  OSR Score (mean):         74.23%
+  AUROC:                    0.8394
+
+======================================================================
+OSR Calibration (OOD_HEAD_FUSION_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (600 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: +0.3558
+              dist_ratio: -0.4330
+             softmax_max: -0.5233
+                 entropy: -1.9351
+               feat_norm: -0.3528
+                2nd_dist: +0.3008
+               score_gap: +0.0668
+          dist_to_center: -1.4185
+         proto_score_var: +0.1583
+         norm_dist_ratio: +1.4468
+           cluster_mahal: -5.7434
+        cluster_post_max: -0.1241
+             cluster_ent: +0.1735
+        anti_proto_score: -0.1711 ← NEW
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.6925)
+Mean separation: 0.87 (positive = known higher = good)
+
+Threshold (tau): 0.6847
+
+======================================================================
+OSR Evaluation (OOD_HEAD_FUSION_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (10800 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -0.6006
+              dist_ratio: -1.1044
+             softmax_max: +1.0711
+                 entropy: -2.2237
+               feat_norm: +0.7280
+                2nd_dist: -0.7437
+               score_gap: -0.8158
+          dist_to_center: -0.1513
+         proto_score_var: -1.5992
+         norm_dist_ratio: +0.8318
+           cluster_mahal: -0.1935
+        cluster_post_max: -0.1475
+             cluster_ent: -0.4225
+        anti_proto_score: -1.5214 ← NEW
+  Calib TNR: 95.00%  TPR: 69.56%  (threshold=0.2414)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   66.25%
+  OSR Score (mean):         80.62%
+  AUROC:                    0.8971
+
+Results saved to experiment/episodic_exp/openness/results.json
+
+============================================================
+OPENNESS SWEEP SUMMARY
+============================================================
+    OpenWays      AP     Mah     O23   ExtV2   CluV2   FusV2
+       open2 59.77% 49.92% 85.91% 85.85% 85.91% 89.46%
+       open4 52.72% 49.89% 74.25% 73.15% 74.23% 80.62%

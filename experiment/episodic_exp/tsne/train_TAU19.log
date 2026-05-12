@@ -1,0 +1,30 @@
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_realfewshot_osr24/base_feature_extractor.pth
+Loading cached features from experiment/fewshot_cache/tau19_train_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5]
+    Class 0: 2500 samples
+    Class 1: 2500 samples
+    Class 2: 2500 samples
+    Class 3: 2500 samples
+    Class 4: 2500 samples
+    Class 5: 2500 samples
+Loading cached features from experiment/fewshot_cache/tau19_test_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Class 0: 1000 samples
+    Class 1: 1000 samples
+    Class 2: 1000 samples
+    Class 3: 1000 samples
+    Class 4: 1000 samples
+    Class 5: 1000 samples
+    Class 6: 1000 samples
+    Class 7: 1000 samples
+    Class 8: 1000 samples
+    Class 9: 1000 samples
+
+=== Full Model t-SNE ===
+  Computing t-SNE on 2000 samples...
+  Saved: experiment/episodic_exp/tsne/TAU19_full_model.png
+
+=== Baseline (distance head only) t-SNE ===
+  Computing t-SNE on 2000 samples...
+  Saved: experiment/episodic_exp/tsne/TAU19_baseline.png
