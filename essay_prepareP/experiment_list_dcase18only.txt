@@ -1,0 +1,209 @@
+================================================================================
+DCASE18 实验可行性分析
+对照 experiment_list.txt 的实验体系 (A-G)
+================================================================================
+
+一、DCASE18 数据集概况
+────────────────────────────────────────────────────────────────────────────────
+
+  数据集: DCASE 2018 Task 5 (家居环境声音分类)
+  位置: /coding/DCASE2018-task5-dev/
+  类别: 9类 → 5 base (absence/cooking/social_activity/watching_tv/working)
+               + 4 novel (dishwashing/eating/other/vacuum_cleaner)
+  音频: 10s @ 16kHz = 160000 samples/文件
+  折叠: 4-fold cross-validation (fold1~4)
+        sampled_setup/fold{n}_train.csv      ← 训练集 (含session_id)
+        sampled_setup/fold{n}_calib.csv      ← 校准集 (含session_id)
+        sampled_setup/fold{n}_evaluate.csv   ← 测试集 (无session_id, 仅filename+scene_label)
+  TAU22/TAU19 无 fold 结构 (单次 split)
+
+二、现有基础设施对 DCASE18 的支持状态
+────────────────────────────────────────────────────────────────────────────────
+
+  模块                          支持DCASE18?  备注
+  ──────────────────────────────────────────────────────────────────────────
+  【FOAC-AIFP 系统】
+  datasets/DCASE18.py          ✅ 完成       OpenDCASE18 + DCASE18Pretrain, 均支持 args.fold
+  datasets/dataloaders.py      ✅ 完成       meta_train/calib/test 均已路由 DCASE18
+  dcase18_aligned.yml          ✅ 完成       fold: 1 硬编码, train_classes=5, n_ways=3, n_open_ways=2
+  pretrain.py                  ✅ 完成       已有 DCASE18 pretrain 分支
+  main.py                      ✅ 完成       导入 DCASE18Pretrain
+  foac_exp_ablation.py         ❌ 缺失       choices=['TAU22','TAU19','all'], 无 DCASE18
+  foac_exp_way_shot.py         ❌ 缺失       choices=['TAU22','TAU19','all'], 无 DCASE18
+  foac_exp_openness.py         ❌ 缺失       choices=['TAU22','TAU19','all'], 无 DCASE18
+  foac_exp_cross_domain.py     ❌ 缺失       choices=['TAU22','TAU19'], 无 DCASE18
+  foac_exp_complexity.py       ✅ 可运行     不依赖数据集, 仅测模型参数/MACs/AIT
+  foac_exp_statistical.py      ✅ 可运行     接收任意 results.json, 无需改
+  foac_exp_tsne.py             ❌ 缺失       硬编码 TAU22/TAU19 路径和 label 数
+
+  【Episodic 系统】
+  utils/DCASE18.py             ✅ 完成       DCASE18Dataset(split, fold), 支持4 fold
+  episodic_trainer.py          ✅ 完成       --dataset dcase18 + --fold 1-4,
+                                            base=[0-4], unknown=[5-8],
+                                            CACHE_VERSION 已设
+  episodic_exp_ablation.py     ❌ 缺失       choices=['TAU22','TAU19','all'], 无 DCASE18
+  episodic_exp_way_shot.py     ❌ 缺失       choices=['TAU22','TAU19'], 无 DCASE18
+  episodic_exp_openness.py     ❌ 缺失       choices=['TAU22','TAU19'], 无 DCASE18
+  episodic_exp_cross_domain.py ❌ 缺失       choices=['TAU22','TAU19'], 无 DCASE18
+  episodic_exp_complexity.py   ✅ 可运行     不依赖数据集, 仅测模型参数/AIT
+  episodic_exp_statistical.py  ✅ 可运行     接收任意 results.json, 无需改
+  episodic_exp_tsne.py         ❌ 缺失       硬编码 TAU22/TAU19 路径和 label 数
+
+三、回答：能否仅对 DCASE18 运行一次？
+────────────────────────────────────────────────────────────────────────────────
+
+  结论: 不能直接运行，但改动量可控。
+
+  原因:
+    1. 所有实验脚本的 --dataset 参数均未将 'DCASE18' 加入 choices
+    2. 脚本内部硬编码了 TAU22/TAU19 的 config 路径 / class数 / label数
+    3. DCASE18 与 TAU22/TAU19 关键差异:
+       - 类别数: TAU=10 (6+4), DCASE18=9 (5+4)
+       - way数: TAU train: 4-way+2-open, DCASE18: 3-way+2-open
+       - fold: TAU 无, DCASE18 有4 fold
+
+  最小改动清单 (以 foac_exp_ablation.py 为例):
+
+    ① parser choices 加入 'DCASE18'
+        parser.add_argument('--dataset', choices=['TAU22','TAU19','DCASE18','all'])
+
+    ② dataset=='DCASE18' 时加载 dcase18_aligned.yml 而非 tau22_aligned.yml
+
+    ③ delete dataloaders 中的 testset 调用 — 因为 DCASE18 evaluate.csv 无 scene_label 列,
+       而 OpenDCASE18 在 partition='test' 时使用 all_test_df (有 scene_label), 无问题。
+       BUT: 原始 evaluate.csv 格式与 train/calib 不同 (无 session_id, 仅2列),
+       但 sampled_setup 下的文件已统一为3列 — 需确认 fold{n}_evaluate.csv 格式。
+
+    ④ checkpoint 命名: model_DCASE18_max_acc.pth 已自动适配
+
+  跨域实验特殊注意:
+    - 跨域需 TAU22↔DCASE18、TAU19↔DCASE18、DCASE18↔TAU22、DCASE18↔TAU19 四种方向
+    - 需要 backbone 在源域训练后在目标域评估, 两系统架构不同需分别处理
+
+四、回答：4-fold 是否需要微调实验过程？
+────────────────────────────────────────────────────────────────────────────────
+
+  结论: 必须微调，这是最大改动点。
+
+  当前状态:
+    - dcase18_aligned.yml 硬编码 fold: 1
+    - 所有脚本均按单次运行设计 (1 config → 1 results set)
+
+  DCASE18 的 fold 含义:
+    - 4-fold cross-validation: 不同 fold 的 train/calib/evaluate 包含不同 session 的数据
+    - 论文标准要求: 每 fold 独立训练+评估, 报告 4-fold 均值±标准差
+    - 对比: TAU22/TAU19 的 train/calib/test 是一次性划分, 没有 CV
+
+  所需改动:
+
+    2.1 实验脚本层 (每个 foac_exp_*.py / episodic_exp_*.py)
+    ───────────────────────────────────────────────────────────
+      - 新增 --fold 参数 (int or 'all')
+      - 当 dataset==DCASE18 且 fold=='all' 时, 外层增加 fold in [1,2,3,4] 循环
+      - 每个 fold 独立训练, 结果存为 {fold}/{config_name}/
+      - 汇总时计算 4-fold mean±std
+
+    2.2 配置文件层
+    ───────────────────────────────────────────────────────────
+      - dcase18_aligned.yml 中的 fold: 1 作为默认值
+      - 运行时由 --fold 参数覆盖 (args.fold)
+      - save_folder 建议改为 f'./dcase18_aligned_fold{fold}'
+
+    2.3 数据加载层 (已就绪)
+    ───────────────────────────────────────────────────────────
+      - DCASE18Pretrain / OpenDCASE18 已支持 args.fold
+      - dataloaders.py 已正确路由
+      - 只需确保 args.fold 传递到位
+
+    2.4 结果汇总层
+    ───────────────────────────────────────────────────────────
+      - results.json 结构需扩展: {dataset: {fold: {config: {...}}}}
+      - 最终报告: 每指标 = mean±std over 4 folds
+      - 统计检验: Friedman 的行数可从 2 (TAU22+TAU19) 扩展到 6 (TAU22+TAU19+DCASE18×4fold)
+        或把每 fold 作为独立行 → N=10
+
+五、建议实施路径
+────────────────────────────────────────────────────────────────────────────────
+
+  优先级 P0: 快速验证 DCASE18 单 fold 能跑通
+  ───────────────────────────────────────────
+    1. 手动测试 FOAC-AIFP baseline:
+       cd /coding/FOAC-AIFP
+       python main.py --config dcase18_aligned.yml
+       → 验证 pretrain + meta-train + meta-test 全流程
+
+    2. 手动测试 Episodic baseline:
+       cd /coding
+       python episodic_trainer.py --dataset dcase18 --fold 1 --epochs 200
+       → 验证训练流程 + OSR 评估
+
+  优先级 P1: 改实验脚本支持 DCASE18 + fold
+  ───────────────────────────────────────────
+    对每个 foac_exp_*.py / episodic_exp_*.py:
+      a) 加入 --dataset DCASE18
+      b) 加入 --fold 参数 (default=1, 支持 all → 逐fold运行)
+      c) DCASE18 时使用 dcase18_aligned.yml 配置
+      d) 结果 JSON 结构嵌套 fold 维度
+      e) 汇总时计算 fold mean±std
+
+  优先级 P2: 跨域实验 (需要 DCASE18 作为第3域)
+  ───────────────────────────────────────────
+      - 跨域方向: TAU22↔DCASE18, TAU19↔DCASE18 (4组双向)
+      - 需 backbone 在两个系统上都做目标域特征提取
+
+六、各脚本改动量估算
+────────────────────────────────────────────────────────────────────────────────
+
+  脚本                          改动位置              行数    难度
+  ──────────────────────────────────────────────────────────────────────────
+  foac_exp_ablation.py          L137 choices + fold    ~30行   低
+  foac_exp_way_shot.py          L119 choices + fold    ~30行   低
+  foac_exp_openness.py          L104 choices + fold    ~30行   低
+  foac_exp_cross_domain.py      L261-262 choices       ~40行   中 (需5种方向组合)
+  foac_exp_tsne.py              config路径 + labels    ~20行   低
+  episodic_exp_ablation.py      L189 choices + fold    ~30行   低
+  episodic_exp_way_shot.py      L146 choices + fold    ~30行   低
+  episodic_exp_openness.py      L100 choices + fold    ~30行   低
+  episodic_exp_cross_domain.py  L176-177 choices       ~40行   中
+  episodic_exp_tsne.py          L129 choices + paths   ~20行   低
+  ──────────────────────────────────────────────────────────────────────────
+  合计                                            ~300行   2-3小时工作量
+
+七、DCASE18 与 TAU22/TAU19 的配置对照 (供参考)
+────────────────────────────────────────────────────────────────────────────────
+
+  参数                TAU22/TAU19            DCASE18
+  ──────────────────────────────────────────────────────────────────────────
+  train_classes       6                      5
+  total_classes       10                     9
+  n_ways (train)      4                      3
+  n_open_ways (train) 2                      2
+  test_n_ways         6                      5
+  test_n_open_ways    4                      4
+  n_shots             5                      5
+  n_queries           15                     15
+  fold                无                     1-4
+  sample_rate         44100                  16000
+  audio_duration      10s                    10s (segmented → 1s × 10)
+
+八、注意事项
+────────────────────────────────────────────────────────────────────────────────
+
+  1. evaluate.csv 格式差: TAU22 evaluate.csv 有 scene_label 列,
+     DCASE18 原版 evaluate.csv 仅2列 (filename, scene_label).
+     但 sampled_setup/fold{n}_evaluate.csv 已经包含 scene_label, 与 calib 格式相同 — OK.
+
+  2. session 隔离: DCASE18 的 fold 划分按 session 隔离 (同一 session 的音频不出现在
+     train+test 两侧), 这是标准做法, 无需额外处理.
+
+  3. 10s→1s 分段: DCASE18Pretrain 和 OpenDCASE18 均将 10s 音频切成 10×1s 段.
+     这会扩增样本量 ×10, 训练/评估时需注意 batch 内可能有同源段.
+
+  4. DCASE18 评估的 n_queries: calib set 中 novel 类仅有 3 files/class →
+     30 segments (3×10). 当前 n_queries=15 能覆盖.
+
+  5. 两系统 backbone 不同 (ResNet18 vs YAMNet), 结果不可直接对比.
+     论文中 DCASE18 应作为独立第3域补充, 强化跨域泛化论证.
+
+  6. 如需快速验证, 建议优先改 episodic 系统的脚本 (episodic_trainer.py 已有完整
+     DCASE18 训练循环, 实验脚本改起来更快).

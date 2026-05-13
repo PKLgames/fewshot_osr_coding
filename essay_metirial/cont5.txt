@@ -1,21 +1,45 @@
-第五章 结论与展望
+## V. Discussion
 
-5.1 主要工作与贡献
+### A. Why Fusion V2 Works
 
-本文针对小样本开放集声学场景识别问题，提出了一种基于查询依赖反原型与GMM聚类增强的双信号融合框架。研究围绕"如何仅利用极少量已知类样本有效检测未知类"这一核心问题，从几何评分、统计建模和信号融合三个层面展开工作，主要贡献如下。
+Fusion V2 combines two signals with complementary failure modes. The extended head [8] learns a discriminative boundary explicitly conditioned on the support set; it is accurate when the test-time unknown distribution resembles what was seen during training, and brittle when it doesn't. The cluster head [24] scores queries by proximity to individual support points without learning a boundary, making it less sensitive to unknown distribution shift but noisier at small K. When one signal is weak, the other often compensates.
 
-第一，提出了查询依赖的反原型评分方法。区别于RPL[引13]将反原型作为固定可学习参数的做法，本文利用查询批次的样本均值$\hat{\mathbf{c}}_Q = \frac{1}{|Q|}\sum_{x \in Q}f_\phi(x)$动态计算反原型中心$\mathbf{a}_c = 2\hat{\mathbf{c}}_Q - \mathbf{p}_c$。该方法不引入额外参数，从数学上消除了固定中心在训练-测试分布偏移下的系统性误差——固定中心偏移$\Delta = \bar{\mathbf{p}} - \bar{\mathbf{p}}_{\text{ep}}$在反原型构造中被放大为$2\Delta$，导致决策边界畸变。消融实验表明，查询依赖设计使TPR从8.32%提升至18.92%，增幅达127%。
+The data reflect this complementarity. On TAU19, where per-device acoustic modes create clean gaps between known clusters, the fusion margin over the next-best single head reaches +0.035–0.050 AUROC. On TAU22, where uniform recording blurs class boundaries, the gain shrinks to +0.021. The learned weight \(\alpha\) tilts toward the discriminative signal when the boundary is sharp and toward the density signal when it is not—this adaptivity explains why fusion_v2 wins every cell of the ablation matrix, both datasets, and all way-shot/openness conditions.
 
-第二，提出了GMM聚类增强的统计OOD检测方法。在全部已知类特征上拟合高斯混合模型，从中提取聚类Mahalanobis距离、最大后验概率和后验熵三个特征，将OOD特征向量从11维扩展至13维。相较于Lee等人[引12]仅使用类条件Mahalanobis距离的做法，本文通过GMM的完全协方差矩阵$\boldsymbol{\Sigma}_k$捕捉二阶统计信息，同时利用后验分布的信息熵$H(\mathbf{x}) = -\sum_k \gamma_k \log \gamma_k$量化归属不确定性。实验表明GMM聚类特征使TPR从16.33%提升至21.76%，相对提升33.3%。
+A metric note: across the TAU19 ablation, AUROC spread is 0.354 vs. OSR Score spread of 40.5 pp. As a threshold-free metric [14], AUROC captures the full ranking without the variance introduced by per-round calibration at fixed TNR. We return to this in Section V.D.
 
-第三，设计了几何-统计双信号融合框架。通过Z-score归一化消除量纲差异，利用Youden J统计量[引35]搜索最优融合权重。实验确定$\alpha^* = 0.6$，表明两路信号提供了互补的已知/未知判别信息，融合后TPR从单路最优的21.76%提升至24.94%。
+### B. The wo_ood_head Surprise
 
-第四，在TAU-2022数据集[引25]上进行了系统实验。五轮迭代中穷尽探索了归一化流路线并予以证伪——64维空间中每类5000个样本不足以支撑Flow在分布尾部的高质量密度估计。这一负面结论具有方法论价值：在小样本OSR场景下，非参数地描述已有特征结构优于参数化地学习新分布模型。最终方法在TNR=95%约束下达到TPR=24.94%、OSR=59.97%，相比基线相对提升41.6%。
+The global optimum across all experiments is wo_ood_head + fusion_v2 on TAU19: AUROC = 0.985. Removing the OSR binary cross-entropy loss—the term explicitly designed to teach known/unknown separation—improves open-set detection.
 
-5.2 研究局限性
+Our hypothesis is gradient interference. Early in training, when the feature space is disorganized, the OSR loss pushes \(s_{\text{osr}}\) in directions that conflict with the classification gradient. The reciprocal attention [9] and separation losses already supply a weaker but less noisy separation signal. With a strong pretrained backbone [11], the additional OSR supervision adds more noise than signal.
 
-本文工作存在以下局限。其一，实验仅在TAU-2022单一数据集上验证，泛化性需在视觉数据集（如CIFAR-10、miniImageNet）上进一步确认，特别是查询依赖反原型的有效性是否依赖特定的特征空间结构。其二，TPR绝对值仍有提升空间，$K$-shot条件下原型估计方差$\text{Var}(\mathbf{p}_c) = \boldsymbol{\Sigma}_c / K$在$K=5$时使所有下游OSR评分均继承了基础不确定性。其三，GMM分量数$K_{\text{GMM}} = 2N$为经验设定，缺乏BIC/AIC等信息准则的理论指导。其四，开放集检测能力未在训练阶段显式优化，当前的后处理解耦策略限制了性能上界。
+The effect is dataset-asymmetric. wo_ood_head vs. full_model gains only +0.010 AUROC on TAU22 (0.872 vs. 0.862) but +0.013 on TAU19 (0.985 vs. 0.972). The harder dataset, where per-device variation demands more from the feature representation, benefits more from removing the conflicting gradient.
 
-5.3 未来工作展望
+The practical moral: with a strong pretrained backbone, a well-chosen head and a clean classification loss can outperform a carefully engineered multi-term objective [5], [6]. Good features beat complicated losses.
 
-基于本文的研究基础，以下方向值得进一步探索。在训练阶段改进方面，可引入Margin Loss[引37]显式增大已知类原型间的间隔$\mathcal{L}_{\text{margin}} = \max(0, m - \|\mathbf{p}_i - \mathbf{p}_j\|_2)$，或利用监督对比学习[引38]增强类内聚合度。在特征表示方面，利用YAMNet[引23]中间层的多尺度声学信息为OSR提供更丰富的判别依据。在融合架构方面，以小型神经网络替代线性组合，学习非线性的评分映射函数以捕捉信号间的交互效应。在理论分析方面，查询依赖中心$\hat{\mathbf{c}}_Q$的最优性缺乏严格证明——在何种正则条件下（如查询批次中已知类样本比例下界、嵌入空间维数条件等），$\hat{\mathbf{c}}_Q$以高概率接近真实中心？对该问题的回答将为方法提供理论保障，并可能导出TPR的概率下界。此外，可从异常检测[引42]和机器学习[引43]的更广泛视角审视FS-OSR问题，并借鉴深度学习处理器[引46]的研究优化模型推理效率。
+### C. Cross-Domain Asymmetry
+
+TAU22→TAU19 OSR Score = 90.49% vs. TAU19→TAU22 = 74.31%—a 16.2 pp gap (AUROC: 0.977 vs. 0.878). The explanation lies in target-domain feature geometry. TAU19 [19] spans three recording devices with a wide quality range, producing well-separated per-device sub-clusters with gaps between them. Unknown samples land in these gaps, making detection easy regardless of the training domain. TAU22's uniform recordings produce tighter, overlapping clusters with less open space.
+
+The implication for practitioners: if cross-domain OSR robustness matters, train on the acoustically more diverse dataset—even at the cost of within-domain classification accuracy. The wider feature distribution acts as implicit open-set regularization. A direction we haven't explored is deliberately augmenting training with multi-device recordings or background noise to artificially widen the known-class feature distribution.
+
+### D. AUROC vs. OSR Score as Evaluation Metrics
+
+The choice of primary metric shapes conclusions. AUROC consistently discriminates methods better than OSR Score. The three OOD head family methods differ by < 1 pp in OSR Score but show systematic gaps of 0.005–0.010 in AUROC—small but consistent differences that track the statistical ranking. OSR Score is a point estimate at TNR = 95%; its variance includes threshold calibration noise. AUROC [14], as a threshold-free integral over the full ROC, averages this out.
+
+Under OSR Score alone, one might conclude osr23, ext_v2, and clust_v2 are interchangeable and their ordering irrelevant. Under AUROC, the ranking osr23 ≈ clust_v2 > ext_v2 is visible across conditions, and the statistical test (Section IV.C) confirms this pattern. We recommend AUROC as the primary FOAC open-set metric, with OSR Score and TPR@TNR95 as supplementary diagnostics.
+
+### E. Limitations
+
+Several limitations bound the generality of our conclusions.
+
+First, we evaluate two acoustic scene datasets from one domain family (DCASE). While TAU19 and TAU22 differ in recording conditions, they share class semantics and spectrotemporal statistics. Validation on cross-domain data—speech [31], musical instruments [30], bioacoustics—is needed.
+
+Second, the fusion weight \(\alpha\) is a single scalar per dataset. Per-episode fusion weights conditioned on the support set could adapt to episode-to-episode variation in the known/unknown boundary.
+
+Third, YAMNet [11] was pretrained on AudioSet [10], whose 500+ sound classes may overlap with TAU19/TAU22 categories. Known-class leakage through the pretrained backbone could inflate both classification and open-set metrics. A controlled study with a backbone trained on disjoint data would quantify this.
+
+Fourth, we have not compared against foundation models (CLAP [15], AST [16], PaSST [28]). Whether the wo_ood_head finding holds under stronger representations is unknown.
+
+Fifth, the near-saturation of AUROC with increasing shots (Section IV.G1) lacks a theoretical account. Why does K = 1 → 10 gain 10–15 pp ACC but under 0.02 AUROC? A model relating prototype estimation error to open-set score variance would clarify whether this is fundamental to the FOAC formulation or an architectural artifact.

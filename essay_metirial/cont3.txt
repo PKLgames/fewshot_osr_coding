@@ -1,179 +1,118 @@
-第三章 基于原型学习与聚类的OSR算法设计
+## III. Method
 
-本章详细阐述本文所提出的小样本开放集声学场景识别算法。首先给出系统的整体架构，然后依次介绍特征提取与原型计算、查询依赖反原型评分方法、GMM聚类增强的统计OOD检测方法，以及几何-统计双信号融合框架的设计，最后描述Episodic元训练策略。
+### A. Problem Formulation
 
-3.1 整体框架概述
+The FOAC task is defined over three disjoint label sets. **Base classes** \(\mathcal{D}_{\text{base}}\) contain hundreds of labeled examples per class; these are used for training the feature extractor and OSR detection heads, and are never encountered at evaluation time. **Novel classes** \(\mathcal{D}_{\text{novel}}\) are the categories the model must learn to classify from sparse support. They are partitioned into episodes, each constructed by sampling N classes and drawing K support examples and Q query examples per class. **Unknown classes** form a third label pool disjoint from both \(\mathcal{D}_{\text{base}}\) and \(\mathcal{D}_{\text{novel}}\). They appear exclusively at test time as query samples that the model must reject.
 
-本文提出的FS-OSR系统采用"先学习特征表示、后校准开放集边界"的两阶段设计，整体数据流如图3.1所示。
+A single evaluation episode is therefore defined by a support set \(\mathcal{S} = \{(\mathbf{x}_{i}, y_{i})\}_{i=1}^{N \times K}\) and a query set \(\mathcal{Q} = \{(\mathbf{x}_{j}, y_{j})\}_{j=1}^{N \times Q} \;\cup\; \{(\mathbf{x}_{k})\}_{k=1}^{M}\) where the first \(N \times Q\) queries carry known-class labels and the trailing M queries are unlabeled unknowns. The M unknown samples are drawn uniformly from the unknown-class pool and are not identified as such to the model; they arrive intermixed with the known queries in random order.
 
-第一阶段为Episodic元训练阶段。音频信号经YAMNet[引23]提取521维原始特征后，通过三层全连接网络（521→256→128→64，每层配备SE通道注意力与Dropout正则化）映射为64维嵌入向量。YAMNet的参数全程冻结，仅更新距离头和特征适配器的参数。训练采用Episode机制：每个Episode从已知类中随机采样$N_{\text{way}}$个类别，每类$K_{\text{shot}}$个样本构成支持集，另取$Q_{\text{query}}$个样本构成查询集。支持集样本嵌入的均值即为各类原型$\mathbf{p}_c$，查询样本通过到各原型的加权距离完成分类。
+The model maps each query through a shared feature extractor into an embedding \(\mathbf{h}\), then routes \(\mathbf{h}\) through two parallel heads. A **classification head** produces a distribution \(\hat{\mathbf{y}} \in \Delta^{N}\) over the N known classes via a prototype-based softmax [1]. An **OSR detection head** outputs a scalar \(s_{\text{osr}} \in \mathbb{R}\), where higher values indicate stronger evidence that the query is known. The rejection rule is:
 
-第二阶段为OSR校准阶段。训练完成后，在已知类特征上独立拟合两个开放集检测通路。通路A为几何信号——查询依赖反原型评分，利用查询批次均值动态构建反原型，通过样本到原型与反原型的距离差判断已知/未知属性。通路B为统计信号——13维扩展OOD特征经逻辑回归分类器输出概率评分，其中第11至13维为本文新增的GMM聚类增强特征。两个通路的评分经Z-score归一化后，以Youden J最优准则搜索的权重$\alpha^*$进行加权融合，最终输出已知/未知判定。
+\[
+\text{decision} = \begin{cases}
+\text{reject (unknown)} & \text{if } s_{\text{osr}} < \tau, \\
+\arg\max_{c} \hat{y}_{c} & \text{otherwise},
+\end{cases}
+\]
 
-【图3.1】系统整体架构图。左侧为音频输入经YAMNet与FC层生成64维嵌入。中间上方为Episodic元训练流程。中间下方分两路：路径A为查询依赖反原型评分$s_{\text{anti}}$；路径B为13维特征提取（含GMM聚类特征）→逻辑回归→$s_{\text{ood}}$。右侧为Z-score归一化、加权融合与阈值判定。
+with the threshold \(\tau\) calibrated to achieve TNR = 95% on a held-out split of the support set [5], [8]. The calibration split is disjoint from both the prototypes' support samples and the evaluation queries, which avoids the self-calibration loop that makes TNR artificially constant and uninformative.
 
-3.2 特征提取与原型计算
+Performance is measured along two axes. Closed-set classification accuracy (ACC) and classification AUROC (one-vs-rest) are computed over the known-class queries that survive the rejection step. Open-set detection quality is measured by the area under the ROC curve (AUROC) [14], the OSR Score—defined as \(( \text{TPR} + \text{TNR} ) / 2\) at a TNR of 95%—and TPR@TNR95, the true positive rate at the operating point where TNR equals 95%.
 
-3.2.1 音频特征提取
+### B. Episodic Training Framework
 
-本文采用YAMNet[引23]作为音频特征提取的骨干网络。YAMNet基于MobileNet v1[引34]架构，在AudioSet大规模音频数据集上完成预训练，其处理流程为：输入16kHz单声道音频，经短时傅里叶变换计算对数梅尔频谱图，由深度可分离卷积层提取时频特征，输出521维全局音频嵌入；训练中可引入SpecAugment[引26]等数据增强策略提升泛化能力。
+Training follows the episodic meta-learning protocol [1], [2]. Each training episode is constructed to match the test-time FOAC structure: N classes are drawn from \(\mathcal{D}_{\text{base}}\), K support and Q query samples are sampled per class, and M unknown-class samples—drawn from a disjoint subset of \(\mathcal{D}_{\text{base}}\) unseen by the classifier—are injected into the query batch. The model is trained exclusively on \(\mathcal{D}_{\text{base}}\); no novel-class data appears during training. This gating ensures that evaluation on \(\mathcal{D}_{\text{novel}}\) measures generalization to genuinely unseen categories, not memorization of the base-class distribution.
 
-由于YAMNet的预训练目标与本文的声学场景分类任务存在领域差异，在其之上设计了特征适配层和距离头两个可训练模块。特征适配层对冻结的YAMNet特征进行线性变换和层归一化：
+**[Insert Fig 1 about here.]**
 
-【公3.1】$\mathbf{z} = \text{LayerNorm}(W\mathbf{x} + \mathbf{b})$
+**Fig 1.** FOAC episodic training architecture. An input audio clip is converted to a log-mel spectrogram and encoded by a frozen YAMNet backbone [10], [11] into a 1024-dim embedding \(\mathbf{z}\). An optional Flow Transform [17], [18] (dashed box, ~25K parameters) warps \(\mathbf{z}\) to \(\mathbf{h}\) via four affine coupling layers. The embedding then feeds two parallel branches: a classification branch (top) that computes N class prototypes and scores queries via softmax over Euclidean distances [1], and an OSR branch (bottom, expanded in the dashed inset) that routes the same embedding through one of six detection heads to produce the open-set score \(s_{\text{osr}}\). The final decision applies the rejection rule of Eq. (1): reject if \(s_{\text{osr}} < \tau\), otherwise classify.
 
-其中$\mathbf{x} \in \mathbb{R}^{521}$，$W \in \mathbb{R}^{64 \times 521}$。LayerNorm消除不同维度的量纲差异，有利于后续距离计算。距离头对适配后的特征做进一步非线性映射：
+Input audio clips are first converted to log-mel spectrograms (64 mel bands, 96 frames, 0.96 s duration) and passed through a frozen YAMNet backbone [11] pretrained on AudioSet [10]; we freeze the backbone throughout. Preliminary runs with backbone fine-tuning produced no consistent gain on TAU22 and a small degradation on TAU19, corroborating the view that AudioSet-pretrained features already span the acoustic invariances relevant to these datasets.
 
-【公3.2】$\mathbf{z}' = W_2 \cdot \text{GELU}(\text{Dropout}(\text{LayerNorm}(W_1 \mathbf{z})))$
+An optional **Flow Transform** module follows the backbone. It stacks four affine coupling layers [17], [18] that map \(\mathbf{z} \in \mathbb{R}^{1024}\) to a warped representation \(\mathbf{h} = f_{\phi}(\mathbf{z})\), where \(f_{\phi}\) is invertible with a tractable log-determinant Jacobian. The flow adds approximately 25K trainable parameters. The intended effect is to Gaussianize the per-class feature distributions, which sharpens the covariance estimates that distance-based detectors rely on. Whether the flow actually delivers this benefit is dataset-dependent; the ablation in Section IV.F shows it helps on TAU22 but is neutral or mildly harmful on TAU19.
 
-其中$W_1, W_2 \in \mathbb{R}^{64 \times 64}$，GELU激活函数$\text{GELU}(x) = x \cdot \Phi(x)$（$\Phi$为标准正态分布的累积分布函数）相比ReLU具有更平滑的梯度。Dropout率设为0.25以增强泛化。
+The embedding \(\mathbf{h}\)—or \(\mathbf{z}\) directly when the flow is removed—feeds two parallel branches (see Fig 1). The **classification branch** computes N class prototypes via support-set averaging and produces query class scores through a softmax over Euclidean distances to those prototypes [1]. The **OSR branch** routes the same embedding through the active detection head (Section III.C, expanded in the Fig 1 inset) to produce \(s_{\text{osr}}\). Both branches share the same feature representation; there is no separate OSR-specific feature extractor.
 
-3.2.2 原型计算与Episodic分类
+### C. Six OSR Detection Heads
 
-在Episodic训练中，第$c$类的原型为支持集中该类样本嵌入的算术平均：
+The six heads span distinct operating principles and are shown together in the OSR branch inset of Fig 1. Each head receives the feature representation \(\mathbf{h}\) (post-flow, if the flow is active) and outputs a scalar \(s_{\text{osr}}\); heads that require per-class modeling obtain the support set's class assignments to construct their internal representations.
 
-【公3.3】$\mathbf{p}_c = \frac{1}{K}\sum_{i=1}^{K} f_\phi(x_i^{(c)})$
+**1. Anti-Prototype Head (anti_proto).** Following [9], the head learns a single anti-prototype vector \(\mathbf{a} \in \mathbb{R}^{d}\) that serves as a negative center for all known classes. During training, a reciprocal loss pushes \(\mathbf{a}\) away from the known-class support embeddings while the classification loss pulls class prototypes toward their respective support samples. Given N class prototypes \(\{\mathbf{p}_{c}\}_{c=1}^{N}\) computed as the mean of the K support embeddings for class c, the open-set score for a query \(\mathbf{h}\) is:
 
-查询样本的分类得分通过负欧氏距离平方乘以温度参数得到：
+\[
+s_{\text{anti}} = d(\mathbf{h}, \mathbf{a}) - \min_{c \in \{1,\ldots,N\}} d(\mathbf{h}, \mathbf{p}_{c})
+\]
 
-【公3.4】$P(y=c|x) = \text{softmax}(-\|f_{\text{dist}}(x) - f_{\text{dist}}(\mathbf{p}_c)\|_2^2 \cdot \tau)$
+where \(d(\cdot, \cdot)\) denotes Euclidean distance. A positive score indicates the query is closer to a known prototype than to the anti-prototype and is therefore classified as known; a negative score triggers rejection. The anti-prototype is trained jointly with the backbone via the reciprocal loss described in Section III.D.
 
-其中$\tau > 0$为可学习的温度参数（初始化为10.0），控制softmax输出的锐利程度。为防止极端分数导致梯度过大，分类得分在softmax之前经$\tanh$平滑截断：$s = 10 \cdot \tanh(s_{\text{raw}}/10)$。值得指出的是，原型计算使用特征适配器输出而分类距离在距离头输出空间中计算，使得原型保持对原始特征的忠实表示，距离头则专注于学习对分类有利的空间变换。
+**2. Mahalanobis Distance Head (mahal).** This head fits a multivariate Gaussian \(\mathcal{N}(\boldsymbol{\mu}_{c}, \mathbf{\Sigma}_{c})\) to the support embeddings of each class c [8]. The mean is the sample average of the K support vectors; the covariance is estimated via shrinkage toward a pooled diagonal matrix to stabilize inversion at small K:
 
-3.3 查询依赖反原型评分
+\[
+\mathbf{\Sigma}_{c} = (1 - \lambda) \mathbf{S}_{c} + \lambda \mathbf{\Sigma}_{\text{pooled}}
+\]
 
-3.3.1 反原型的几何构造
+where \(\mathbf{S}_{c}\) is the empirical per-class covariance and \(\lambda = 0.5\). The open-set score for query \(\mathbf{h}\) is the negative Mahalanobis distance to the nearest class:
 
-如第二章所述，反原型方法的核心在于参考中心$\mathbf{c}$的选择。在标准小样本设定中，模型训练时可以访问全部$N$个已知类，固定中心$\bar{\mathbf{p}} = \frac{1}{N}\sum_{c=1}^{N}\mathbf{p}_c$能够合理反映已知类特征空间的整体中心。然而测试阶段每个Episode仅包含已知类的一个子集$\mathcal{C}_{\text{ep}} \subset \mathcal{C}_{\text{known}}$，此时$\bar{\mathbf{p}}$与当前Episode的原型均值$\bar{\mathbf{p}}_{\text{ep}} = \frac{1}{|\mathcal{C}_{\text{ep}}|}\sum_{c \in \mathcal{C}_{\text{ep}}}\mathbf{p}_c$之间存在偏差$\Delta = \bar{\mathbf{p}} - \bar{\mathbf{p}}_{\text{ep}}$。该偏差将直接传递到所有反原型上：$\mathbf{a}_c^{\text{fixed}} = \mathbf{a}_c^{\text{true}} + 2\Delta$，导致反原型整体平移$2\Delta$，已知/未知边界发生畸变。
+\[
+s_{\text{mahal}} = -\min_{c} \sqrt{(\mathbf{h} - \boldsymbol{\mu}_{c})^{T} \mathbf{\Sigma}_{c}^{-1} (\mathbf{h} - \boldsymbol{\mu}_{c})}.
+\]
 
-针对这一问题，本文采用查询依赖中心作为参考点。设当前查询批次为$Q = \{x_1, \ldots, x_B\}$，则
+This head involves no learned parameters beyond what the backbone produces; it is the simplest detector in our comparison and serves as the `only_distance_head` baseline in the ablation.
 
-【公3.5】$\hat{\mathbf{c}}_Q = \frac{1}{B}\sum_{i=1}^{B} f_\phi(x_i)$
+**3. OOD Head OSR23 (osr23).** A Gaussian Mixture Model with \(G = 4\) components is fit to the aggregated support features of all N known classes [24]. The GMM is trained per episode via expectation-maximization initialized from k-means. The open-set score is the log-likelihood of \(\mathbf{h}\) under the mixture:
 
-【公3.6】$\mathbf{a}_c = 2\hat{\mathbf{c}}_Q - \mathbf{p}_c$
+\[
+s_{\text{osr23}} = \log \sum_{g=1}^{G} \pi_{g} \, \mathcal{N}(\mathbf{h}; \boldsymbol{\mu}_{g}, \mathbf{\Sigma}_{g})
+\]
 
-这一构造的性质如下：当查询批次中已知类样本占主导时，$\hat{\mathbf{c}}_Q$自动偏向已知类特征空间的中心区域，反原型被推至远离已知类的空间中；当未知类样本混入时，$\hat{\mathbf{c}}_Q$向未知方向偏移，但评分函数中"到最近原型距离"的贡献始终占优，仍能保持判别力。
+where \(\pi_{g}\) are the learned mixing coefficients. This head models the known-class density directly rather than carving a decision boundary; out-of-distribution queries are expected to land in low-density regions under the fitted GMM.
 
-【图3.3】查询依赖反原型构造示意图。左子图为训练场景（6个已知类），固定中心$\bar{\mathbf{p}}$与全局中心吻合。右子图为测试场景（Episode仅含两个已知类），固定中心偏离实际原型分布，查询依赖中心$\hat{\mathbf{c}}_Q$由当前批次自适应计算。
+**4. OOD Head Extended V2 (ext_v2).** This head augments the Mahalanobis detector with a learned linear transformation \(\mathbf{W} \in \mathbb{R}^{d \times d'}\) that projects features to a lower-dimensional discriminative space before computing distances [8]. The open-set score becomes:
 
-3.3.2 评分函数与决策规则
+\[
+s_{\text{ext}} = -\min_{c} \sqrt{(\mathbf{W}\mathbf{h} - \tilde{\boldsymbol{\mu}}_{c})^{T} \tilde{\mathbf{\Sigma}}_{c}^{-1} (\mathbf{W}\mathbf{h} - \tilde{\boldsymbol{\mu}}_{c})}
+\]
 
-反原型评分函数定义为
+where \(\tilde{\boldsymbol{\mu}}_{c} = \mathbf{W}\boldsymbol{\mu}_{c}\) and \(\tilde{\mathbf{\Sigma}}_{c}\) is the covariance in the projected space. The matrix \(\mathbf{W}\) is trained end-to-end with the OSR binary cross-entropy loss so that the projected space separates known from unknown queries. The transformation adds roughly 300 parameters.
 
-【公3.7】$s_{\text{anti}}(x) = -\underbrace{\min_{c=1,\ldots,N} \|f_\phi(x) - \mathbf{p}_c\|_2}_{d_{\text{proto}}(x)} + \underbrace{\min_{c=1,\ldots,N} \|f_\phi(x) - \mathbf{a}_c\|_2}_{d_{\text{anti}}(x)}$
+**5. OOD Head Cluster V2 (clust_v2).** This head takes a density estimation approach closer in spirit to osr23 but operates per-class rather than pooling across classes [24]. For each class c, the K support embeddings are treated as cluster centers; the open-set score is the negative distance to the nearest center across all N classes:
 
-决策规则为$s_{\text{anti}}(x) \geq \tau_{\text{anti}}$时判定为已知类，阈值$\tau_{\text{anti}}$取校准集已知类评分的第5百分位数以保证TNR≈95%。该评分函数不涉及任何额外参数——反原型由查询批次均值和原型通过线性运算$\mathbf{a}_c = 2\hat{\mathbf{c}}_Q - \mathbf{p}_c$得到。与RPL[引13]需要为每个类别维护可学习反原型参数的做法相比，本文方法在参数效率上具有显著优势。
+\[
+s_{\text{clust}} = -\min_{c \in \{1,\ldots,N\}} \min_{k \in \{1,\ldots,K\}} \|\mathbf{h} - \mathbf{h}_{c,k}\|_{2}.
+\]
 
-3.3.3 查询依赖中心有效性的实验验证
+When K = 1, this reduces to nearest-neighbor distance to the single prototype. When K > 1, the head retains access to individual support samples rather than collapsing them into a mean, which can be advantageous when the support set contains outlier samples that would distort a single prototype.
 
-为验证查询依赖设计的必要性，在校准集上对比了两种中心策略。
+**6. OOD Head Fusion V2 (fusion_v2) — Core Contribution.** The fusion head (see Fig 1, bottom right of OSR inset) combines ext_v2 and clust_v2 through a learned scalar weight \(\alpha \in [0, 1]\):
 
-【表3.1】查询依赖中心与固定中心对比
+\[
+s_{\text{fusion}} = \alpha \cdot s_{\text{ext}} + (1 - \alpha) \cdot s_{\text{clust}}.
+\]
 
-| 中心类型 | TPR (%) | 分析 |
-|----------|---------|------|
-| 固定中心 $\bar{\mathbf{p}}$ | 8.32 | 训练-测试Episode分布偏移导致反原型位置错误 |
-| 查询依赖中心 $\hat{\mathbf{c}}_Q$ | 18.92 | 自适应当前Episode的查询分布 |
+The motivation is that ext_v2 and clust_v2 capture complementary failure modes. ext_v2 learns a discriminative boundary in a projected space—it separates known from unknown queries explicitly, conditioned on the episode's support set. clust_v2 provides a generative density estimate: queries landing far from all support points receive low scores regardless of where a learned boundary happens to fall. Discriminative boundaries tend to be brittle when the unknown distribution shifts between training and test domains; density estimates, meanwhile, grow noisy when K is small. Blending the two lets the model lean on the signal that is more reliable for a given domain and shot count. The weight \(\alpha\) is a scalar parameter optimized jointly with the rest of the model through the multi-objective loss. At inference, \(s_{\text{fusion}}\) substitutes for \(s_{\text{osr}}\) in the rejection rule of Section III.A.
 
-查询依赖设计使TPR提升约10.6个百分点，增幅达127%。这表明在小样本元学习框架下，训练-测试之间的分布偏移对OSR性能的影响远超预期，而查询依赖中心能够有效缓解这一问题。
+### D. Training Objectives
 
-3.4 GMM聚类增强的统计OOD检测
+The total loss combines four terms:
 
-3.4.1 动机与全局GMM建模
+\[
+\mathcal{L} = \mathcal{L}_{\text{cls}} + \lambda_{\text{osr}} \mathcal{L}_{\text{osr}} + \lambda_{\text{rec}} \mathcal{L}_{\text{rec}} + \lambda_{\text{sep}} \mathcal{L}_{\text{sep}}.
+\]
 
-原型网络利用类原型（一阶统计量）进行分类，隐含假设各类在嵌入空间中呈各向同性的球状分布（如第二章的概率解释所示）。然而实际声学场景特征往往呈现各向异性的分布——某些维度类内方差较大（区分度低），另一些维度方差较小（区分度高）。完全协方差矩阵能够捕捉各向异性，但每类仅有$K$个小样本时直接估计类条件协方差$\boldsymbol{\Sigma}_c$在统计上不可行。
+**Classification loss** \(\mathcal{L}_{\text{cls}}\) is standard cross-entropy over the N known classes, computed on both support and query samples. For support samples, this encourages the backbone to produce well-separated class embeddings; for query samples, it drives the prototype-based classifier toward correct predictions.
 
-本文提出折中方案：在全部已知类特征的并集上拟合全局高斯混合模型。GMM的分量数设定为$K_{\text{GMM}} = 2N = 12$（$N=6$个已知类，每类2个分量），旨在让每个类别被1-2个分量覆盖，同时允许类别内部存在子结构。协方差类型采用完全协方差矩阵（full），每个分量$\boldsymbol{\Sigma}_k \in \mathbb{R}^{64 \times 64}$包含全部维度间的相关性信息。对数似然优化目标为
+**OSR loss** \(\mathcal{L}_{\text{osr}}\) is binary cross-entropy on the open-set scores [5], [6]: known queries are assigned label 1 (accept), unknown queries label 0 (reject). The loss is applied at the output of the active OSR detection head and is the primary training signal for heads that contain learnable parameters (ext_v2, fusion_v2).
 
-【公3.8】$\log P(\mathbf{X}) = \sum_{i=1}^{n}\log\left[\sum_{k=1}^{K}\pi_k \mathcal{N}(\mathbf{x}_i | \boldsymbol{\mu}_k, \boldsymbol{\Sigma}_k)\right]$
+**Reciprocal loss** \(\mathcal{L}_{\text{rec}}\) implements the reciprocal point constraint from [9] with weight \(\lambda_{\text{rec}} = 0.3\). It pushes the anti-prototype \(\mathbf{a}\) away from all known-class embeddings while regularizing its norm, ensuring that \(\mathbf{a}\) remains a meaningful negative reference point throughout training.
 
-参数通过EM算法[引30]估计，马勇等人[引52]也曾将GMM应用于音频场景分类。实验中在200轮迭代内收敛，训练时加入正则化$\boldsymbol{\Sigma}_k \leftarrow \boldsymbol{\Sigma}_k + 10^{-6}I$以保证正定性。
+**Separation loss** \(\mathcal{L}_{\text{sep}}\) encourages the feature representations of known and unknown samples to occupy distinct regions of the embedding space [24]. It is implemented as a contrastive term with weight \(\lambda_{\text{sep}} = 0.02\) that penalizes overlap between the two distributions. Gradients are globally clipped to stabilize training, particularly during early episodes when the anti-prototype and class prototypes are poorly initialized.
 
-3.4.2 聚类特征提取
+### E. Model Configuration Variants
 
-GMM参数确定后，对任意输入样本$\mathbf{x}$提取三个聚类特征。
+**[Insert TABLE 1 about here.]**
 
-第一个特征是到最近GMM分量的Mahalanobis距离：
+**TABLE 1.** Model configuration variants for ablation experiments. All variants share the YAMNet backbone [11], the episodic sampling protocol, and optimizer settings (AdamW, learning rate \(2 \times 10^{-4}\), 200 warmup steps, 3000 training episodes).
 
-【公3.9】$d_{\text{cluster}}(\mathbf{x}) = \min_{k=1,\ldots,K}\sqrt{(f_\phi(\mathbf{x}) - \boldsymbol{\mu}_k)^\top \boldsymbol{\Sigma}_k^{-1}(f_\phi(\mathbf{x}) - \boldsymbol{\mu}_k)}$
+To isolate the contribution of each architectural component, we define six configurations obtained by selectively removing elements from the full model. TABLE 1 lists the variants. The `full_model` includes the Flow Transform, the active OOD head, the reciprocal loss, and per-episode threshold adaptation. Each subsequent variant strips one component: `wo_flow_transform` removes the normalizing flow [17], [18]; `wo_ood_head` disables the OSR-specific training loss, retaining only classification cross-entropy and separation loss; `wo_reciprocal` drops the reciprocal attention term [9]; `wo_threshold` replaces the calibrated per-episode threshold with a fixed percentile; and `only_distance_head` reduces the system to the bare Mahalanobis detector [8] with no flow, no OOD-specific training, and no reciprocal regularization—the simplest configuration in the ablation space.
 
-与类条件Mahalanobis距离不同，这里的$\boldsymbol{\mu}_k$和$\boldsymbol{\Sigma}_k$来自全局GMM而非单类估计，12个分量与6个类之间不构成一一对应，因此$d_{\text{cluster}}$度量的是样本到最近聚类中心的统计距离，能够捕捉类别内部的子结构。
-
-第二个特征是GMM后验概率的最大值：
-
-【公3.10】$p_{\max}(\mathbf{x}) = \max_{k=1,\ldots,K}\gamma_k(f_\phi(\mathbf{x}))$
-
-已知类样本的后验高度集中于某个分量（$p_{\max}$接近1），未知类样本后验在多个分量上分散（$p_{\max}$较低）。
-
-第三个特征是后验分布的信息熵：
-
-【公3.11】$H_{\text{cluster}}(\mathbf{x}) = -\sum_{k=1}^{K}\gamma_k(f_\phi(\mathbf{x}))\log\gamma_k(f_\phi(\mathbf{x}))$
-
-熵从信息论角度量化归属的不确定性。已知类后验呈尖峰状（低熵），未知类后验趋于均匀（高熵）。当$K=12$时最大熵为$\log 12 \approx 2.485$，典型已知类样本熵值低于0.5。
-
-【图3.4】GMM聚类特征示意图。二维示意空间中12个分量以等密度椭圆表示。已知类样本（蓝三角）靠近某分量中心，$d_{\text{cluster}}=0.8$、$p_{\max}=0.92$、$H=0.31$；未知类样本（红方块）远离所有中心，$d_{\text{cluster}}=3.7$、$p_{\max}=0.18$、$H=2.1$。
-
-3.4.3 13维扩展OOD特征向量
-
-三个GMM聚类特征与原有10维OOD特征组合构成13维扩展特征向量。第1-10维从原型距离、分类器输出和特征范数三个层面描述已知/未知属性，关注的是样本与"类别"（离散标签）的关系。第11-13维为本文新增的GMM聚类特征，关注样本与"聚类"（连续概率分布分量）的关系，能够捕捉类别内部的细微结构差异。
-
-3.4.4 逻辑回归OOD分类器
-
-以13维特征向量$\mathbf{h}_{13}(x)$为输入，训练逻辑回归分类器。训练数据来自校准集，训练前进行Z-score标准化，采用$L_2$正则化（$C=1.0$）和class_weight='balanced'缓解样本不均衡。逻辑回归学习到的权重中，特征范数权重+5.8004（范数越大越倾向已知类），全局中心距离权重-4.2817（距离越大越倾向未知类），GMM后验熵权重-0.4769（熵越高越倾向未知类），三个GMM特征的权重方向均与理论预期一致。OOD评分定义为
-
-【公3.12】$s_{\text{ood}}(x) = P(\text{known}|\mathbf{h}_{13}(x)) = \sigma(\mathbf{w}^\top \hat{\mathbf{h}}_{13}(x) + b)$
-
-3.5 几何-统计双信号融合框架
-
-3.5.1 Z-score归一化与加权融合
-
-几何信号$s_{\text{anti}}$和统计信号$s_{\text{ood}}$具有不同的物理含义和数值范围。先对两路评分分别Z-score归一化：
-
-【公3.13】$\hat{s}_{\text{anti}} = \frac{s_{\text{anti}} - \mu_{\text{anti}}}{\sigma_{\text{anti}}}, \quad \hat{s}_{\text{ood}} = \frac{s_{\text{ood}} - \mu_{\text{ood}}}{\sigma_{\text{ood}}}$
-
-融合评分定义为
-
-【公3.14】$s_{\text{ens}}(x) = \alpha \cdot \hat{s}_{\text{anti}}(x) + (1-\alpha) \cdot \hat{s}_{\text{ood}}(x)$
-
-3.5.2 Youden J最优融合权重搜索
-
-最优权重通过在校准集上最大化Youden J统计量确定：
-
-【公3.15】$\alpha^* = \arg\max_{\alpha \in \mathcal{A}} J(\alpha) = \arg\max_{\alpha \in \mathcal{A}}(\text{TNR}_\alpha + \text{TPR}_\alpha - 1)$
-
-搜索空间$\mathcal{A} = \{0.3, 0.4, \ldots, 0.9\}$。对每个候选$\alpha$，以校准集已知类评分的第5百分位数作为阈值（保证TNR≈95%），计算对应TPR和J值。实验确定$\alpha^* = 0.6$，非极端值表明两路信号确实提供了互补信息。
-
-【图3.5】融合权重搜索曲线。X轴为$\alpha$，主Y轴为Youden J值，$\alpha=0.6$处J值最高。
-
-3.5.3 互补性分析
-
-几何信号$s_{\text{anti}}$仅利用查询样本到原型和反原型的最小距离，是"局部"度量。统计信号$s_{\text{ood}}$综合13个特征维度，既包含局部信息（$d_{\min}$、$p_{\max}^{\text{softmax}}$），也包含全局信息（$d_{\text{center}}$、$d_{\text{cluster}}$、$H_{\text{cluster}}$），是"多尺度"度量。两类信号的误差模式不完全相关，这正是集成学习理论[引21][引22]中多样性带来增益的体现；刘越等人[引51]综述了基于集成学习的分布外检测方法。
-
-3.6 Episodic元训练策略
-
-3.6.1 Episode构建与损失函数
-
-Episodic训练[引1][引2]通过模拟测试时的任务结构来组织训练。每个Episode从$N$个已知类中随机采样$N_{\text{way}}$个类别，每类$K_{\text{shot}}$个样本构成支持集、$Q_{\text{query}}$个样本构成查询集。为增强鲁棒性，训练时对原型加入高斯扰动$\epsilon \sim \mathcal{N}(\mathbf{0}, 0.15^2 I)$。
-
-总损失由四个分量构成：
-
-【公3.16】$\mathcal{L} = \mathcal{L}_{\text{CE}} + \lambda_1 \mathcal{L}_{\text{density}} + \lambda_2 \mathcal{L}_{\text{entropy}} + \lambda_3 \mathcal{L}_{\text{sep}}$
-
-分类损失$\mathcal{L}_{\text{CE}} = -\frac{1}{|Q|}\sum_{(x,y) \in Q}\log P(y|x)$通过带$\tanh$截断的交叉熵计算。原型分离损失最大化不同类别原型之间的距离：
-
-【公3.18】$\mathcal{L}_{\text{sep}} = -\frac{1}{N(N-1)}\sum_{i \neq j}\|\mathbf{p}_i - \mathbf{p}_j\|_2^2$
-
-该损失确保各类原型在嵌入空间中充分分散，为开放集检测提供更清晰的决策边界——原型间距越大，已知类覆盖区域与开放空间之间的间隙越宽，反原型评分的区分度随之提高。
-
-3.6.2 训练策略
-
-训练采用分阶段的课程学习策略。前500个Episode为预热阶段，仅优化$\mathcal{L}_{\text{CE}}$，学习率从0线性升至$10^{-4}$。预热后逐步引入正则化损失，权重从0线性增长至目标值。优化器采用AdamW（权重衰减$10^{-2}$，amsgrad变体），学习率以余弦退火调度降至$10^{-7}$。梯度累积步数设为4，梯度裁剪阈值0.5。共训练4000个Episode，每200个Episode评估一次，连续3000个Episode验证准确率未提升则触发早停。
-
-【表3.4】元训练超参数配置
-
-| 参数 | 值 | 参数 | 值 |
-|------|-----|------|-----|
-| $N_{\text{way}}/K_{\text{shot}}/Q_{\text{query}}$ | 6/5/15 | 优化器 | AdamW |
-| 训练Episode数 | 4000（早停3000） | 学习率 | $10^{-4}$→$10^{-7}$ |
-| 温度参数$\tau$ | 可学习，初始10.0 | 梯度累积 | 4 |
-| $\lambda_{\text{density}}/\lambda_{\text{entropy}}/\lambda_{\text{sep}}$ | 0.1/0.05/0.05 | 原型噪声$\sigma$ | 0.15 |
+All variants share the same YAMNet backbone [11], the same episode sampling procedure, and the same optimizer settings (AdamW, learning rate \(2 \times 10^{-4}\), 200 warmup steps, 3000 training episodes). Cross-configuration comparisons therefore reflect genuine architectural differences rather than confounding factors in the training protocol.

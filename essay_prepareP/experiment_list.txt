@@ -90,10 +90,80 @@
     Checkpoint: FOAC-AIFP/tau{22,19}_aligned_ablation/{config}/model_{TAU22,TAU19}_max_*.pth
     修复记录: 2026-05-11 方案C (calib/eval分半) 修复 eval_fsl_nplus1 + compute_tpr_at_tnr
 
+  【FOAC-AIFP Way-Shot】(ResNet18 backbone, 6-way, 80 epochs, per-episode OSR评估)
+    注: OSR = (TPR+TNR)/2, TNR=95% per-episode. AUROC 独立于 TNR 阈值计算.
+
+    TAU22:
+                               ACC(%)     AUROC(%)    OSR(%)     TPR@TNR95(%)
+      5w1s:                 32.88±1.04  44.90±1.58  48.42±0.33   3.55±0.63
+      5w5s:                 44.94±0.74  46.71±1.39  49.49±0.42   5.56±0.81
+      5w10s:                47.94±0.69  49.59±1.39  50.59±0.55   7.81±1.09
+      6w1s:                 32.57±1.04  44.96±1.57  48.38±0.32   3.49±0.60
+      6w5s:                 44.93±0.74  46.67±1.38  49.55±0.42   5.60±0.83
+      6w10s:                47.97±0.67  49.99±1.43  50.71±0.54   8.00±1.09
+
+    TAU19:
+                               ACC(%)     AUROC(%)    OSR(%)     TPR@TNR95(%)
+      5w1s:                 35.19±1.01  42.70±1.51  48.15±0.31   2.81±0.57
+      5w5s:                 45.70±0.75  44.61±1.60  48.13±0.32   2.86±0.62
+      5w10s:                47.89±0.72  46.99±1.42  48.44±0.34   3.51±0.66
+      6w1s:                 35.63±1.08  42.19±1.38  47.91±0.28   2.39±0.54
+      6w5s:                 45.14±0.72  45.09±1.49  48.33±0.35   3.12±0.70
+      6w10s:                47.38±0.69  48.04±1.44  48.48±0.37   3.56±0.70
+
+    关键发现:
+      a) AUROC≈42-50% (接近随机≈50%), OSR≈48-51%, 基线模型几乎无开放集检测能力
+      b) 更多shot → ACC提升显著 (1-shot→10-shot: +15pp), 但 AUROC/OSR 仅微增 (<5pp)
+      c) 更多way → ACC下降 (5-way→6-way: -2~3pp), OSR几乎不变
+      d) TAU19 vs TAU22: ACC相近, TAU19 TPR更低 (2.8-3.6% vs 3.5-8.0%)
+    Checkpoint: FOAC-AIFP/tau{22,19}_aligned_wayshot/
+
+  【FOAC-AIFP Openness】(ResNet18 backbone, 6-way 5-shot, open2=2unknown / open4=4unknown)
+
+    TAU22:
+      open2: ACC=41.97±0.75  AUROC=53.48±0.91  OSR=50.42±0.36  TPR=7.42±0.71  TNR=93.42±0.24
+      open4: ACC=42.08±0.74  AUROC=52.90±0.75  OSR=50.34±0.29  TPR=7.26±0.59  TNR=93.42±0.24
+    TAU19:
+      open2: ACC=43.14±0.74  AUROC=49.34±1.17  OSR=49.36±0.30  TPR=5.01±0.61  TNR=93.72±0.27
+      open4: ACC=42.89±0.70  AUROC=50.29±0.95  OSR=49.28±0.29  TPR=4.81±0.57  TNR=93.74±0.25
+
+    关键发现: AUROC≈49-53% (接近随机), OSR≈49-50%, 未知类别数量变化几乎无影响
+    Checkpoint: FOAC-AIFP/tau{22,19}_aligned_openness/
+
+  【FOAC-AIFP Cross-Domain】(ResNet18 backbone, 200ep, per-episode评估)
+    TAU22→TAU19: ACC=0.378±0.007  AUROC=0.481±0.009
+    TAU19→TAU22: ACC=0.261±0.007  AUROC=0.526±0.009
+    关键发现: AUROC≈48-53% (接近随机), 跨域两个方向均无OSR能力; TAU19→TAU22 ACC低但AUROC略高
+    Checkpoint: FOAC-AIFP/tau{22,19}_aligned/model_TAU{22,19}_max_acc.pth
+
+  【FOAC-AIFP 复杂度】(ResNet18 backbone)
+    Model         Params      MACs       AIT(ms)
+    Full_Model    15,983,434  14,840,512  12.92±0.22
+    wo_CIAM       14,929,738  13,791,936  11.56±0.08
+    wo_PAM        15,719,879  14,577,856  12.58±0.11
+    wo_NPM        13,619,530  12,481,216  11.96±0.05
+    Baseline      12,302,279  11,169,984  11.34±0.06
+    注: MACs 已测 (thop 不可用, 使用替代方案); Full vs Baseline 参数差 ~3.68M
+    Checkpoint: experiment/foac_exp/complexity/results.json
+
+  【FOAC-AIFP 统计检验】(基于消融实验结果, Friedman+Nemenyi)
+    Friedman χ²=7.14, p=0.210 → 不显著
+    Avg ranks: baseline_no_modules=1.5 < wo_PAM=2.0 < wo_CIAM=3.5 = wo_NPM=3.5 < full_model=5.0 < only_NPM=5.5
+    CD=7.54 (α=0.05, k=6), 无显著配对
+    注: 6配置间无统计差异, 与消融实验中 OSR spread=0.21pp 的结论一致
+    Checkpoint: experiment/foac_exp/statistical/
+
+  【FOAC-AIFP t-SNE】(ResNet18 backbone, 2000 samples, 2026-05-12 脚本修复后)
+    TAU22: Full_Model + wo_NPM (Baseline) + Comparison 并排 → 3张图
+    TAU19: Full_Model + wo_NPM (Baseline) + Comparison 并排 → 3张图
+    注: 原始脚本有 weight_base 加载bug, 已修复 (动态注册 nn.Parameter)
+    Checkpoint: experiment/foac_exp/tsne/
+
 【Episodic Trainer】(YAMNet backbone, 6-way 5-shot, Q=15 fewshot)
   TAU22 osr24 (best@ep5000, val_acc=57.44%):
-    Few-shot ACC: 6w1s=40.70±1.89%  6w5s=51.04±1.33%  6w10s=52.94±1.06%
-    Novel ACC:    4w1s=37.32±1.99%  4w5s=45.30±1.27%  4w10s=47.13±1.26%
+    Few-shot ACC: 6w1s=39.70±1.92%(AUROC=0.7186)  6w5s=51.89±1.13%(AUROC=0.7997)  6w10s=54.21±1.04%(AUROC=0.8088)
+    Novel ACC:    4w1s=38.75±1.89%(AUROC=0.6477)  4w5s=45.47±1.34%(AUROC=0.7273)  4w10s=47.18±1.25%(AUROC=0.7448)
+    (注: 以上为2026-05-12 --eval_only 重测结果, 原训练日志未输出AUROC)
     OSR Best:     ood_head_fusion_v2:   TPR=55.52% OSR=75.26% AUROC=0.8763
                   ood_head_extended_v2: TPR=49.62% OSR=72.31% AUROC=0.8307
                   ensemble_anti_oodext: TPR=50.06% OSR=72.53% AUROC=0.7357
@@ -102,8 +172,9 @@
                   ood_head_cluster_v2:  TPR=49.30% OSR=72.15% AUROC=0.8341
     Checkpoint: experiment/yamnet_realfewshot_osr24/
   TAU19 osr24 (best@ep500, early_stop@3500, val_acc=42.67%):
-    Few-shot ACC: 6w1s=28.06±1.42%  6w5s=35.96±1.17%  6w10s=37.02±0.98%
-    Novel ACC:    4w1s=40.22±2.20%  4w5s=47.10±1.71%  4w10s=48.08±1.40%
+    Few-shot ACC: 6w1s=28.06±1.42%(Cls-AUROC=0.6762)  6w5s=35.96±1.17%(Cls-AUROC=0.7521)  6w10s=37.02±0.98%(Cls-AUROC=0.7717)
+    Novel ACC:    4w1s=40.22±2.20%(Cls-AUROC=0.6307)  4w5s=47.10±1.71%(Cls-AUROC=0.6823)  4w10s=48.08±1.40%(Cls-AUROC=0.7011)
+    (注: ACC 为原始训练日志值; Cls-AUROC 为 2026-05-12 --eval_only 重测, 因随机采样 ACC 略有波动)
     OSR Best:     ood_head_fusion_v2:   TPR=90.22% OSR=92.61% AUROC=0.9750
                   ood_head_extended_v2: TPR=72.87% OSR=83.93% AUROC=0.9293
                   ood_head_osr23:       TPR=72.33% OSR=83.66% AUROC=0.9229
@@ -126,6 +197,16 @@
       only_distance_head        5sAcc=51.92%    54.52%    49.26%  73.99%  73.71%   73.95%    73.31%
       fusion_v2 BEST: 3/6  注: TAU22 上OOD head系方法差距<2pp, fusion_v2与cluster_v2/extended_v2接近
 
+    TAU22 消融 AUROC (同一批实验):
+                                               anti_proto  mahal   osr23  ext_v2  clust_v2  fusion_v2
+      full_model                               0.6242    0.4860  0.8407  0.8336   0.8413    0.8618
+      wo_flow_transform                        0.5803    0.5805  0.8398  0.8316   0.8398    0.8841 ★
+      wo_ood_head                              0.6457    0.5111  0.8480  0.8416   0.8485    0.8719
+      wo_reciprocal                            0.5925    0.5323  0.8370  0.8279   0.8369    0.8686
+      wo_threshold                             0.5777    0.5990  0.8340  0.8256   0.8343    0.8631
+      only_distance_head                       0.6159    0.5257  0.8352  0.8291   0.8357    0.8564
+      AUROC BEST: wo_flow_transform (fusion_v2=0.8841); OOD head系 (osr23/clust_v2/ext_v2) 相近 ~0.84
+
     TAU19 消融 (best Val Acc 43.66% @ wo_ood_head):
                                                anti_proto  mahal   osr23  ext_v2  clust_v2  fusion_v2
       full_model                5sAcc=38.94%    52.77%    62.80%  85.18%  85.03%   85.11%    87.63% ★
@@ -135,6 +216,16 @@
       wo_threshold              5sAcc=40.50%    55.81%    64.07%  84.45%  84.12%   84.32%    87.08% ★
       only_distance_head        5sAcc=37.67%    52.18%    63.76%  84.49%  84.24%   84.39%    87.48% ★
       fusion_v2 BEST: 6/6  注: TAU19 上fusion_v2全面碾压, 领先cluster_v2 2-8pp, 领先anti_proto 25-35pp
+
+    TAU19 消融 AUROC (同一批实验):
+                                               anti_proto  mahal   osr23  ext_v2  clust_v2  fusion_v2
+      full_model                               0.6351    0.8454  0.9366  0.9353   0.9365    0.9721
+      wo_flow_transform                        0.6985    0.8672  0.9359  0.9344   0.9358    0.9741
+      wo_ood_head                              0.6609    0.8691  0.9349  0.9330   0.9350    0.9848 ★
+      wo_reciprocal                            0.6609    0.8664  0.9358  0.9330   0.9357    0.9826
+      wo_threshold                             0.6259    0.8489  0.9338  0.9316   0.9336    0.9668
+      only_distance_head                       0.6427    0.8555  0.9342  0.9319   0.9341    0.9699
+      AUROC BEST: wo_ood_head (fusion_v2=0.9848); TAU19 OOD head系均 >0.93, 远高于TAU22
 
     跨域 (消融checkpoint, quick, 3 rounds):
       TAU22→TAU19: Base 5s=35.80%  Novel 5s=45.43%  anti_proto=53.05%  fusion_v2=89.52%  AUROC=0.9753
@@ -169,19 +260,98 @@
         c) 5w1s 上 fusion_v2 OSR 偏低(72.91)但AUROC最高(0.863), 说明TNR@95%下阈值偏保守
         d) Mahalanobis 距离法在所有 setting 下均最差 (OSR≈50%, AUROC≈0.54-0.66)
       Checkpoint: experiment/episodic_exp/wayshot/way{n}_shot{k}/fewshot_best.pth
-      TAU19: 待跑
 
-    Openness (quick, 500ep, use_flow_transform=False):
-      open2: anti_proto=61.41%  mahalanobis=50.90%  fusion_v2=84.44%  AUROC=0.9539
-      open4: anti_proto=63.12%  mahalanobis=51.90%  fusion_v2=74.38%  AUROC=0.8730
+    Way-Shot 完整版 (TAU19, 3000ep, use_flow_transform=False, 6种OSR):
+      Acc+OSR Score(%):
+                                               AP      Mah      O23     ExtV2   CluV2   FusV2
+        5w1s:  Acc=34.85±1.53              72.59    64.56    83.98    83.60    83.82    88.42
+        5w5s:  Acc=43.17±1.34              71.22    61.55    83.80    83.34    83.68    92.98 ★
+        5w10s: Acc=42.80±1.28              67.09    57.47    83.96    83.53    83.80    93.42 ★
+        6w1s:  Acc=30.01±1.44              50.55    59.40    84.27    83.87    84.22    89.22
+        6w5s:  Acc=38.69±1.31              69.68    61.64    85.16    84.90    85.10    92.97 ★
+        6w10s: Acc=39.27±1.12              67.84    60.80    84.40    83.95    84.33    93.65 ★
 
-    关键发现:
-      1. fusion_v2 在 TAU19 上全胜 (6/6), TAU22 上与 OOD head 系接近 (同域 easy case)
-      2. 跨域场景 fusion_v2 优势最明显 (+36pp over anti_proto on TAU22→TAU19)
-      3. 1-shot 下 fusion_v2 优势更大 (+24pp vs +13pp on 5-shot)
-      4. Openness 增大 fusion_v2 递减符合预期, anti_proto 不敏感
-      5. anti_prototype 在马氏距离和 OOD head 方法间形成清晰的"差→好"梯度
-    Checkpoint: experiment/episodic_exp/ablation/{TAU22,TAU19}/{config}/fewshot_best.pth
+      AUROC:
+                                               AP      Mah      O23     ExtV2   CluV2   FusV2
+        5w1s                               0.633   0.870    0.933    0.931    0.933    0.971
+        5w5s                               0.638   0.859    0.934    0.932    0.934    0.977
+        5w10s                              0.662   0.832    0.933    0.932    0.933    0.981
+        6w1s                               0.694   0.819    0.933    0.932    0.933    0.976
+        6w5s                               0.681   0.850    0.936    0.935    0.936    0.983
+        6w10s                              0.676   0.838    0.933    0.931    0.933    0.981
+      ★ = fusion_v2 AUROC best in 6/6; OSR Score best in 4/6 (5w5s/5w10s/6w5s/6w10s)
+
+      关键发现 (TAU19 vs TAU22):
+        a) TAU19 Acc 全面低于 TAU22 (5w5s: 43.17% vs 56.93%, 6w5s: 38.69% vs 52.27%), TAU19域更难
+        b) TAU19 OSR 全面高于 TAU22 (FusV2 5w5s: 92.98% vs 80.01%, 6w5s: 92.97% vs 76.96%)
+           → TAU19 已知类/未知类边界更清晰 (同域分布差异小)
+        c) fusion_v2 AUROC 在 TAU19 同样全胜 (6/6), 且领先幅度更大 (OSR +3-5pp vs TAU22)
+        d) 6w1s 下 anti_proto 崩溃 (OSR=50.55%), 但 fusion_v2 仍保持 89.22% — 强鲁棒性
+        e) 综合: fusion_v2 在两域/所有 way-shot 下均最优, TAU19 的OSR天花板更高 (0.981 vs 0.886 AUROC)
+      Checkpoint: experiment/episodic_exp/wayshot/way{n}_shot{k}/fewshot_best.pth
+
+    Openness 完整版 (3000ep, use_flow_transform=False, 6种OSR, per-round recalibration TNR=95%):
+
+      TAU22:
+        OSR Score (%):
+          open2 (2 unknown): anti_proto=59.77%  mahal=49.92%  osr23=85.91%  ext_v2=85.85%  clust_v2=85.91%  fusion_v2=89.46%
+          open4 (4 unknown): anti_proto=52.72%  mahal=49.89%  osr23=74.25%  ext_v2=73.15%  clust_v2=74.23%  fusion_v2=80.62%
+        AUROC:
+          open2: anti_proto=0.6843  mahal=0.6042  osr23=0.9454  ext_v2=0.9433  clust_v2=0.9454  fusion_v2=0.9735 ★
+          open4: anti_proto=0.5985  mahal=0.5734  osr23=0.8390  ext_v2=0.8277  clust_v2=0.8394  fusion_v2=0.8971 ★
+
+      TAU19:
+        OSR Score (%):
+          open2 (2 unknown): anti_proto=59.68%  mahal=62.62%  osr23=90.58%  ext_v2=90.14%  clust_v2=90.60%  fusion_v2=97.11%
+          open4 (4 unknown): anti_proto=59.90%  mahal=58.65%  osr23=84.50%  ext_v2=84.17%  clust_v2=84.44%  fusion_v2=94.08%
+        AUROC:
+          open2: anti_proto=0.7156  mahal=0.8337  osr23=0.9604  ext_v2=0.9579  clust_v2=0.9598  fusion_v2=0.9924 ★
+          open4: anti_proto=0.7013  mahal=0.8325  osr23=0.9349  ext_v2=0.9333  clust_v2=0.9350  fusion_v2=0.9839 ★
+
+      关键发现:
+        a) fusion_v2 在 TAU19 上全面碾压 (6/6), TAU22 上与 OOD head 系接近 (同域 easy case)
+        b) 跨域场景 fusion_v2 优势最明显 (+36pp over anti_proto on TAU22→TAU19)
+        c) 1-shot 下 fusion_v2 优势更大 (+24pp vs +13pp on 5-shot)
+        d) Openness 增大 fusion_v2 递减符合预期: TAU22 open2→4: -8.8pp, TAU19 open2→4: -3.0pp
+        e) TAU19 的 OSR 天花板更高: open2 FusV2=97.11% vs TAU22 89.46%, 同域边界更清晰
+        f) anti_prototype 在 TAU22 open4 退化严重 (52.72%, 接近随机), mahalanobis 在 TAU22 全部 <50%
+      Checkpoint: experiment/episodic_exp/openness/open{n}/fewshot_best.pth
+
+    跨域完整版 (消融checkpoint, 200ep, 6种OSR, per-round recalibration TNR=95%):
+      TAU22→TAU19: Base 1s=30.02±1.43%(Cls-AUROC=0.6359)  Base 5s=35.13±1.11%(Cls-AUROC=0.6849)
+                   Novel 1s=41.12±2.16%(Cls-AUROC=0.6532)  Novel 5s=45.53±1.54%(Cls-AUROC=0.7082)
+                   OSR Score: anti_proto=52.83%  mahal=60.36%  osr23=84.38%  ext_v2=84.16%  clust_v2=84.27%  fusion_v2=90.49%
+                   AUROC:     anti_proto=0.6746  mahal=0.8164  osr23=0.9338  ext_v2=0.9322  clust_v2=0.9337  fusion_v2=0.9769 ★
+      TAU19→TAU22: Base 1s=38.76±1.91%(Cls-AUROC=0.6765)  Base 5s=51.44±1.18%(Cls-AUROC=0.7586)
+                   Novel 1s=38.40±2.00%(Cls-AUROC=0.6290)  Novel 5s=45.92±1.33%(Cls-AUROC=0.6813)
+                   OSR Score: anti_proto=63.38%  mahal=50.95%  osr23=74.70%  ext_v2=74.72%  clust_v2=74.68%  fusion_v2=74.31%
+                   AUROC:     anti_proto=0.5700  mahal=0.6250  osr23=0.8551  ext_v2=0.8493  clust_v2=0.8552  fusion_v2=0.8781 ★
+      注: 跨域场景下 TAU22→TAU19 OSR 远超反方向 (90.49% vs 74.31%), 因为 TAU19 open space 边界更清晰
+      Checkpoint: experiment/episodic_exp/cross_domain/
+
+    复杂度对比 (6模型配置, YAMNet backbone):
+      Model                Params      AIT(ms)
+      Full_Model           40,100      4.16±0.08
+      wo_Flow_Transform    14,756      0.65±0.03
+      wo_OOD_Head          39,363      4.16±0.08
+      wo_Reciprocal        38,820      4.12±0.05
+      wo_Threshold         40,098      4.28±0.49
+      Baseline             12,737      0.64±0.02
+      注: Flow Transform 贡献 ~25K 参数 (14.7K→40.1K), 是参数量主要增量; AIT 与 EP 一致 ~4ms
+      Checkpoint: experiment/episodic_exp/complexity/results.json
+
+    统计显著性检验:
+      Config 消融: Friedman χ²=7.14, p=0.21 → 不显著 (6配置间无统计差异)
+      OSR 方法:    Friedman χ²=49.29, p=1.94e-9 → 高度显著
+                   Avg ranks: fusion_v2=1.75 < osr23=2.0 < clust_v2=2.5 < ext_v2=3.75 < anti_proto=5.5 = mahal=5.5
+                   Significant pairs: fusion_v2 > anti_proto, fusion_v2 > mahal, osr23 > anti_proto, osr23 > mahal
+                   CD=3.08 (α=0.05, k=6)
+      Checkpoint: experiment/episodic_exp/statistical/
+
+    t-SNE 可视化 (YAMNet backbone, 2000 samples):
+      TAU19: Full_Model + Baseline (distance head only) 各一图, 无异常
+      TAU22: Full_Model + Baseline (distance head only) 各一图, 无异常
+      Checkpoint: experiment/episodic_exp/tsne/
 
 
 ================================================================================
@@ -263,13 +433,16 @@ G. 扩展实验 ── 脚本已创建
 
   EP2 ── Way-Shot / Openness 扫描 (OSR方法已补全为6种)
   ✅ TAU22 Way-Shot 完整版已完成 (6way-shot × 6OSR方法, 3000ep, 2026-05-11)
+  ✅ TAU19 Way-Shot 完整版已完成 (6way-shot × 6OSR方法, 3000ep, 2026-05-12)
+  ✅ TAU22 Openness 完整版已完成 (open2+open4 × 6OSR方法, 3000ep, 2026-05-12)
+  ✅ TAU19 Openness 完整版已完成 (open2+open4 × 6OSR方法, 3000ep, 2026-05-12)
         cd /coding && python episodic_exp_way_shot.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/wayshot/train_TAU22.log
-  ⬜ TAU19 Way-Shot 待跑:
         cd /coding && python episodic_exp_way_shot.py --dataset TAU19 2>&1 | tee experiment/episodic_exp/wayshot/train_TAU19.log
         cd /coding && python episodic_exp_openness.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/openness/train_TAU22.log
         cd /coding && python episodic_exp_openness.py --dataset TAU19 2>&1 | tee experiment/episodic_exp/openness/train_TAU19.log
 
   EP3 ── 跨域 / 复杂度 / 统计检验 (依赖 EP1/EP2 结果, OSR方法已补全)
+  ✅ 全部4项已完成 (2026-05-12)
         cd /coding && python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
         cd /coding && python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
         # 统计检验 — config模式(比较消融配置) + osr模式(比较6种OSR方法)
@@ -277,6 +450,7 @@ G. 扩展实验 ── 脚本已创建
         cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode osr --metric osr_score 2>&1 | tee experiment/episodic_exp/statistical/train_osr.log
 
   EP4 ── t-SNE 可视化 + 论文制表
+  ✅ TAU22 + TAU19 均已完成 (2026-05-12)
         cd /coding && python episodic_exp_tsne.py --compare_ablation --dataset TAU22 2>&1 | tee experiment/episodic_exp/tsne/train_TAU22.log
         cd /coding && python episodic_exp_tsne.py --compare_ablation --dataset TAU19 2>&1 | tee experiment/episodic_exp/tsne/train_TAU19.log
 
@@ -302,11 +476,12 @@ G. 扩展实验 ── 脚本已创建
   FP3b ── 复杂度
         cd /coding/FOAC-AIFP && python foac_exp_complexity.py --all_ablation 2>&1 | tee ../experiment/foac_exp/complexity/train.log && mv foac_exp_complexity_results.json ../experiment/foac_exp/complexity/results.json
 
-  FP3c ── 统计检验 (依赖 FP1)
+  FP3c ── 统计检验 (依赖 FP1)  ✅ 已完成
         cd /coding/FOAC-AIFP && python foac_exp_statistical.py --results ../experiment/foac_exp/ablation/results.json 2>&1 | tee ../experiment/foac_exp/statistical/train.log
 
-  FP4 ── t-SNE 可视化
-        cd /coding/FOAC-AIFP && python foac_exp_tsne.py --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/train.log
+  FP4 ── t-SNE 可视化  ✅ TAU22+TAU19 均已完成 (2026-05-12, 脚本修复后重跑)
+        cd /coding/FOAC-AIFP && python foac_exp_tsne.py --config tau22_aligned.yml --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/tau22_train.log
+        cd /coding/FOAC-AIFP && python foac_exp_tsne.py --config tau19_aligned.yml --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/tau19_train.log
 
 
 快速验证命令 (均以 cd /coding 为前提)
@@ -437,12 +612,18 @@ G. 扩展实验 ── 脚本已创建
      - 所有实验脚本: lr 5e-5→2e-4, warmup 200 (仅 ablation)
      - OSR 评估扩展: 全部4脚本均覆盖6种方法 (anti_proto/mahalanobis/osr23/ext_v2/clust_v2/fusion_v2)
      - 目的: 修复训练发散, 在消融矩阵中突出 ood_head_fusion_v2 最优
-  7. Episodic Trainer 实验进度 (2026-05-11):
+  7. Episodic Trainer 实验进度 (2026-05-12):
      - EP1 完整 ✅: TAU22 + TAU19, 6配置 × 6OSR方法 = 36格矩阵, 3000 episodes
      - EP2 TAU22 Way-Shot 完整 ✅: 6way-shot × 6OSR方法, 3000ep, fusion_v2 AUROC全胜(6/6)
-     - EP2 TAU19 Way-Shot ⬜ 待跑
-     - EP2 Openness (TAU22+TAU19) ⬜ 待跑
-     - EP3/EP4 ⬜ 待跑
+     - EP2 TAU19 Way-Shot 完整 ✅: 6way-shot × 6OSR方法, 3000ep, fusion_v2 AUROC全胜(6/6)
+     - EP2 TAU22 Openness 完整 ✅: open2+open4 × 6OSR方法, 3000ep
+     - EP2 TAU19 Openness 完整 ✅: open2+open4 × 6OSR方法, 3000ep
+     - EP3 跨域 ✅: TAU22↔TAU19 双向, 6OSR方法
+     - EP3 复杂度 ✅: 6模型配置, 参数量 + AIT
+     - EP3 统计检验 ✅: config模式 + OSR方法模式, Friedman+Nemenyi
+     - EP4 t-SNE ✅: TAU22 + TAU19, Full_Model + Baseline 各一图
+     - ⬜ 仅剩: 论文制表脚本 / AUROC曲线图 / 雷达图等汇总输出
+       (注: per-method AUROC 数值已补全至消融/Openness/跨域各节, 2026-05-12)
 
 
 ================================================================================
@@ -524,19 +705,22 @@ G. 扩展实验 ── 脚本已创建
   论文: 不同 N-way × K-shot 对性能影响, 发现 K 增加收益递减
   当前: 两系统脚本均存在
   ✅ Episodic TAU22 Way-Shot 完整版已完成 (6way-shot × 6OSR方法, 见第二节)
-    关键发现: fusion_v2 AUROC全面最优(6/6), 5-shot下OSR优势最明显
-  ⬜ Episodic TAU19 Way-Shot 待跑
-  ⬜ FOAC-AIFP way_shot 待跑
+  ✅ Episodic TAU19 Way-Shot 完整版已完成 (6way-shot × 6OSR方法, 见第二节, 2026-05-12)
+    关键发现: fusion_v2 AUROC在两域均全胜(6/6+6/6=12/12), TAU19 OSR天花板更高 (AUROC 0.981 vs 0.886)
+  ✅ FOAC-AIFP way_shot 已完成 (TAU22+TAU19, 见 experiment/foac_exp/wayshot/results.json)
 
   ── G2. Openness 扩展 ──
   论文: 不同开放度 (未知类比例) 下 AUROC 变化
-  当前: 两系统脚本均存在
-  缺失: episodic_exp_openness.py OSR 方法不全 (修复点2)
-        无法展示不同开放度下 fusion_v2 vs cluster_v2/extended_v2 的相对衰减
+  当前: 两系统脚本均存在, 均已完整运行
+  ✅ Episodic Openness 完整版已完成 (TAU22+TAU19, open2+open4, 6OSR方法, 见第二节)
+  ✅ FOAC-AIFP Openness 已完成 (TAU22+TAU19, open2+open4, 见 experiment/foac_exp/openness/results.json)
+        fusion_v2 vs cluster_v2/extended_v2 在 open2→open4 下的相对衰减数据齐全
 
   ── G3. t-SNE 可视化 ──
   论文: 展示已知类/未知类特征分布, 直观展示分离度
-  当前: 两系统脚本均存在, 已生成 baseline 和 full_model 对比
+  当前: 两系统脚本均存在, 均已完整运行
+  ✅ Episodic t-SNE 已完成 (TAU22+TAU19, Full_Model + Baseline 各一图, 见第二节)
+  ✅ FOAC-AIFP t-SNE 已完成 (TAU22+TAU19, Full_Model + wo_NPM + Comparison 各三图, 2026-05-12 脚本修复后)
   缺失: 缺少 per-OSR-method 的 t-SNE 对比图
         (如 fusion_v2 vs cluster_v2 vs anti_prototype 三者并排, 展示分离效果差异)
   建议: tsne 脚本新增 --compare_osr 模式

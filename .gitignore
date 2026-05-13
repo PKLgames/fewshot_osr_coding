@@ -1,6 +1,7 @@
 # ─── Large data & pretrained weights ─────────────────────────────────────────
 TAU-urban-acoustic-scenes-2019-development/
 TAU-urban-acoustic-scenes-2022-mobile-development/
+DCASE2018-task5-dev/audio/
 
 *.zip
 

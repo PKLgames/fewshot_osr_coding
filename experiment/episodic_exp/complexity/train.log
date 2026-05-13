@@ -1,0 +1,43 @@
+
+  Analyzing: Full_Model
+    Params: 40,100
+    MACs:   N/A (thop not installed)
+    AIT:    4.16 +/- 0.08 ms
+
+  Analyzing: wo_Flow_Transform
+    Params: 14,756
+    MACs:   N/A (thop not installed)
+    AIT:    0.65 +/- 0.03 ms
+
+  Analyzing: wo_OOD_Head
+    Params: 39,363
+    MACs:   N/A (thop not installed)
+    AIT:    4.16 +/- 0.08 ms
+
+  Analyzing: wo_Reciprocal
+    Params: 38,820
+    MACs:   N/A (thop not installed)
+    AIT:    4.12 +/- 0.05 ms
+
+  Analyzing: wo_Threshold
+    Params: 40,098
+    MACs:   N/A (thop not installed)
+    AIT:    4.28 +/- 0.49 ms
+
+  Analyzing: Baseline
+    Params: 12,737
+    MACs:   N/A (thop not installed)
+    AIT:    0.64 +/- 0.02 ms
+
+Results saved to experiment/episodic_exp/complexity/results.json
+
+======================================================================
+COMPLEXITY COMPARISON
+======================================================================
+  Model                      Params           MACs      AIT(ms)
+  Full_Model                 40,100            N/A         4.16
+  wo_Flow_Transform          14,756            N/A         0.65
+  wo_OOD_Head                39,363            N/A         4.16
+  wo_Reciprocal              38,820            N/A         4.12
+  wo_Threshold               40,098            N/A         4.28
+  Baseline                   12,737            N/A         0.64

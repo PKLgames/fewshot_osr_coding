@@ -1,0 +1,242 @@
+{
+  "TAU22->TAU19": {
+    "source": "TAU22",
+    "target": "TAU19",
+    "fewshot": {
+      "base_1shot": {
+        "mean_acc": 0.30022223003208637,
+        "std_acc": 0.07297860427334987,
+        "ci95": 0.014303806437576574,
+        "mean_confidence": 0.8063448244333267,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100,
+        "macro_auroc": 0.6358584518518519
+      },
+      "base_5shot": {
+        "mean_acc": 0.35133334159851076,
+        "std_acc": 0.0564107490417502,
+        "ci95": 0.011056506812183039,
+        "mean_confidence": 0.8053373837471008,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100,
+        "macro_auroc": 0.6848608518518519
+      },
+      "novel_1shot": {
+        "mean_acc": 0.41116668984293936,
+        "std_acc": 0.11025362695985107,
+        "ci95": 0.021609710884130807,
+        "mean_confidence": 0.7817933565378189,
+        "N_way": 4,
+        "K_shot": 1,
+        "num_episodes": 100,
+        "macro_auroc": 0.6531714074074074
+      },
+      "novel_5shot": {
+        "mean_acc": 0.455333357155323,
+        "std_acc": 0.0788063772021304,
+        "ci95": 0.015446049931617559,
+        "mean_confidence": 0.7354130563139916,
+        "N_way": 4,
+        "K_shot": 5,
+        "num_episodes": 100,
+        "macro_auroc": 0.7081610740740741
+      }
+    },
+    "osr": {
+      "anti_prototype": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.10665000039152801,
+        "osr_score": 0.5283249942352995,
+        "auroc": 0.6745663816666667,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "anti_prototype",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "feature_mahalanobis": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.25725000351667404,
+        "osr_score": 0.6036249957978725,
+        "auroc": 0.8163524999999998,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "feature_mahalanobis",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_osr23": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.7376500010490418,
+        "osr_score": 0.8438249945640564,
+        "auroc": 0.9338256466666668,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_osr23",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_extended_v2": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.7332500070333481,
+        "osr_score": 0.8416249975562096,
+        "auroc": 0.9322341833333333,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_extended_v2",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_cluster_v2": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.7354999989271164,
+        "osr_score": 0.8427499935030938,
+        "auroc": 0.9337225933333333,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_cluster_v2",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_fusion_v2": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.8597499996423721,
+        "osr_score": 0.9048749938607216,
+        "auroc": 0.9769070416666666,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_fusion_v2",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      }
+    }
+  },
+  "TAU19->TAU22": {
+    "source": "TAU19",
+    "target": "TAU22",
+    "fewshot": {
+      "base_1shot": {
+        "mean_acc": 0.3875555619597435,
+        "std_acc": 0.09742714699845914,
+        "ci95": 0.01909572081169799,
+        "mean_confidence": 0.5798319756984711,
+        "N_way": 6,
+        "K_shot": 1,
+        "num_episodes": 100,
+        "macro_auroc": 0.6765037925925926
+      },
+      "base_5shot": {
+        "mean_acc": 0.5144444501399994,
+        "std_acc": 0.06031808918147786,
+        "ci95": 0.01182234547956966,
+        "mean_confidence": 0.6138155099749565,
+        "N_way": 6,
+        "K_shot": 5,
+        "num_episodes": 100,
+        "macro_auroc": 0.7585778592592592
+      },
+      "novel_1shot": {
+        "mean_acc": 0.38400002077221873,
+        "std_acc": 0.10192372157849651,
+        "ci95": 0.019977049429385316,
+        "mean_confidence": 0.6466765439510346,
+        "N_way": 4,
+        "K_shot": 1,
+        "num_episodes": 100,
+        "macro_auroc": 0.6289815370370371
+      },
+      "novel_5shot": {
+        "mean_acc": 0.4591666904091835,
+        "std_acc": 0.06771570851555432,
+        "ci95": 0.013272278869048646,
+        "mean_confidence": 0.6778185850381852,
+        "N_way": 4,
+        "K_shot": 5,
+        "num_episodes": 100,
+        "macro_auroc": 0.6812858703703704
+      }
+    },
+    "osr": {
+      "anti_prototype": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.3176111117005348,
+        "osr_score": 0.633805549889803,
+        "auroc": 0.5699776031378601,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "anti_prototype",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "feature_mahalanobis": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.06902777776122093,
+        "osr_score": 0.509513882920146,
+        "auroc": 0.6250207561728395,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "feature_mahalanobis",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_osr23": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.5440555512905121,
+        "osr_score": 0.7470277696847916,
+        "auroc": 0.8551165802469136,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_osr23",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_extended_v2": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.5445000000298024,
+        "osr_score": 0.7472499940544367,
+        "auroc": 0.849322717335391,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_extended_v2",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_cluster_v2": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.5435555554926396,
+        "osr_score": 0.7467777717858552,
+        "auroc": 0.8551526118827161,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_cluster_v2",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      },
+      "ood_head_fusion_v2": {
+        "known_tnr": 0.949999988079071,
+        "unknown_tpr": 0.5361111115664243,
+        "osr_score": 0.7430555498227477,
+        "auroc": 0.8780519531893003,
+        "threshold": "per-round",
+        "num_rounds": 5,
+        "method": "ood_head_fusion_v2",
+        "recalibrate": true,
+        "per_class_threshold": false,
+        "rectified_prototypes": false
+      }
+    }
+  }
+}

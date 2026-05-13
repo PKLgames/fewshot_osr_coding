@@ -1,0 +1,16 @@
+Metric,TAU22→TAU19,TAU19→TAU22
+Base 1s ACC (%),30.02,38.76
+Base 5s ACC (%),35.13,51.44
+Cls-AUROC (base 5s),68.49,75.86
+Anti-Prototype AUROC,67.457,56.998
+Anti-Prototype OSR Score,52.83,63.38
+Mahalanobis AUROC,81.635,62.502
+Mahalanobis OSR Score,60.36,50.95
+OSR23 AUROC,93.383,85.512
+OSR23 OSR Score,84.38,74.70
+Extended V2 AUROC,93.223,84.932
+Extended V2 OSR Score,84.16,74.72
+Cluster V2 AUROC,93.372,85.515
+Cluster V2 OSR Score,84.27,74.68
+Fusion V2 (ours) AUROC,97.691,87.805
+Fusion V2 (ours) OSR Score,90.49,74.31

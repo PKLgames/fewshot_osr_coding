@@ -1,0 +1,7 @@
+Configuration,Flow Transform,OOD Head Training,Reciprocal Loss,Threshold Adaptation,Description
+full_model,✓,✓,✓,✓,All components active
+wo_flow_transform,,✓,✓,✓,No normalizing flow [17][18]
+wo_ood_head,✓,,✓,✓,No OSR-specific BCE loss
+wo_reciprocal,✓,✓,,✓,No reciprocal attention [9]
+wo_threshold,✓,✓,✓,,Fixed percentile threshold
+only_distance_head,,,,,Bare Mahalanobis detector [8]

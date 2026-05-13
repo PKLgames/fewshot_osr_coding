@@ -1,3 +1,5 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
 Dataset: tau22 (TAUDataset from utils.TAU22)
 GPU: NVIDIA GeForce RTX 4090
 VRAM: 23.5 GB
@@ -16,28 +18,18 @@ FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers ra
 FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_realfewshot_osr24/base_feature_extractor.pth
 
 ======================================================================
-Phase 1: Feature Extraction
+EVAL-ONLY MODE: Loading checkpoint & cached features
 ======================================================================
-使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_calib_pro_1s.pt
-索引映射构建完成，总样本数: 620
-使用动态加载模式，不加载缓存文件 /coding/audio_classifying/unprocessed_data/TAU22_eval_pro_1s.pt
-索引映射构建完成，总样本数: 18000
-Extracting features for 'train' split...
-Extracting train:   0%|          | 0/469 [00:00<?, ?it/s]Extracting train:   0%|          | 1/469 [00:01<09:11,  1.18s/it]Extracting train:   4%|▍         | 19/469 [00:01<00:22, 20.01it/s]Extracting train:   6%|▌         | 29/469 [00:01<00:14, 30.46it/s]Extracting train:   8%|▊         | 39/469 [00:01<00:10, 41.00it/s]Extracting train:  10%|█         | 49/469 [00:01<00:08, 47.68it/s]Extracting train:  12%|█▏        | 58/469 [00:01<00:07, 55.36it/s]Extracting train:  15%|█▍        | 69/469 [00:01<00:05, 67.10it/s]Extracting train:  17%|█▋        | 81/469 [00:01<00:04, 78.73it/s]Extracting train:  20%|█▉        | 92/469 [00:02<00:04, 79.11it/s]Extracting train:  22%|██▏       | 102/469 [00:02<00:05, 71.83it/s]Extracting train:  25%|██▍       | 115/469 [00:02<00:04, 84.20it/s]Extracting train:  27%|██▋       | 125/469 [00:02<00:04, 83.22it/s]Extracting train:  29%|██▉       | 135/469 [00:02<00:04, 83.06it/s]Extracting train:  31%|███       | 144/469 [00:02<00:03, 84.52it/s]Extracting train:  33%|███▎      | 155/469 [00:02<00:03, 89.87it/s]Extracting train:  35%|███▌      | 165/469 [00:02<00:03, 88.06it/s]Extracting train:  38%|███▊      | 176/469 [00:03<00:03, 93.73it/s]Extracting train:  40%|███▉      | 186/469 [00:03<00:03, 86.56it/s]Extracting train:  42%|████▏     | 195/469 [00:03<00:03, 82.81it/s]Extracting train:  44%|████▎     | 205/469 [00:03<00:03, 73.65it/s]Extracting train:  45%|████▌     | 213/469 [00:03<00:03, 74.71it/s]Extracting train:  48%|████▊     | 225/469 [00:03<00:02, 85.03it/s]Extracting train:  51%|█████     | 237/469 [00:03<00:02, 88.14it/s]Extracting train:  53%|█████▎    | 249/469 [00:03<00:02, 95.75it/s]Extracting train:  55%|█████▌    | 259/469 [00:04<00:02, 91.23it/s]Extracting train:  57%|█████▋    | 269/469 [00:04<00:02, 88.17it/s]Extracting train:  59%|█████▉    | 279/469 [00:04<00:02, 89.46it/s]Extracting train:  62%|██████▏   | 289/469 [00:04<00:02, 88.89it/s]Extracting train:  64%|██████▍   | 299/469 [00:04<00:01, 91.35it/s]Extracting train:  66%|██████▌   | 309/469 [00:04<00:01, 86.48it/s]Extracting train:  68%|██████▊   | 320/469 [00:04<00:01, 89.75it/s]Extracting train:  71%|███████   | 331/469 [00:04<00:01, 95.11it/s]Extracting train:  73%|███████▎  | 341/469 [00:04<00:01, 93.82it/s]Extracting train:  75%|███████▌  | 352/469 [00:05<00:01, 94.56it/s]Extracting train:  77%|███████▋  | 362/469 [00:05<00:01, 87.74it/s]Extracting train:  79%|███████▉  | 371/469 [00:05<00:01, 85.15it/s]Extracting train:  81%|████████  | 381/469 [00:05<00:01, 86.00it/s]Extracting train:  84%|████████▍ | 393/469 [00:05<00:00, 94.55it/s]Extracting train:  86%|████████▋ | 405/469 [00:05<00:00, 92.42it/s]Extracting train:  88%|████████▊ | 415/469 [00:05<00:00, 93.70it/s]Extracting train:  91%|█████████ | 425/469 [00:05<00:00, 89.89it/s]Extracting train:  93%|█████████▎| 436/469 [00:05<00:00, 94.66it/s]Extracting train:  95%|█████████▌| 446/469 [00:06<00:00, 93.98it/s]Extracting train:  97%|█████████▋| 456/469 [00:06<00:00, 87.20it/s]Extracting train: 100%|██████████| 469/469 [00:06<00:00, 47.31it/s]Extracting train: 100%|██████████| 469/469 [00:06<00:00, 69.29it/s]
-  Feature normalization: mean_range=[-0.6513, 0.6375] std_range=[0.4755, 1.3439]
-Cached 30000 features -> experiment/fewshot_cache/train_features.pt
-  Classes: [0, 1, 2, 3, 4, 5]
+Loading checkpoint: experiment/yamnet_realfewshot_osr24/fewshot_final.pth
+Flow classifier loaded (epoch from checkpoint config)
+  Loaded experiment/fewshot_cache/train_features.pt: 30000 samples, classes=[0, 1, 2, 3, 4, 5]
     Class 0: 5000 samples
     Class 1: 5000 samples
     Class 2: 5000 samples
     Class 3: 5000 samples
     Class 4: 5000 samples
     Class 5: 5000 samples
-  Loaded norm stats from cache: mean_range=[-0.6513, 0.6375] std_range=[0.4755, 1.3439]
-Extracting features for 'calib' split...
-Extracting calib:   0%|          | 0/10 [00:00<?, ?it/s]Extracting calib:  10%|█         | 1/10 [00:00<00:02,  3.88it/s]Extracting calib: 100%|██████████| 10/10 [00:00<00:00, 14.38it/s]Extracting calib: 100%|██████████| 10/10 [00:00<00:00, 12.72it/s]
-Cached 620 features -> experiment/fewshot_cache/calib_features.pt
-  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  Loaded experiment/fewshot_cache/calib_features.pt: 620 samples, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     Class 0: 100 samples
     Class 1: 100 samples
     Class 2: 100 samples
@@ -48,10 +40,7 @@ Cached 620 features -> experiment/fewshot_cache/calib_features.pt
     Class 7: 5 samples
     Class 8: 5 samples
     Class 9: 5 samples
-Extracting features for 'test' split...
-Extracting test:   0%|          | 0/282 [00:00<?, ?it/s]Extracting test:   0%|          | 1/282 [00:00<01:23,  3.36it/s]Extracting test:   4%|▍         | 11/282 [00:00<00:07, 34.42it/s]Extracting test:   6%|▋         | 18/282 [00:00<00:06, 40.83it/s]Extracting test:   9%|▉         | 26/282 [00:00<00:05, 48.69it/s]Extracting test:  12%|█▏        | 35/282 [00:00<00:04, 58.81it/s]Extracting test:  17%|█▋        | 48/282 [00:00<00:03, 76.95it/s]Extracting test:  21%|██        | 58/282 [00:00<00:02, 78.82it/s]Extracting test:  25%|██▍       | 70/282 [00:01<00:02, 89.30it/s]Extracting test:  29%|██▉       | 82/282 [00:01<00:02, 88.86it/s]Extracting test:  33%|███▎      | 94/282 [00:01<00:01, 94.62it/s]Extracting test:  38%|███▊      | 106/282 [00:01<00:01, 94.28it/s]Extracting test:  42%|████▏     | 118/282 [00:01<00:01, 100.33it/s]Extracting test:  46%|████▌     | 129/282 [00:01<00:01, 101.33it/s]Extracting test:  50%|████▉     | 140/282 [00:01<00:01, 99.30it/s] Extracting test:  54%|█████▎    | 151/282 [00:01<00:01, 100.02it/s]Extracting test:  57%|█████▋    | 162/282 [00:02<00:01, 96.50it/s] Extracting test:  62%|██████▏   | 174/282 [00:02<00:01, 102.81it/s]Extracting test:  66%|██████▌   | 185/282 [00:02<00:00, 102.73it/s]Extracting test:  70%|██████▉   | 196/282 [00:02<00:00, 98.73it/s] Extracting test:  74%|███████▍  | 208/282 [00:02<00:00, 102.81it/s]Extracting test:  78%|███████▊  | 219/282 [00:02<00:00, 96.75it/s] Extracting test:  82%|████████▏ | 231/282 [00:02<00:00, 101.10it/s]Extracting test:  86%|████████▌ | 242/282 [00:02<00:00, 96.14it/s] Extracting test:  90%|█████████ | 254/282 [00:02<00:00, 100.31it/s]Extracting test:  94%|█████████▍| 266/282 [00:03<00:00, 96.82it/s] Extracting test:  99%|█████████▉| 279/282 [00:03<00:00, 104.43it/s]Extracting test: 100%|██████████| 282/282 [00:03<00:00, 76.89it/s] 
-Cached 18000 features -> experiment/fewshot_cache/test_features.pt
-  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  Loaded experiment/fewshot_cache/test_features.pt: 18000 samples, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     Class 0: 1800 samples
     Class 1: 1800 samples
     Class 2: 1800 samples
@@ -62,80 +51,40 @@ Cached 18000 features -> experiment/fewshot_cache/test_features.pt
     Class 7: 1800 samples
     Class 8: 1800 samples
     Class 9: 1800 samples
-
-Computing t-SNE on 5000 samples...
-t-SNE plot saved: experiment/yamnet_realfewshot_osr24/tsne_features.png
-
-======================================================================
-Phase 2: Episodic Meta-Training
-======================================================================
-OOD exposure: 4 unknown classes, 7200 total samples
-Real OOD exposure: 7200 samples from classes [6, 7, 8, 9]
+Caches loaded: train=30000, calib=620, test=18000
 Initializing Curriculum OOD Sampler (3-level progressive training)...
   CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
   CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
   GMM Boundary Sampler: fitting GMM(6) on 30000 samples, dim=64
   GMM train log-likelihood: mean=114.71, 10th percentile=67.27
-/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
-  rng.multivariate_normal(mean, covariance, int(sample))
   GMM boundary pool: 5000 samples, dim=64, device=cuda
 Flow classifier params: 14,756
-
-Resumed from episode 5000 (Val Acc: 57.44%)
-Continuing from episode 5001 to 6000
-Curriculum OOD Sampler configured with classifier
-
-======================================================================
-Episodic Meta-Training: 6-way 5-shot
-Base classes:     [0, 1, 2, 3, 4, 5]
-Unknown classes:  [6, 7, 8, 9]
-Episodes:         6000
-Accum steps:      1 (eff.batch=1x)
-Eval every:       500 episodes
-Proto noise std:  0.15
-OOD ratio:          0.3
-LR warmup:        200 episodes
-Stage2 (cls):     400 episodes
-Gaussian prior:   delayed to Phase 2 (ep 201)
-Patience:         3000 episodes (6 evals)
-======================================================================
-
-Ep  5500/6000 | CE: 1.5986 Total: 3.7315 Acc: 38.00% | Val Loss: 2.0053 Acc: 51.11% | LR: 2.11e-05 cls:1.0
-Ep  6000/6000 | CE: 1.5892 Total: 3.7275 Acc: 39.20% | Val Loss: 1.7802 Acc: 56.56% | LR: 2.00e-05 cls:1.0
-
-Loaded best model (Val Acc: 57.44%, Ep 5000)
-
-======================================================================
-Episodic training complete!
-Best validation accuracy: 57.44%
-======================================================================
-Episode history saved: experiment/yamnet_realfewshot_osr24/episodic_history.json
 
 ======================================================================
 Phase 3: Evaluation & OSR Calibration
 ======================================================================
 
 --- Base class few-shot evaluation (train cache) ---
-6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:  14%|█▍        | 14/100 [00:00<00:00, 131.22it/s]6w1s eval:  28%|██▊       | 28/100 [00:00<00:00, 131.14it/s]6w1s eval:  42%|████▏     | 42/100 [00:00<00:00, 131.27it/s]6w1s eval:  56%|█████▌    | 56/100 [00:00<00:00, 131.40it/s]6w1s eval:  70%|███████   | 70/100 [00:00<00:00, 130.28it/s]6w1s eval:  84%|████████▍ | 84/100 [00:00<00:00, 130.68it/s]6w1s eval:  98%|█████████▊| 98/100 [00:00<00:00, 131.15it/s]6w1s eval: 100%|██████████| 100/100 [00:00<00:00, 131.01it/s]
+6w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w1s eval:   1%|          | 1/100 [00:00<00:35,  2.81it/s]6w1s eval:  14%|█▍        | 14/100 [00:00<00:02, 39.18it/s]6w1s eval:  27%|██▋       | 27/100 [00:00<00:01, 64.28it/s]6w1s eval:  40%|████      | 40/100 [00:00<00:00, 81.51it/s]6w1s eval:  52%|█████▏    | 52/100 [00:00<00:00, 91.24it/s]6w1s eval:  65%|██████▌   | 65/100 [00:00<00:00, 100.66it/s]6w1s eval:  78%|███████▊  | 78/100 [00:00<00:00, 107.63it/s]6w1s eval:  91%|█████████ | 91/100 [00:01<00:00, 113.28it/s]6w1s eval: 100%|██████████| 100/100 [00:01<00:00, 85.85it/s]
 
-  6-way 1-shot: Acc = 40.70% +/- 1.89% (conf: 82.06%)
-6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  13%|█▎        | 13/100 [00:00<00:00, 129.99it/s]6w5s eval:  27%|██▋       | 27/100 [00:00<00:00, 130.17it/s]6w5s eval:  41%|████      | 41/100 [00:00<00:00, 130.10it/s]6w5s eval:  55%|█████▌    | 55/100 [00:00<00:00, 129.91it/s]6w5s eval:  69%|██████▉   | 69/100 [00:00<00:00, 130.25it/s]6w5s eval:  83%|████████▎ | 83/100 [00:00<00:00, 130.60it/s]6w5s eval:  97%|█████████▋| 97/100 [00:00<00:00, 130.66it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 130.33it/s]
+  6-way 1-shot: Acc = 39.70% +/- 1.92% (conf: 83.23%) AUROC=0.7186
+6w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w5s eval:  12%|█▏        | 12/100 [00:00<00:00, 117.15it/s]6w5s eval:  25%|██▌       | 25/100 [00:00<00:00, 122.93it/s]6w5s eval:  38%|███▊      | 38/100 [00:00<00:00, 121.20it/s]6w5s eval:  51%|█████     | 51/100 [00:00<00:00, 119.90it/s]6w5s eval:  64%|██████▍   | 64/100 [00:00<00:00, 120.97it/s]6w5s eval:  77%|███████▋  | 77/100 [00:00<00:00, 121.28it/s]6w5s eval:  90%|█████████ | 90/100 [00:00<00:00, 122.64it/s]6w5s eval: 100%|██████████| 100/100 [00:00<00:00, 121.90it/s]
 
-  6-way 5-shot: Acc = 51.04% +/- 1.33% (conf: 84.64%)
-6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:  13%|█▎        | 13/100 [00:00<00:00, 126.50it/s]6w10s eval:  26%|██▌       | 26/100 [00:00<00:00, 128.31it/s]6w10s eval:  39%|███▉      | 39/100 [00:00<00:00, 128.68it/s]6w10s eval:  52%|█████▏    | 52/100 [00:00<00:00, 128.47it/s]6w10s eval:  65%|██████▌   | 65/100 [00:00<00:00, 127.31it/s]6w10s eval:  78%|███████▊  | 78/100 [00:00<00:00, 127.67it/s]6w10s eval:  92%|█████████▏| 92/100 [00:00<00:00, 128.49it/s]6w10s eval: 100%|██████████| 100/100 [00:00<00:00, 128.36it/s]
+  6-way 5-shot: Acc = 51.89% +/- 1.13% (conf: 83.87%) AUROC=0.7997
+6w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]6w10s eval:  13%|█▎        | 13/100 [00:00<00:00, 124.85it/s]6w10s eval:  26%|██▌       | 26/100 [00:00<00:00, 124.42it/s]6w10s eval:  39%|███▉      | 39/100 [00:00<00:00, 123.98it/s]6w10s eval:  52%|█████▏    | 52/100 [00:00<00:00, 124.33it/s]6w10s eval:  65%|██████▌   | 65/100 [00:00<00:00, 124.59it/s]6w10s eval:  78%|███████▊  | 78/100 [00:00<00:00, 124.89it/s]6w10s eval:  91%|█████████ | 91/100 [00:00<00:00, 125.19it/s]6w10s eval: 100%|██████████| 100/100 [00:00<00:00, 124.84it/s]
 
-  6-way 10-shot: Acc = 52.94% +/- 1.06% (conf: 84.62%)
+  6-way 10-shot: Acc = 54.21% +/- 1.04% (conf: 84.72%) AUROC=0.8088
 
 --- Novel class few-shot evaluation (test cache) ---
-4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:  17%|█▋        | 17/100 [00:00<00:00, 164.19it/s]4w1s eval:  35%|███▌      | 35/100 [00:00<00:00, 169.73it/s]4w1s eval:  53%|█████▎    | 53/100 [00:00<00:00, 172.08it/s]4w1s eval:  71%|███████   | 71/100 [00:00<00:00, 171.43it/s]4w1s eval:  89%|████████▉ | 89/100 [00:00<00:00, 167.85it/s]4w1s eval: 100%|██████████| 100/100 [00:00<00:00, 169.33it/s]
+4w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w1s eval:  16%|█▌        | 16/100 [00:00<00:00, 154.33it/s]4w1s eval:  32%|███▏      | 32/100 [00:00<00:00, 155.21it/s]4w1s eval:  48%|████▊     | 48/100 [00:00<00:00, 154.94it/s]4w1s eval:  64%|██████▍   | 64/100 [00:00<00:00, 154.67it/s]4w1s eval:  80%|████████  | 80/100 [00:00<00:00, 154.88it/s]4w1s eval:  96%|█████████▌| 96/100 [00:00<00:00, 155.26it/s]4w1s eval: 100%|██████████| 100/100 [00:00<00:00, 155.01it/s]
 
-  4-way 1-shot: Acc = 37.32% +/- 1.99% (conf: 70.20%)
-4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:  17%|█▋        | 17/100 [00:00<00:00, 166.81it/s]4w5s eval:  34%|███▍      | 34/100 [00:00<00:00, 167.06it/s]4w5s eval:  52%|█████▏    | 52/100 [00:00<00:00, 172.45it/s]4w5s eval:  70%|███████   | 70/100 [00:00<00:00, 171.03it/s]4w5s eval:  88%|████████▊ | 88/100 [00:00<00:00, 170.32it/s]4w5s eval: 100%|██████████| 100/100 [00:00<00:00, 169.72it/s]
+  4-way 1-shot: Acc = 38.75% +/- 1.89% (conf: 78.39%) AUROC=0.6477
+4w5s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w5s eval:  16%|█▌        | 16/100 [00:00<00:00, 156.63it/s]4w5s eval:  32%|███▏      | 32/100 [00:00<00:00, 155.91it/s]4w5s eval:  48%|████▊     | 48/100 [00:00<00:00, 155.98it/s]4w5s eval:  64%|██████▍   | 64/100 [00:00<00:00, 155.70it/s]4w5s eval:  80%|████████  | 80/100 [00:00<00:00, 156.14it/s]4w5s eval:  96%|█████████▌| 96/100 [00:00<00:00, 156.31it/s]4w5s eval: 100%|██████████| 100/100 [00:00<00:00, 155.99it/s]
 
-  4-way 5-shot: Acc = 45.30% +/- 1.27% (conf: 55.29%)
-4w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w10s eval:  18%|█▊        | 18/100 [00:00<00:00, 172.60it/s]4w10s eval:  36%|███▌      | 36/100 [00:00<00:00, 170.92it/s]4w10s eval:  54%|█████▍    | 54/100 [00:00<00:00, 170.22it/s]4w10s eval:  72%|███████▏  | 72/100 [00:00<00:00, 170.13it/s]4w10s eval:  90%|█████████ | 90/100 [00:00<00:00, 169.72it/s]4w10s eval: 100%|██████████| 100/100 [00:00<00:00, 171.12it/s]
+  4-way 5-shot: Acc = 45.47% +/- 1.34% (conf: 72.18%) AUROC=0.7273
+4w10s eval:   0%|          | 0/100 [00:00<?, ?it/s]4w10s eval:  16%|█▌        | 16/100 [00:00<00:00, 154.51it/s]4w10s eval:  32%|███▏      | 32/100 [00:00<00:00, 155.98it/s]4w10s eval:  48%|████▊     | 48/100 [00:00<00:00, 156.35it/s]4w10s eval:  64%|██████▍   | 64/100 [00:00<00:00, 156.82it/s]4w10s eval:  80%|████████  | 80/100 [00:00<00:00, 156.73it/s]4w10s eval:  96%|█████████▌| 96/100 [00:00<00:00, 156.13it/s]4w10s eval: 100%|██████████| 100/100 [00:00<00:00, 156.10it/s]
 
-  4-way 10-shot: Acc = 47.13% +/- 1.26% (conf: 51.53%)
+  4-way 10-shot: Acc = 47.18% +/- 1.25% (conf: 69.61%) AUROC=0.7448
 
 --- OSR FEATURE_MAHALANOBIS calibration (calib data) ---
 
@@ -146,13 +95,13 @@ Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Known samples:   600
 Unknown samples: 20
-Known scores:   [-9.62, -2.20] mean=-4.94
-Unknown scores: [-15.52, -4.15] mean=-8.79
-Mean separation: 3.85 (positive = known higher = good)
+Known scores:   [-9.36, -1.06] mean=-3.52
+Unknown scores: [-7.22, -1.89] mean=-4.44
+Mean separation: 0.92 (positive = known higher = good)
 
-Threshold (tau): -8.5145
+Threshold (tau): -7.3131
 Known accepted (TNR): 95.00%
-Unknown detected (TPR): 45.00%
+Unknown detected (TPR): 0.00%
 
 --- OSR FEATURE_MAHALANOBIS evaluation (test data, per-round recalib) ---
 
@@ -163,9 +112,9 @@ Mode: per-round recalibration (TNR-fixed at 95%)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   18.58%
-  OSR Score (mean):         56.79%
-  AUROC:                    0.7053
+  Unknown detected (TPR):   4.10%
+  OSR Score (mean):         49.55%
+  AUROC:                    0.5811
 
 --- OSR ANTI_PROTOTYPE calibration (calib data) ---
 
@@ -176,13 +125,13 @@ Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Known samples:   600
 Unknown samples: 20
-Known scores:   [-4.43, 9.89] mean=0.68
-Unknown scores: [-5.89, 8.13] mean=-0.09
-Mean separation: 0.77 (positive = known higher = good)
+Known scores:   [-0.78, 2.31] mean=0.30
+Unknown scores: [-0.56, 0.74] mean=0.11
+Mean separation: 0.19 (positive = known higher = good)
 
-Threshold (tau): -2.5796
+Threshold (tau): -0.4333
 Known accepted (TNR): 95.00%
-Unknown detected (TPR): 20.00%
+Unknown detected (TPR): 5.00%
 
 --- OSR ANTI_PROTOTYPE evaluation (test data, per-round recalib) ---
 
@@ -193,9 +142,9 @@ Mode: per-round recalibration (TNR-fixed at 95%)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   38.07%
-  OSR Score (mean):         66.53%
-  AUROC:                    0.5888
+  Unknown detected (TPR):   19.68%
+  OSR Score (mean):         57.34%
+  AUROC:                    0.6228
 
 --- OSR GEO_FUSION calibration (calib data) ---
 
@@ -205,16 +154,16 @@ OSR Calibration (GEO_FUSION)
 Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Computing geometric fusion normalization stats...
-  Fusion weight: alpha=0.80 (Youden J=0.550)
+  Fusion weight: alpha=0.20 (Youden J=0.950)
 Known samples:   600
 Unknown samples: 20
-Known scores:   [-2.27, 3.45] mean=-0.00
-Unknown scores: [-2.55, 2.96] mean=-0.72
-Mean separation: 0.72 (positive = known higher = good)
+Known scores:   [-2.71, 1.45] mean=0.00
+Unknown scores: [-1.51, 0.81] mean=-0.49
+Mean separation: 0.49 (positive = known higher = good)
 
-Threshold (tau): -1.2689
+Threshold (tau): -1.7157
 Known accepted (TNR): 95.00%
-Unknown detected (TPR): 40.00%
+Unknown detected (TPR): 0.00%
 
 --- OSR GEO_FUSION evaluation (test data, per-round recalib) ---
 
@@ -225,9 +174,9 @@ Mode: per-round recalibration (TNR-fixed at 95%)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   25.54%
-  OSR Score (mean):         60.27%
-  AUROC:                    0.6668
+  Unknown detected (TPR):   3.69%
+  OSR Score (mean):         49.35%
+  AUROC:                    0.6056
 
 --- OSR OOD_HEAD calibration (calib data) ---
 
@@ -238,13 +187,13 @@ Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Known samples:   600
 Unknown samples: 20
-Known scores:   [0.05, 0.79] mean=0.62
-Unknown scores: [0.06, 0.71] mean=0.31
-Mean separation: 0.30 (positive = known higher = good)
+Known scores:   [0.17, 0.82] mean=0.67
+Unknown scores: [0.20, 0.76] mean=0.41
+Mean separation: 0.26 (positive = known higher = good)
 
-Threshold (tau): 0.3153
+Threshold (tau): 0.3985
 Known accepted (TNR): 95.00%
-Unknown detected (TPR): 55.00%
+Unknown detected (TPR): 65.00%
 
 --- OSR OOD_HEAD evaluation (test data, per-round recalib) ---
 
@@ -255,9 +204,9 @@ Mode: per-round recalibration (TNR-fixed at 95%)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   42.30%
-  OSR Score (mean):         68.65%
-  AUROC:                    0.7863
+  Unknown detected (TPR):   42.20%
+  OSR Score (mean):         68.60%
+  AUROC:                    0.7979
 
 --- OSR OOD_HEAD_EXTENDED calibration (calib data) ---
 
@@ -268,21 +217,21 @@ Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Training extended OOD head (11-dim features)...
   Extended OOD head weights:
-              min_dist: -0.7112
-            dist_ratio: -0.3820
-           softmax_max: -1.2310
-               entropy: -0.8627
-             feat_norm: +0.5098
-              2nd_dist: -0.3758
-             score_gap: +0.2921
-        dist_to_center: -1.0244
-       proto_score_var: -0.1236
-       norm_dist_ratio: +0.4636
-      neighbor_density: +0.0343
-  Calib TNR: 95.00%  TPR: 65.00%  (threshold=0.2744)
-Mean separation: 0.49 (positive = known higher = good)
+              min_dist: +0.2875
+            dist_ratio: +0.1420
+           softmax_max: -2.1578
+               entropy: -1.9493
+             feat_norm: +0.8709
+              2nd_dist: +0.4849
+             score_gap: +0.4876
+        dist_to_center: -2.8742
+       proto_score_var: +0.1637
+       norm_dist_ratio: +1.0290
+      neighbor_density: -1.5204
+  Calib TNR: 95.00%  TPR: 60.00%  (threshold=0.1790)
+Mean separation: 0.54 (positive = known higher = good)
 
-Threshold (tau): 0.2744
+Threshold (tau): 0.1790
 
 --- OSR OOD_HEAD_EXTENDED evaluation (test data, per-round recalib) ---
 
@@ -292,24 +241,24 @@ Mode: per-round recalibration (TNR-fixed at 95%)
 ======================================================================
 Training extended OOD head (11-dim features)...
   Extended OOD head weights:
-              min_dist: -2.1721
-            dist_ratio: -0.8799
-           softmax_max: -0.7539
-               entropy: +1.8319
-             feat_norm: -2.5980
-              2nd_dist: -1.9846
-             score_gap: -0.9844
-        dist_to_center: +5.9398
-       proto_score_var: +2.4372
-       norm_dist_ratio: +0.4053
-      neighbor_density: +0.0838
-  Calib TNR: 95.00%  TPR: 48.38%  (threshold=0.2174)
+              min_dist: -0.7377
+            dist_ratio: -0.3920
+           softmax_max: -0.9287
+               entropy: +1.2380
+             feat_norm: +1.3776
+              2nd_dist: -0.6626
+             score_gap: -0.2413
+        dist_to_center: -0.9348
+       proto_score_var: +2.4629
+       norm_dist_ratio: +0.1032
+      neighbor_density: +0.3977
+  Calib TNR: 95.00%  TPR: 52.60%  (threshold=0.2122)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   49.19%
-  OSR Score (mean):         72.09%
-  AUROC:                    0.8338
+  Unknown detected (TPR):   52.43%
+  OSR Score (mean):         73.71%
+  AUROC:                    0.8306
 
 --- OSR OOD_HEAD_OSR23 calibration (calib data) ---
 
@@ -323,30 +272,30 @@ Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
   osr23 GMM converged: True
   osr23a: n_unknown=200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
   osr23e Mixup: 20 real → 200 total unknown
-    L1 C=0.01: CV-AUROC=0.9214
-    L1 C=0.05: CV-AUROC=0.9200
-    L1 C=0.10: CV-AUROC=0.9193
-    L1 C=0.50: CV-AUROC=0.9193
-    L1 C=1.00: CV-AUROC=0.9184
-  osr23d: Best L1 C=0.01 (CV-AUROC=0.9214)
-  osr23 weights (2/13 non-zero):
-                min_dist: -0.5947
-              dist_ratio: +0.0000 *
-             softmax_max: +0.0000 *
-                 entropy: +0.0000 *
-               feat_norm: +0.0000 *
+    L1 C=0.01: CV-AUROC=0.9077
+    L1 C=0.05: CV-AUROC=0.9115
+    L1 C=0.10: CV-AUROC=0.9100
+    L1 C=0.50: CV-AUROC=0.9261
+    L1 C=1.00: CV-AUROC=0.9301
+  osr23d: Best L1 C=1.00 (CV-AUROC=0.9301)
+  osr23 weights (10/13 non-zero):
+                min_dist: -0.0867
+              dist_ratio: -1.1568
+             softmax_max: -2.2146
+                 entropy: -2.9373
+               feat_norm: +2.8248
                 2nd_dist: +0.0000 *
-               score_gap: +0.0000 *
-          dist_to_center: -0.4395
-         proto_score_var: +0.0000 *
-         norm_dist_ratio: +0.0000 *
+               score_gap: +0.7215
+          dist_to_center: -5.4689
+         proto_score_var: -1.1841
+         norm_dist_ratio: +1.0650
            cluster_mahal: +0.0000 *
         cluster_post_max: +0.0000 *
-             cluster_ent: +0.0000 *
-  Calib TNR: 95.00%  TPR: 62.50%  (threshold=0.3891)
-Mean separation: 0.34 (positive = known higher = good)
+             cluster_ent: +0.2176
+  Calib TNR: 95.00%  TPR: 58.00%  (threshold=0.1595)
+Mean separation: 0.61 (positive = known higher = good)
 
-Threshold (tau): 0.3891
+Threshold (tau): 0.1595
 
 --- OSR OOD_HEAD_OSR23 evaluation (test data, per-round recalib) ---
 
@@ -358,33 +307,33 @@ Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
   osr23 GMM: fitting on train set (30000 samples), n_components=12, covariance=full
   osr23 GMM converged: True
   osr23a: n_unknown=7200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
-    L1 C=0.01: CV-AUROC=0.7920
-    L1 C=0.05: CV-AUROC=0.7961
-    L1 C=0.10: CV-AUROC=0.8002
-    L1 C=0.50: CV-AUROC=0.8047
-    L1 C=1.00: CV-AUROC=0.8052
-  osr23d: Best L1 C=1.00 (CV-AUROC=0.8052)
+    L1 C=0.01: CV-AUROC=0.8176
+    L1 C=0.05: CV-AUROC=0.8223
+    L1 C=0.10: CV-AUROC=0.8234
+    L1 C=0.50: CV-AUROC=0.8239
+    L1 C=1.00: CV-AUROC=0.8239
+  osr23d: Best L1 C=1.00 (CV-AUROC=0.8239)
   osr23 weights (13/13 non-zero):
-                min_dist: -2.7657
-              dist_ratio: -0.9031
-             softmax_max: -0.7302
-                 entropy: +1.9476
-               feat_norm: -2.6739
-                2nd_dist: -2.5083
-               score_gap: -0.9063
-          dist_to_center: +7.0066
-         proto_score_var: +2.5453
-         norm_dist_ratio: +0.6685
-           cluster_mahal: +0.0803
-        cluster_post_max: -0.0672
-             cluster_ent: -0.1345
-  Calib TNR: 95.00%  TPR: 48.47%  (threshold=0.2162)
+                min_dist: -0.7262
+              dist_ratio: -0.2973
+             softmax_max: -0.9196
+                 entropy: +1.2944
+               feat_norm: +1.2073
+                2nd_dist: -0.6502
+               score_gap: -0.1582
+          dist_to_center: -0.6772
+         proto_score_var: +2.5251
+         norm_dist_ratio: +0.3589
+           cluster_mahal: +0.0134
+        cluster_post_max: +0.0085
+             cluster_ent: +0.0265
+  Calib TNR: 95.00%  TPR: 52.61%  (threshold=0.1974)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   49.27%
-  OSR Score (mean):         72.13%
-  AUROC:                    0.8339
+  Unknown detected (TPR):   52.36%
+  OSR Score (mean):         73.68%
+  AUROC:                    0.8271
 
 --- OSR OOD_HEAD_CLUSTER_V2 calibration (calib data) ---
 
@@ -397,23 +346,23 @@ Training osr24b OOD head (13-dim with train-set GMM clusters)...
   osr23 GMM: fitting on train set (30000 samples), n_components=12, covariance=full
   osr23 GMM converged: True
   osr24b OOD head weights:
-                min_dist: -1.0059
-              dist_ratio: -0.6627
-             softmax_max: -1.2645
-                 entropy: -0.7970
-               feat_norm: +0.8230
-                2nd_dist: -0.7182
-               score_gap: +0.0240
-          dist_to_center: -0.5648
-         proto_score_var: +0.0640
-         norm_dist_ratio: +1.0916
-           cluster_mahal: -0.4113
-        cluster_post_max: -0.1682
-             cluster_ent: -0.3702
-  Calib TNR: 95.00%  TPR: 60.00%  (threshold=0.2286)
+                min_dist: -0.3958
+              dist_ratio: +0.0831
+             softmax_max: -2.1526
+                 entropy: -1.8973
+               feat_norm: +1.5283
+                2nd_dist: +0.1774
+               score_gap: +0.8437
+          dist_to_center: -3.0645
+         proto_score_var: +0.3118
+         norm_dist_ratio: +0.4926
+           cluster_mahal: -0.2210
+        cluster_post_max: -0.2161
+             cluster_ent: +0.5529
+  Calib TNR: 95.00%  TPR: 60.00%  (threshold=0.2220)
 Mean separation: 0.52 (positive = known higher = good)
 
-Threshold (tau): 0.2286
+Threshold (tau): 0.2220
 
 --- OSR OOD_HEAD_CLUSTER_V2 evaluation (test data, per-round recalib) ---
 
@@ -425,26 +374,26 @@ Training osr24b OOD head (13-dim with train-set GMM clusters)...
   osr23 GMM: fitting on train set (30000 samples), n_components=12, covariance=full
   osr23 GMM converged: True
   osr24b OOD head weights:
-                min_dist: -2.3678
-              dist_ratio: -0.8242
-             softmax_max: -0.7270
-                 entropy: +1.8242
-               feat_norm: -2.5966
-                2nd_dist: -2.1061
-               score_gap: -0.8753
-          dist_to_center: +6.1633
-         proto_score_var: +2.4080
-         norm_dist_ratio: +0.4993
-           cluster_mahal: +0.0751
-        cluster_post_max: -0.0635
-             cluster_ent: -0.1309
-  Calib TNR: 95.00%  TPR: 48.57%  (threshold=0.2166)
+                min_dist: -0.7007
+              dist_ratio: -0.2869
+             softmax_max: -0.9195
+                 entropy: +1.2960
+               feat_norm: +1.2127
+                2nd_dist: -0.6055
+               score_gap: -0.1570
+          dist_to_center: -0.7507
+         proto_score_var: +2.5277
+         norm_dist_ratio: +0.3368
+           cluster_mahal: +0.0175
+        cluster_post_max: +0.0132
+             cluster_ent: +0.0310
+  Calib TNR: 95.00%  TPR: 52.62%  (threshold=0.1976)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   49.30%
-  OSR Score (mean):         72.15%
-  AUROC:                    0.8341
+  Unknown detected (TPR):   52.44%
+  OSR Score (mean):         73.72%
+  AUROC:                    0.8291
 
 --- OSR OOD_HEAD_FUSION_V2 calibration (calib data) ---
 
@@ -457,24 +406,24 @@ Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
   osr23 GMM: fitting on train set (30000 samples), n_components=12, covariance=full
   osr23 GMM converged: True
   osr24b fusion OOD head weights:
-                min_dist: -0.5868
-              dist_ratio: -1.4959
-             softmax_max: -1.0629
-                 entropy: -0.5987
-               feat_norm: +0.3789
-                2nd_dist: -0.5901
-               score_gap: -0.3425
-          dist_to_center: -1.0268
-         proto_score_var: -0.1412
-         norm_dist_ratio: +1.1852
-           cluster_mahal: -0.4985
-        cluster_post_max: -0.1387
-             cluster_ent: -0.2968
-        anti_proto_score: -0.7775 ← NEW
-  Calib TNR: 95.00%  TPR: 50.00%  (threshold=0.1632)
-Mean separation: 0.61 (positive = known higher = good)
+                min_dist: -0.4015
+              dist_ratio: +0.1251
+             softmax_max: -2.3260
+                 entropy: -1.9198
+               feat_norm: +1.5608
+                2nd_dist: +0.1769
+               score_gap: +0.8505
+          dist_to_center: -3.0724
+         proto_score_var: +0.3604
+         norm_dist_ratio: +0.4988
+           cluster_mahal: -0.2285
+        cluster_post_max: -0.2079
+             cluster_ent: +0.5203
+        anti_proto_score: +0.2281 ← NEW
+  Calib TNR: 95.00%  TPR: 65.00%  (threshold=0.2160)
+Mean separation: 0.50 (positive = known higher = good)
 
-Threshold (tau): 0.0831
+Threshold (tau): 0.2114
 
 --- OSR OOD_HEAD_FUSION_V2 evaluation (test data, per-round recalib) ---
 
@@ -486,27 +435,27 @@ Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
   osr23 GMM: fitting on train set (30000 samples), n_components=12, covariance=full
   osr23 GMM converged: True
   osr24b fusion OOD head weights:
-                min_dist: -3.0600
-              dist_ratio: -1.2104
-             softmax_max: -0.8094
-                 entropy: +2.3693
-               feat_norm: -0.2226
-                2nd_dist: -2.7532
-               score_gap: -1.2398
-          dist_to_center: +4.6136
-         proto_score_var: +3.0426
-         norm_dist_ratio: +0.7220
-           cluster_mahal: +0.1335
-        cluster_post_max: -0.1195
-             cluster_ent: -0.1998
-        anti_proto_score: -1.0344 ← NEW
-  Calib TNR: 95.00%  TPR: 55.15%  (threshold=0.1760)
+                min_dist: -0.7550
+              dist_ratio: -0.6329
+             softmax_max: -0.3120
+                 entropy: +0.4791
+               feat_norm: +1.2458
+                2nd_dist: -0.7459
+               score_gap: -0.4526
+          dist_to_center: -0.8270
+         proto_score_var: +1.6917
+         norm_dist_ratio: +0.5263
+           cluster_mahal: +0.1399
+        cluster_post_max: +0.0119
+             cluster_ent: +0.0398
+        anti_proto_score: -0.9845 ← NEW
+  Calib TNR: 95.00%  TPR: 55.71%  (threshold=0.1919)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   55.52%
-  OSR Score (mean):         75.26%
-  AUROC:                    0.8763
+  Unknown detected (TPR):   55.02%
+  OSR Score (mean):         75.01%
+  AUROC:                    0.8625
 
 --- OSR ANTI_PROTOTYPE_PER_CLASS calibration (calib data) ---
 
@@ -517,13 +466,13 @@ Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Known samples:   600
 Unknown samples: 20
-Known scores:   [-4.43, 9.89] mean=0.68
-Unknown scores: [-5.89, 8.13] mean=-0.09
-Mean separation: 0.77 (positive = known higher = good)
+Known scores:   [-0.78, 2.31] mean=0.30
+Unknown scores: [-0.56, 0.74] mean=0.11
+Mean separation: 0.19 (positive = known higher = good)
 
-Threshold (tau): -2.5796
+Threshold (tau): -0.4333
 Known accepted (TNR): 95.00%
-Unknown detected (TPR): 20.00%
+Unknown detected (TPR): 5.00%
 
 --- OSR ANTI_PROTOTYPE_PER_CLASS evaluation (test data, per-class threshold) ---
 
@@ -534,10 +483,10 @@ Threshold: per-class adaptive
 ======================================================================
 
 Results over 10 rounds:
-  Known accepted (TNR):     94.55%
-  Unknown detected (TPR):   32.42%
-  OSR Score (mean):         63.48%
-  AUROC:                    0.5888
+  Known accepted (TNR):     95.65%
+  Unknown detected (TPR):   13.27%
+  OSR Score (mean):         54.46%
+  AUROC:                    0.6228
 
 --- OSR OOD_HEAD_EXTENDED_PER_CLASS calibration (calib data) ---
 
@@ -548,21 +497,21 @@ Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Training extended OOD head (11-dim features)...
   Extended OOD head weights:
-              min_dist: -0.7112
-            dist_ratio: -0.3820
-           softmax_max: -1.2310
-               entropy: -0.8627
-             feat_norm: +0.5098
-              2nd_dist: -0.3758
-             score_gap: +0.2921
-        dist_to_center: -1.0244
-       proto_score_var: -0.1236
-       norm_dist_ratio: +0.4636
-      neighbor_density: +0.0343
-  Calib TNR: 95.00%  TPR: 65.00%  (threshold=0.2744)
-Mean separation: 0.49 (positive = known higher = good)
+              min_dist: +0.2875
+            dist_ratio: +0.1420
+           softmax_max: -2.1578
+               entropy: -1.9493
+             feat_norm: +0.8709
+              2nd_dist: +0.4849
+             score_gap: +0.4876
+        dist_to_center: -2.8742
+       proto_score_var: +0.1637
+       norm_dist_ratio: +1.0290
+      neighbor_density: -1.5204
+  Calib TNR: 95.00%  TPR: 60.00%  (threshold=0.1790)
+Mean separation: 0.54 (positive = known higher = good)
 
-Threshold (tau): 0.2744
+Threshold (tau): 0.1790
 
 --- OSR OOD_HEAD_EXTENDED_PER_CLASS evaluation (test data, per-class threshold) ---
 
@@ -573,24 +522,24 @@ Threshold: per-class adaptive
 ======================================================================
 Training extended OOD head (11-dim features)...
   Extended OOD head weights:
-              min_dist: -2.1721
-            dist_ratio: -0.8799
-           softmax_max: -0.7539
-               entropy: +1.8319
-             feat_norm: -2.5980
-              2nd_dist: -1.9846
-             score_gap: -0.9844
-        dist_to_center: +5.9398
-       proto_score_var: +2.4372
-       norm_dist_ratio: +0.4053
-      neighbor_density: +0.0838
-  Calib TNR: 95.00%  TPR: 48.38%  (threshold=0.2174)
+              min_dist: -0.7377
+            dist_ratio: -0.3920
+           softmax_max: -0.9287
+               entropy: +1.2380
+             feat_norm: +1.3776
+              2nd_dist: -0.6626
+             score_gap: -0.2413
+        dist_to_center: -0.9348
+       proto_score_var: +2.4629
+       norm_dist_ratio: +0.1032
+      neighbor_density: +0.3977
+  Calib TNR: 95.00%  TPR: 52.60%  (threshold=0.2122)
 
 Results over 10 rounds:
-  Known accepted (TNR):     97.88%
-  Unknown detected (TPR):   18.35%
-  OSR Score (mean):         58.11%
-  AUROC:                    0.8338
+  Known accepted (TNR):     98.02%
+  Unknown detected (TPR):   19.74%
+  OSR Score (mean):         58.88%
+  AUROC:                    0.8306
 
 --- OSR OOD_HEAD_OSR23_PER_CLASS calibration (calib data) ---
 
@@ -604,30 +553,30 @@ Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
   osr23 GMM converged: True
   osr23a: n_unknown=200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
   osr23e Mixup: 20 real → 200 total unknown
-    L1 C=0.01: CV-AUROC=0.9214
-    L1 C=0.05: CV-AUROC=0.9200
-    L1 C=0.10: CV-AUROC=0.9193
-    L1 C=0.50: CV-AUROC=0.9193
-    L1 C=1.00: CV-AUROC=0.9185
-  osr23d: Best L1 C=0.01 (CV-AUROC=0.9214)
-  osr23 weights (2/13 non-zero):
-                min_dist: -0.5950
-              dist_ratio: +0.0000 *
-             softmax_max: +0.0000 *
-                 entropy: +0.0000 *
-               feat_norm: +0.0000 *
+    L1 C=0.01: CV-AUROC=0.9077
+    L1 C=0.05: CV-AUROC=0.9115
+    L1 C=0.10: CV-AUROC=0.9100
+    L1 C=0.50: CV-AUROC=0.9260
+    L1 C=1.00: CV-AUROC=0.9301
+  osr23d: Best L1 C=1.00 (CV-AUROC=0.9301)
+  osr23 weights (10/13 non-zero):
+                min_dist: -0.0944
+              dist_ratio: -1.1562
+             softmax_max: -2.2144
+                 entropy: -2.9329
+               feat_norm: +2.8227
                 2nd_dist: +0.0000 *
-               score_gap: +0.0000 *
-          dist_to_center: -0.4392
-         proto_score_var: +0.0000 *
-         norm_dist_ratio: +0.0000 *
+               score_gap: +0.7210
+          dist_to_center: -5.4605
+         proto_score_var: -1.1801
+         norm_dist_ratio: +1.0691
            cluster_mahal: +0.0000 *
         cluster_post_max: +0.0000 *
-             cluster_ent: +0.0000 *
-  Calib TNR: 95.00%  TPR: 62.50%  (threshold=0.3891)
-Mean separation: 0.34 (positive = known higher = good)
+             cluster_ent: +0.2177
+  Calib TNR: 95.00%  TPR: 58.00%  (threshold=0.1596)
+Mean separation: 0.61 (positive = known higher = good)
 
-Threshold (tau): 0.3891
+Threshold (tau): 0.1596
 
 --- OSR OOD_HEAD_OSR23_PER_CLASS evaluation (test data, per-class threshold) ---
 
@@ -640,33 +589,33 @@ Training osr23e OOD head (adaptive features + robust GMM + L1 + Mixup)...
   osr23 GMM: fitting on train set (30000 samples), n_components=12, covariance=full
   osr23 GMM converged: True
   osr23a: n_unknown=7200 → full (13-dim): ['min_dist', 'dist_ratio', 'softmax_max', 'entropy', 'feat_norm', '2nd_dist', 'score_gap', 'dist_to_center', 'proto_score_var', 'norm_dist_ratio', 'cluster_mahal', 'cluster_post_max', 'cluster_ent']
-    L1 C=0.01: CV-AUROC=0.7920
-    L1 C=0.05: CV-AUROC=0.7961
-    L1 C=0.10: CV-AUROC=0.8002
-    L1 C=0.50: CV-AUROC=0.8047
-    L1 C=1.00: CV-AUROC=0.8052
-  osr23d: Best L1 C=1.00 (CV-AUROC=0.8052)
+    L1 C=0.01: CV-AUROC=0.8176
+    L1 C=0.05: CV-AUROC=0.8223
+    L1 C=0.10: CV-AUROC=0.8234
+    L1 C=0.50: CV-AUROC=0.8239
+    L1 C=1.00: CV-AUROC=0.8239
+  osr23d: Best L1 C=1.00 (CV-AUROC=0.8239)
   osr23 weights (13/13 non-zero):
-                min_dist: -2.7673
-              dist_ratio: -0.9032
-             softmax_max: -0.7303
-                 entropy: +1.9475
-               feat_norm: -2.6739
-                2nd_dist: -2.5063
-               score_gap: -0.9070
-          dist_to_center: +7.0068
-         proto_score_var: +2.5453
-         norm_dist_ratio: +0.6686
-           cluster_mahal: +0.0803
-        cluster_post_max: -0.0672
-             cluster_ent: -0.1345
-  Calib TNR: 95.00%  TPR: 48.47%  (threshold=0.2162)
+                min_dist: -0.7276
+              dist_ratio: -0.2961
+             softmax_max: -0.9193
+                 entropy: +1.2938
+               feat_norm: +1.2078
+                2nd_dist: -0.6433
+               score_gap: -0.1588
+          dist_to_center: -0.6824
+         proto_score_var: +2.5243
+         norm_dist_ratio: +0.3572
+           cluster_mahal: +0.0136
+        cluster_post_max: +0.0085
+             cluster_ent: +0.0266
+  Calib TNR: 95.00%  TPR: 52.61%  (threshold=0.1974)
 
 Results over 10 rounds:
-  Known accepted (TNR):     97.89%
-  Unknown detected (TPR):   18.39%
-  OSR Score (mean):         58.14%
-  AUROC:                    0.8339
+  Known accepted (TNR):     98.09%
+  Unknown detected (TPR):   20.16%
+  OSR Score (mean):         59.12%
+  AUROC:                    0.8271
 
 --- OSR ENSEMBLE_ANTI_OODEXT calibration (calib data) ---
 
@@ -676,9 +625,9 @@ OSR Calibration (ENSEMBLE_ANTI_OODEXT)
 Prototypes: torch.Size([6, 64]) from 6 base classes
 Training ensemble (anti_proto + ood_head_extended) fusion...
   Ensemble fusion alpha: 0.30 (Youden J=0.550)
-Mean separation: 1.77 (positive = known higher = good)
+Mean separation: 1.65 (positive = known higher = good)
 
-Threshold (tau): -1.4261
+Threshold (tau): -1.8420
 
 --- OSR ENSEMBLE_ANTI_OODEXT evaluation (test data) ---
 
@@ -687,13 +636,13 @@ OSR Evaluation (ENSEMBLE_ANTI_OODEXT)
 Mode: per-round recalibration (TNR-fixed at 95%)
 ======================================================================
 Training ensemble (anti_proto + ood_head_extended) fusion...
-  Ensemble fusion alpha: 0.30 (Youden J=0.448)
+  Ensemble fusion alpha: 0.30 (Youden J=0.453)
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   50.06%
-  OSR Score (mean):         72.53%
-  AUROC:                    0.7357
+  Unknown detected (TPR):   49.40%
+  OSR Score (mean):         72.20%
+  AUROC:                    0.7884
 
 --- OSR OOD_HEAD_EXTENDED_V2 calibration (calib data) ---
 
@@ -706,23 +655,23 @@ Training extended OOD head v2 (13-dim with GMM clusters)...
   Fitting GMM with 12 components on 600 samples...
   GMM converged: True
   Extended OOD head v2 weights:
-                min_dist: -0.1858
-              dist_ratio: -1.7344
-             softmax_max: -0.6506
-                 entropy: +0.6516
-               feat_norm: -0.1815
-                2nd_dist: -0.3973
-               score_gap: -0.5471
-          dist_to_center: -0.4905
-         proto_score_var: -0.8387
-         norm_dist_ratio: +1.3255
-           cluster_mahal: -5.0836
-        cluster_post_max: -0.0305
-             cluster_ent: +0.0409
-  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.8230)
-Mean separation: 0.93 (positive = known higher = good)
+                min_dist: +0.1146
+              dist_ratio: -0.0990
+             softmax_max: -1.5464
+                 entropy: -1.4267
+               feat_norm: +0.3464
+                2nd_dist: +0.1057
+               score_gap: +0.0374
+          dist_to_center: -1.5367
+         proto_score_var: +0.9048
+         norm_dist_ratio: +1.1380
+           cluster_mahal: -5.8123
+        cluster_post_max: -0.1122
+             cluster_ent: +0.1493
+  Calib TNR: 95.00%  TPR: 100.00%  (threshold=0.6800)
+Mean separation: 0.85 (positive = known higher = good)
 
-Threshold (tau): 0.8230
+Threshold (tau): 0.6800
 
 --- OSR OOD_HEAD_EXTENDED_V2 evaluation (test data) ---
 
@@ -734,20 +683,20 @@ Training extended OOD head v2 (13-dim with GMM clusters)...
   Fitting GMM with 12 components on 10800 samples...
   GMM converged: True
   Extended OOD head v2 weights:
-                min_dist: -2.0653
-              dist_ratio: -1.0077
-             softmax_max: -0.6859
-                 entropy: +1.9119
-               feat_norm: -2.5657
-                2nd_dist: -1.9488
-               score_gap: -1.1490
-          dist_to_center: +5.9465
-         proto_score_var: +2.4427
-         norm_dist_ratio: +0.5097
-           cluster_mahal: -0.1958
-        cluster_post_max: -0.0949
-             cluster_ent: -0.3034
-  Calib TNR: 95.00%  TPR: 49.72%  (threshold=0.2092)
+                min_dist: -0.5017
+              dist_ratio: -0.5062
+             softmax_max: -0.9892
+                 entropy: +1.2727
+               feat_norm: +1.3055
+                2nd_dist: -0.5413
+               score_gap: -0.4390
+          dist_to_center: -0.8825
+         proto_score_var: +2.5426
+         norm_dist_ratio: +0.3555
+           cluster_mahal: -0.2288
+        cluster_post_max: -0.1010
+             cluster_ent: -0.3150
+  Calib TNR: 95.00%  TPR: 54.24%  (threshold=0.1946)
   Fitting GMM with 12 components on 10800 samples...
   GMM converged: True
   Fitting GMM with 12 components on 10800 samples...
@@ -769,9 +718,9 @@ Training extended OOD head v2 (13-dim with GMM clusters)...
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   49.62%
-  OSR Score (mean):         72.31%
-  AUROC:                    0.8307
+  Unknown detected (TPR):   53.72%
+  OSR Score (mean):         74.36%
+  AUROC:                    0.8293
 
 --- OSR CLUSTER_BOUNDARY calibration (calib data) ---
 
@@ -781,10 +730,14 @@ OSR Calibration (CLUSTER_BOUNDARY)
 Prototypes: torch.Size([6, 64]) from 6 base classes
 Computing feature-space statistics...
 Training cluster boundary detector (K_sub=2, beta=1.5)...
-  Cluster boundary detector: 12 sub-clusters across 6 classes
-Mean separation: 2.41 (positive = known higher = good)
+  Cluster boundary detector: 12 sub-clusters across 6 classes/coding/plot_training.py:313: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+  plt.tight_layout()
+/coding/plot_training.py:494: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+  plt.tight_layout()
 
-Threshold (tau): 0.5521
+Mean separation: 1.92 (positive = known higher = good)
+
+Threshold (tau): 0.8576
 
 --- OSR CLUSTER_BOUNDARY evaluation (test data) ---
 
@@ -797,9 +750,9 @@ Training cluster boundary detector (K_sub=2, beta=1.5)...
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   15.17%
-  OSR Score (mean):         55.08%
-  AUROC:                    0.7160
+  Unknown detected (TPR):   3.81%
+  OSR Score (mean):         49.40%
+  AUROC:                    0.4487
 
 --- OSR ENSEMBLE_CLUSTER calibration (calib data) ---
 
@@ -813,13 +766,13 @@ Training adaptive ensemble fusion (GMM density-based alpha)...
   GMM converged: True
   Fitting GMM with 12 components on 600 samples...
   GMM converged: True
-  Adaptive ensemble: alpha in [0.30, 0.90], Youden J=0.400 (TNR=95.00%, TPR=45.00%)
+  Adaptive ensemble: alpha in [0.30, 0.90], Youden J=0.300 (TNR=95.00%, TPR=35.00%)
 Training cluster boundary detector (K_sub=2, beta=1.5)...
   Cluster boundary detector: 12 sub-clusters across 6 classes
   Three-way ensemble weights: anti=0.40, ood=0.40, boundary=0.20, Youden J=0.950
-Mean separation: 4.30 (positive = known higher = good)
+Mean separation: 3.19 (positive = known higher = good)
 
-Threshold (tau): -0.6167
+Threshold (tau): -1.0991
 
 --- OSR ENSEMBLE_CLUSTER evaluation (test data) ---
 
@@ -833,10 +786,10 @@ Training adaptive ensemble fusion (GMM density-based alpha)...
   GMM converged: True
   Fitting GMM with 12 components on 10800 samples...
   GMM converged: True
-  Adaptive ensemble: alpha in [0.30, 0.90], Youden J=0.296 (TNR=95.00%, TPR=34.61%)
+  Adaptive ensemble: alpha in [0.30, 0.90], Youden J=0.169 (TNR=95.00%, TPR=21.94%)
 Training cluster boundary detector (K_sub=2, beta=1.5)...
   Cluster boundary detector: 12 sub-clusters across 6 classes
-  Three-way ensemble weights: anti=0.60, ood=0.40, boundary=0.00, Youden J=0.358
+  Three-way ensemble weights: anti=0.40, ood=0.40, boundary=0.20, Youden J=0.379
   Fitting GMM with 12 components on 10800 samples...
   GMM converged: True
   Fitting GMM with 12 components on 10800 samples...
@@ -876,29 +829,29 @@ Training cluster boundary detector (K_sub=2, beta=1.5)...
 
 Results over 10 rounds:
   Known accepted (TNR):     95.00%
-  Unknown detected (TPR):   43.06%
-  OSR Score (mean):         69.03%
-  AUROC:                    0.6825
+  Unknown detected (TPR):   42.02%
+  OSR Score (mean):         68.51%
+  AUROC:                    0.7487
 
 ======================================================================
 OSR Method Comparison (test data, per-round recalibration)
 ======================================================================
   Method                                   TNR      TPR      OSR    AUROC
-  feature_mahalanobis                  95.00%  18.58%  56.79%   0.7053
-  anti_prototype                       95.00%  38.07%  66.53%   0.5888
-  geo_fusion                           95.00%  25.54%  60.27%   0.6668
-  ood_head                             95.00%  42.30%  68.65%   0.7863
-  ood_head_extended                    95.00%  49.19%  72.09%   0.8338
-  ood_head_osr23                       95.00%  49.27%  72.13%   0.8339
-  ood_head_cluster_v2                  95.00%  49.30%  72.15%   0.8341
-  ood_head_fusion_v2                   95.00%  55.52%  75.26%   0.8763
-  anti_prototype_per_class             94.55%  32.42%  63.48%   0.5888
-  ood_head_extended_per_class          97.88%  18.35%  58.11%   0.8338
-  ood_head_osr23_per_class             97.89%  18.39%  58.14%   0.8339
-  ensemble_anti_oodext                 95.00%  50.06%  72.53%   0.7357
-  ood_head_extended_v2                 95.00%  49.62%  72.31%   0.8307
-  cluster_boundary                     95.00%  15.17%  55.08%   0.7160
-  ensemble_cluster                     95.00%  43.06%  69.03%   0.6825
+  feature_mahalanobis                  95.00%   4.10%  49.55%   0.5811
+  anti_prototype                       95.00%  19.68%  57.34%   0.6228
+  geo_fusion                           95.00%   3.69%  49.35%   0.6056
+  ood_head                             95.00%  42.20%  68.60%   0.7979
+  ood_head_extended                    95.00%  52.43%  73.71%   0.8306
+  ood_head_osr23                       95.00%  52.36%  73.68%   0.8271
+  ood_head_cluster_v2                  95.00%  52.44%  73.72%   0.8291
+  ood_head_fusion_v2                   95.00%  55.02%  75.01%   0.8625
+  anti_prototype_per_class             95.65%  13.27%  54.46%   0.6228
+  ood_head_extended_per_class          98.02%  19.74%  58.88%   0.8306
+  ood_head_osr23_per_class             98.09%  20.16%  59.12%   0.8271
+  ensemble_anti_oodext                 95.00%  49.40%  72.20%   0.7884
+  ood_head_extended_v2                 95.00%  53.72%  74.36%   0.8293
+  cluster_boundary                     95.00%   3.81%  49.40%   0.4487
+  ensemble_cluster                     95.00%  42.02%  68.51%   0.7487
 
 Final model saved: experiment/yamnet_realfewshot_osr24/fewshot_final.pth
 
@@ -909,12 +862,8 @@ Pipeline complete!
 Generating analysis plots from: TAU22_yamnet_osr21a.log
 Output directory: experiment/yamnet_realfewshot_osr24
 
-/coding/plot_training.py:313: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
-  plt.tight_layout()
   Saved: experiment/yamnet_realfewshot_osr24/phase2_episodic_curves.png
   Saved: experiment/yamnet_realfewshot_osr24/phase3_fewshot_accuracy.png
-/coding/plot_training.py:494: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
-  plt.tight_layout()
   Saved: experiment/yamnet_realfewshot_osr24/phase3_osr_analysis.png
 
 All plots saved to: experiment/yamnet_realfewshot_osr24/

@@ -37,7 +37,7 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 # Dataset import deferred to main() based on --dataset argument
-# Available: from utils.TAU22 import TAUDataset  /  from utils.TAU19 import TAUDataset
+# Available: utils.TAU22, utils.TAU19, utils.DCASE18
 TAUDataset = None  # will be set in main()
 import yamnet_PT_inference as yamnet_infer
 from torch_audioset.yamnet.model import yamnet as torch_yamnet
@@ -176,7 +176,7 @@ class BaseClassPretrainer:
 
             for item in loader:
                 audio = item['source_audio'].to(self.device)
-                targets = item['target'].squeeze(1)  # (B, 10)
+                targets = item['target'].squeeze(1)  # (B, num_classes)
                 labels = self._remap_label(targets).to(self.device)
 
                 # NOTE: No autocast! YAMNet BatchNorm1d produces NaN in fp16.
@@ -5516,8 +5516,11 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description='Episodic Meta-Trainer for Few-Shot OSR')
     parser.add_argument('--dataset', type=str, default='tau22',
-                        choices=['tau22', 'tau19'],
-                        help='Dataset: tau22 (TAU Urban Acoustic Scenes 2022) or tau19 (DCASE 2019 Task 1a)')
+                        choices=['tau22', 'tau19', 'dcase18'],
+                        help='Dataset: tau22 (TAU22), tau19 (DCASE2019 Task 1a), '
+                             'dcase18 (DCASE2018 Task 5)')
+    parser.add_argument('--fold', type=int, default=1, choices=[1, 2, 3, 4],
+                        help='Cross-validation fold for DCASE18 (default: 1)')
     parser.add_argument('--eval_only', action='store_true',
                         help='Skip training, load checkpoint and run evaluation only')
     parser.add_argument('--checkpoint', type=str, default=None,
@@ -5547,16 +5550,34 @@ def main():
             'base_pretrained': 'experiment/yamnet_fewshot_osr22/base_feature_extractor.pth',
             'contrastive_pretrained': 'experiment/yamnet_fewshot_osr22/contrastive_feature_extractor.pth',
         },
+        'dcase18': {
+            'import_module': 'utils.DCASE18',
+            'import_class': 'DCASE18Dataset',
+            'experiment_dir': 'experiment/yamnet_realfewshot_osr24_dcase18',
+            'cache_version': 'v24_dcase18_fewshot_yamnet_normalized',
+            'base_classes': [0, 1, 2, 3, 4],
+            'unknown_classes': [5, 6, 7, 8],
+            'base_pretrained': None,
+            'contrastive_pretrained': None,
+        },
     }
 
     cfg = DATASET_CONFIGS[args.dataset]
 
-    # Dynamic import
-    import importlib
-    _mod = importlib.import_module(cfg['import_module'])
+    # Dynamic import — DCASE18 uses partial to bind the fold kwarg
     global TAUDataset
-    TAUDataset = getattr(_mod, cfg['import_class'])
-    print(f"Dataset: {args.dataset} (TAUDataset from {cfg['import_module']})")
+    if args.dataset == 'dcase18':
+        from functools import partial
+        from utils.DCASE18 import DCASE18Dataset
+        TAUDataset = partial(DCASE18Dataset, fold=args.fold)
+        print(f"Dataset: {args.dataset} fold={args.fold} (DCASE18Dataset with partial fold)")
+        cache_dataset_name = f'dcase18_fold{args.fold}'
+    else:
+        import importlib
+        _mod = importlib.import_module(cfg['import_module'])
+        TAUDataset = getattr(_mod, cfg['import_class'])
+        print(f"Dataset: {args.dataset} (TAUDataset from {cfg['import_module']})")
+        cache_dataset_name = None
 
     torch.manual_seed(42)
     random.seed(42)
@@ -5676,24 +5697,25 @@ def main():
         calib_dataset = TAUDataset(split='calib')
         test_dataset = TAUDataset(split='test')
 
-        train_cache = FeatureCache()
+        train_cache = FeatureCache(dataset_name=cache_dataset_name)
         train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
 
         # osr17e: Load normalization stats from cache file (not from already-normalized features)
         # osr17d bug: recomputed mean/std from normalized features → ≈0/≈1, wrong for new extractions
-        train_cache_data = torch.load(
-            os.path.join('experiment/fewshot_cache', 'train_features.pt'), weights_only=True)
+        _train_cache_path = os.path.join('experiment/fewshot_cache',
+            f'{cache_dataset_name}_train_features.pt' if cache_dataset_name else 'train_features.pt')
+        train_cache_data = torch.load(_train_cache_path, weights_only=True)
         train_norm_mean = train_cache_data.get('norm_mean', None)
         train_norm_std = train_cache_data.get('norm_std', None)
         if train_norm_mean is not None:
             print(f"  Loaded norm stats from cache: mean_range=[{train_norm_mean.min():.4f}, {train_norm_mean.max():.4f}] "
                   f"std_range=[{train_norm_std.min():.4f}, {train_norm_std.max():.4f}]")
 
-        calib_cache = FeatureCache()
+        calib_cache = FeatureCache(dataset_name=cache_dataset_name)
         calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64,
                                        norm_mean=train_norm_mean, norm_std=train_norm_std)
 
-        test_cache = FeatureCache()
+        test_cache = FeatureCache(dataset_name=cache_dataset_name)
         test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64,
                                       norm_mean=train_norm_mean, norm_std=train_norm_std)
 
@@ -5779,21 +5801,22 @@ def main():
 
         # Load cached features
         cache_dir = 'experiment/fewshot_cache'
+        _cache_prefix = f'{cache_dataset_name}_' if cache_dataset_name else ''
         for split_name in ['train', 'calib', 'test']:
-            fpath = os.path.join(cache_dir, f'{split_name}_features.pt')
+            fpath = os.path.join(cache_dir, f'{_cache_prefix}{split_name}_features.pt')
             if not os.path.exists(fpath):
                 raise FileNotFoundError(
                     f"Feature cache not found: {fpath}\n"
                     f"Run full training first to generate caches.")
 
-        train_cache = FeatureCache()
-        train_cache.load(os.path.join(cache_dir, 'train_features.pt'))
+        train_cache = FeatureCache(dataset_name=cache_dataset_name)
+        train_cache.load(os.path.join(cache_dir, f'{_cache_prefix}train_features.pt'))
 
-        calib_cache = FeatureCache()
-        calib_cache.load(os.path.join(cache_dir, 'calib_features.pt'))
+        calib_cache = FeatureCache(dataset_name=cache_dataset_name)
+        calib_cache.load(os.path.join(cache_dir, f'{_cache_prefix}calib_features.pt'))
 
-        test_cache = FeatureCache()
-        test_cache.load(os.path.join(cache_dir, 'test_features.pt'))
+        test_cache = FeatureCache(dataset_name=cache_dataset_name)
+        test_cache.load(os.path.join(cache_dir, f'{_cache_prefix}test_features.pt'))
 
         print(f"Caches loaded: train={len(train_cache.features)}, "
               f"calib={len(calib_cache.features)}, test={len(test_cache.features)}")

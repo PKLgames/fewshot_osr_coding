@@ -1,0 +1,32 @@
+{
+  "friedman_stat": 49.28571428571428,
+  "friedman_p": 1.9399972981154434e-09,
+  "significant": true,
+  "avg_ranks": {
+    "anti_proto": 5.5,
+    "mahalanobis": 5.5,
+    "osr23": 2.0,
+    "extended_v2": 3.75,
+    "cluster_v2": 2.5,
+    "fusion_v2": 1.75
+  },
+  "critical_difference": 3.077963341778673,
+  "significant_pairs": [
+    [
+      "anti_proto",
+      "osr23"
+    ],
+    [
+      "anti_proto",
+      "fusion_v2"
+    ],
+    [
+      "mahalanobis",
+      "osr23"
+    ],
+    [
+      "mahalanobis",
+      "fusion_v2"
+    ]
+  ]
+}

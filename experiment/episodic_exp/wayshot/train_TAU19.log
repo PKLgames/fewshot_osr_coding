@@ -2059,3 +2059,121 @@ Computing feature-space statistics...
 Training osr24b OOD head (13-dim with train-set GMM clusters)...
   osr23 GMM: fitting on calib set (1200 samples), n_components=12, covariance=full
   osr23 GMM converged: True
+  osr24b OOD head weights:
+                min_dist: -0.8611
+              dist_ratio: +0.5575
+             softmax_max: -0.6993
+                 entropy: +0.6069
+               feat_norm: +0.8785
+                2nd_dist: -1.2044
+               score_gap: -1.0325
+          dist_to_center: +1.0724
+         proto_score_var: +0.3861
+         norm_dist_ratio: -1.1631
+           cluster_mahal: -4.5649
+        cluster_post_max: -0.5175
+             cluster_ent: -0.8079
+  Calib TNR: 95.00%  TPR: 90.00%  (threshold=0.4625)
+Mean separation: 0.81 (positive = known higher = good)
+
+Threshold (tau): 0.4625
+
+======================================================================
+OSR Evaluation (OOD_HEAD_CLUSTER_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b OOD head (13-dim with train-set GMM clusters)...
+  osr23 GMM: fitting on calib set (6000 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b OOD head weights:
+                min_dist: -3.1051
+              dist_ratio: -0.0255
+             softmax_max: -0.9552
+                 entropy: -0.3923
+               feat_norm: +0.5495
+                2nd_dist: -2.8726
+               score_gap: +0.1555
+          dist_to_center: +3.3615
+         proto_score_var: +0.6728
+         norm_dist_ratio: +1.0662
+           cluster_mahal: -1.3718
+        cluster_post_max: -0.0375
+             cluster_ent: -0.1861
+  Calib TNR: 95.00%  TPR: 73.02%  (threshold=0.2315)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   73.65%
+  OSR Score (mean):         84.33%
+  AUROC:                    0.9332
+
+======================================================================
+OSR Calibration (OOD_HEAD_FUSION_V2)
+======================================================================
+Prototypes: torch.Size([6, 64]) from 6 base classes
+Computing feature-space statistics...
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (1200 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -0.9460
+              dist_ratio: +0.2959
+             softmax_max: -0.9047
+                 entropy: +0.6336
+               feat_norm: +1.3260
+                2nd_dist: -1.5030
+               score_gap: -1.4617
+          dist_to_center: +0.5054
+         proto_score_var: +0.8063
+         norm_dist_ratio: -1.1970
+           cluster_mahal: -4.6095
+        cluster_post_max: -0.2730
+             cluster_ent: -0.6461
+        anti_proto_score: -0.8472 ← NEW
+  Calib TNR: 95.00%  TPR: 90.83%  (threshold=0.4440)
+Mean separation: 0.83 (positive = known higher = good)
+
+Threshold (tau): 0.3852
+
+======================================================================
+OSR Evaluation (OOD_HEAD_FUSION_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (6000 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -4.0692
+              dist_ratio: +0.1344
+             softmax_max: -1.7207
+                 entropy: -2.4007
+               feat_norm: +1.1288
+                2nd_dist: -3.7846
+               score_gap: +0.1191
+          dist_to_center: +1.5719
+         proto_score_var: +0.5085
+         norm_dist_ratio: +1.0784
+           cluster_mahal: -1.2172
+        cluster_post_max: -0.1722
+             cluster_ent: -0.3657
+        anti_proto_score: -3.0407 ← NEW
+  Calib TNR: 95.00%  TPR: 89.85%  (threshold=0.2715)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   92.31%
+  OSR Score (mean):         93.65%
+  AUROC:                    0.9807
+
+Results saved to experiment/episodic_exp/wayshot/results.json
+
+============================================================
+WAY-SHOT SWEEP SUMMARY
+============================================================
+  Config         Acc    CI95      AP     Mah     O23   ExtV2   CluV2   FusV2
+  5w10s      42.80%  1.28% 67.09% 57.47% 83.96% 83.53% 83.80% 93.42%
+  5w1s       34.85%  1.53% 72.59% 64.56% 83.98% 83.60% 83.82% 88.42%
+  5w5s       43.17%  1.34% 71.22% 61.55% 83.80% 83.34% 83.68% 92.98%
+  6w10s      39.27%  1.12% 67.84% 60.80% 84.40% 83.95% 84.33% 93.65%
+  6w1s       30.01%  1.44% 50.55% 59.40% 84.27% 83.87% 84.22% 89.22%
+  6w5s       38.69%  1.31% 69.68% 61.64% 85.16% 84.90% 85.10% 92.97%

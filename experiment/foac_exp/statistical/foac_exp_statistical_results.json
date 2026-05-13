@@ -1,0 +1,33 @@
+{
+  "friedman_stat": 7.142857142857139,
+  "friedman_p": 0.2102308088634859,
+  "significant": "False",
+  "avg_ranks": {
+    "full_model": 5.0,
+    "wo_CIAM": 3.5,
+    "wo_PAM": 2.0,
+    "wo_NPM": 3.5,
+    "only_NPM": 5.5,
+    "baseline_no_modules": 1.5
+  },
+  "critical_difference": 7.539439634349492,
+  "significant_pairs": [],
+  "ranks_per_dataset": [
+    [
+      6.0,
+      4.0,
+      3.0,
+      2.0,
+      5.0,
+      1.0
+    ],
+    [
+      4.0,
+      3.0,
+      1.0,
+      5.0,
+      6.0,
+      2.0
+    ]
+  ]
+}

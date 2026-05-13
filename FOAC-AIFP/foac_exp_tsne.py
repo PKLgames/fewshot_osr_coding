@@ -54,7 +54,12 @@ def load_config(config_path):
 def extract_features(model, dataloader, args, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    """Extract features from dataloader, grouped by class."""
+    """Extract features from dataloader, grouped by class.
+
+    FOAC dataloader returns raw audio tensors of shape (1, N, 16000).
+    model.encode() expects (N, 16000) — 2D: batch × time (no channel dim;
+    the internal Spectrogram adds it via input[:, None, :]).
+    """
     model.eval()
     features = []
     labels = []
@@ -67,12 +72,9 @@ def extract_features(model, dataloader, args, device=None):
                 supp_idx, open_idx = data
 
             # Support features (known/base classes)
-            s_data = support_data.float().squeeze().to(device)
-            s_label = support_label.squeeze().cpu().numpy()
-            if s_data.dim() == 4:
-                s_data = s_data.view(-1, *s_data.shape[2:])
-            elif s_data.dim() == 2:
-                s_data = s_data.unsqueeze(1)
+            # (1, N, 16000) → (N, 16000)
+            s_data = support_data.float().squeeze(0).to(device)
+            s_label = support_label.squeeze(0).cpu().numpy()
             s_feat, _ = model.encode(s_data)
             s_feat = s_feat.cpu().numpy()
 
@@ -82,14 +84,10 @@ def extract_features(model, dataloader, args, device=None):
                 splits.append('known')
 
             # Open-set features (unknown/novel classes)
-            o_data = openset_data.float().squeeze().to(device)
-            o_label = openset_label.squeeze().cpu().numpy()
+            o_data = openset_data.float().squeeze(0).to(device)
+            o_label = openset_label.squeeze(0).cpu().numpy()
             if o_data.numel() == 0:
-                continue  # skip empty openset
-            if o_data.dim() == 4:
-                o_data = o_data.view(-1, *o_data.shape[2:])
-            elif o_data.dim() == 2:
-                o_data = o_data.unsqueeze(0)
+                continue
             o_feat, _ = model.encode(o_data)
             o_feat = o_feat.cpu().numpy()
 
@@ -199,8 +197,14 @@ def main():
         return
 
     state_dict = torch.load(ckpt_path, map_location=device, weights_only=False)
-    model.weight_base.data.copy_(state_dict['weight_base'].to(device))
-    model.weight_base_open.data.copy_(state_dict['weight_base_open'].to(device))
+
+    # weight_base / weight_base_open are dynamically registered in init_representation(),
+    # not in __init__. Pre-create them so load_state_dict can find them.
+    if 'weight_base' in state_dict:
+        model.weight_base = nn.Parameter(state_dict['weight_base'].to(device))
+    if 'weight_base_open' in state_dict:
+        model.weight_base_open = nn.Parameter(state_dict['weight_base_open'].to(device))
+
     model.load_state_dict(state_dict, strict=False)
 
     test_loader = dataloaders.meta_test_dataloader(args)
@@ -223,13 +227,17 @@ def main():
             f'model_{dataset}_max_acc.pth')
         if os.path.exists(baseline_ckpt):
             state = torch.load(baseline_ckpt, map_location=device)
-            model_baseline.weight_base = state['weight_base'].to(device)
-            model_baseline.weight_base_open = state['weight_base_open'].to(device)
+            if 'weight_base' in state:
+                model_baseline.weight_base = nn.Parameter(state['weight_base'].to(device))
+            if 'weight_base_open' in state:
+                model_baseline.weight_base_open = nn.Parameter(state['weight_base_open'].to(device))
             model_baseline.load_state_dict(state, strict=False)
         else:
             print(f"  No baseline checkpoint found, using same weights (feature comparison only)")
-            model_baseline.weight_base = state_dict['weight_base'].to(device)
-            model_baseline.weight_base_open = state_dict['weight_base_open'].to(device)
+            if 'weight_base' in state_dict:
+                model_baseline.weight_base = nn.Parameter(state_dict['weight_base'].to(device))
+            if 'weight_base_open' in state_dict:
+                model_baseline.weight_base_open = nn.Parameter(state_dict['weight_base_open'].to(device))
             model_baseline.load_state_dict(state_dict, strict=False)
 
         features_bl, labels_bl, splits_bl = extract_features(

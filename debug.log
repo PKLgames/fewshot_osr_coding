@@ -1,1 +1,34 @@
-python: can't open file '/coding/foac_exp_ablation.py': [Errno 2] No such file or directory
+Dataset: dcase18 fold=1 (DCASE18Dataset with partial fold)
+GPU: NVIDIA GeForce RTX 4090
+VRAM: 23.5 GB
+
+======================================================================
+Few-Shot Open Set Recognition - Episodic Training Pipeline (osr24)
+Backbone: yamnet  |  Dataset: dcase18
+======================================================================
+
+Loading datasets...
+Dynamic-load mode: 25000 segments across 2500 files
+
+======================================================================
+Phase 0a: Contrastive Pre-training (SimCLR → SupCon)
+  - First half: SimCLR (all classes, no label leakage)
+  - Second half: SupCon (base classes only, discriminative)
+  - yamnet last layers unfrozen for acoustic scene adaptation
+======================================================================
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+
+======================================================================
+Phase 0a: Contrastive Pre-training
+======================================================================
+Samples:         25000
+Epochs:          200
+Batch size:      2048
+Temperature:     0.1
+Backbone unfreeze: ['layer7', 'layer8', 'layer9', 'layer10', 'layer11', 'layer12', 'layer13', 'layer14']
+Mode:            SimCLR (ep 1-100) → SupCon (ep 101-200)
+Base classes:    [0, 1, 2, 3, 4, 5]
+======================================================================
+
+Epoch  1/200 [SimCLR] | Loss: 7.7367 | LR: 3.00e-04
+Epoch  2/200 [SimCLR] | Loss: 7.0238 | LR: 3.00e-04

@@ -252,7 +252,11 @@ class My_Net(nn.Module):
         else:
             # New format: derive centers from fc layer weights in state_dict
             state_dict = params.get('params', params.get('feature_params', params))
-            fc_weight = state_dict['fc.weight']  # (train_classes, 512)
+            fc_weight = state_dict['fc.weight']  # (pretrain_classes, 512)
+            if fc_weight.shape[0] != self.args.train_classes:
+                # Pretrained model has different number of classes — random init
+                fc_weight = torch.randn(self.args.train_classes, fc_weight.shape[1],
+                                        device=fc_weight.device, dtype=fc_weight.dtype)
             self.weight_base = nn.Parameter(fc_weight * self.args.open_weight_sum_cali, requires_grad=True)
             self.weight_base_open = nn.Parameter(-fc_weight * self.args.open_weight_sum_cali, requires_grad=True)
 

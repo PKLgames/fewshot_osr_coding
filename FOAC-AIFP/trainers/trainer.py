@@ -420,6 +420,10 @@ class Train_Manager:
             from datasets.TAU19 import TAU19Pretrain
             train_set = TAU19Pretrain(root=self.args.dataroot, phase="train", index=self.args.train_classes, base_sess=True)
             save_model_path = os.path.join(self.args.save_folder, f'pretrain_model_tau19.pth')
+        elif self.args.dataset == 'DCASE18':
+            from datasets.DCASE18 import DCASE18Pretrain
+            train_set = DCASE18Pretrain(root=self.args.dataroot, phase="train", index=self.args.train_classes, base_sess=True, args=self.args)
+            save_model_path = os.path.join(self.args.save_folder, f'pretrain_model_dcase18.pth')
 
         trainloader = torch.utils.data.DataLoader(dataset=train_set, batch_size=self.args.batch_size, shuffle=True,
                                               num_workers=8, pin_memory=True)
@@ -629,6 +633,7 @@ def run_osr_eval(net, args, logger=None):
     """
     from datasets.TAU22 import TAU22Pretrain
     from datasets.TAU19 import TAU19Pretrain
+    from datasets.DCASE18 import DCASE18Pretrain
     if logger is None:
         logger = get_logger(os.path.join(args.save_folder, 'osr.log'))
 
@@ -639,24 +644,32 @@ def run_osr_eval(net, args, logger=None):
     logger.info("  Test set:  final evaluation")
     logger.info("=" * 70)
 
-    PretrainClass = TAU22Pretrain if args.dataset == 'TAU22' else TAU19Pretrain
+    if args.dataset == 'TAU22':
+        PretrainClass = TAU22Pretrain
+        n_classes = 10
+    elif args.dataset == 'TAU19':
+        PretrainClass = TAU19Pretrain
+        n_classes = 10
+    elif args.dataset == 'DCASE18':
+        PretrainClass = DCASE18Pretrain
+        n_classes = 9
 
-    # Step 1a: Extract features from calib data (all 10 classes) — for prototypes
-    logger.info("Extracting calib features (all 10 classes)...")
+    # Step 1a: Extract features from calib data (all classes) — for prototypes
+    logger.info(f"Extracting calib features (all {n_classes} classes)...")
     calib_dataset = PretrainClass(
-        root=args.dataroot, phase='calib', index=10
+        root=args.dataroot, phase='calib', index=n_classes, args=args
     )
     calib_feats = extract_all_features(net, calib_dataset)
 
-    # Step 1b: Extract features from test data (all 10 classes) — for evaluation
-    logger.info("Extracting test features (all 10 classes)...")
+    # Step 1b: Extract features from test data (all classes) — for evaluation
+    logger.info(f"Extracting test features (all {n_classes} classes)...")
     test_dataset = PretrainClass(
-        root=args.dataroot, phase='test', index=10
+        root=args.dataroot, phase='test', index=n_classes, args=args
     )
     test_feats = extract_all_features(net, test_dataset)
 
-    known_classes = list(range(args.train_classes))  # 0-5
-    unknown_classes = list(range(args.train_classes, 10))  # 6-9
+    known_classes = list(range(args.train_classes))
+    unknown_classes = list(range(args.train_classes, n_classes))
 
     # Evaluation uses test set
     known_all = torch.cat([test_feats[c] for c in known_classes])

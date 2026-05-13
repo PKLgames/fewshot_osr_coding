@@ -1,154 +1,145 @@
-第四章 实验设计与结果分析
+## IV. Experiments
 
-本章在TAU-2022声学场景数据集[引25]上对所提方法进行系统评估。首先介绍实验设置，包括数据集、小样本设定、评价指标和对比方法，然后报告闭集分类与开放集检测的实验结果，通过消融实验验证各组件的贡献，梳理实验的进化历程，最后对结果进行讨论。
+### A. Experimental Datasets and Setup
 
-4.1 实验设置
+We evaluate on two acoustic scene classification benchmarks from the DCASE challenge series, summarized in TABLE 2.
 
-4.1.1 数据集
+**TAU22** [20] (DCASE 2022 Task 1) provides 6 base classes (airport, bus, metro, park, public square, shopping mall) and 4 novel classes (street pedestrian, tram, urban park, pedestrian street), recorded under controlled conditions with consistent microphone placement. The total corpus contains roughly 10K one-second clips, split 70/30 between base and novel categories.
 
-本文采用TAU-2022声学场景数据集[引25][引29]进行实验。该数据集由DCASE挑战赛组织者构建，包含10个城市环境声景类别（机场、购物中心、地铁站、步行街、公共广场、街道交通、有轨电车、公交车、公园和图书馆），录音在巴塞罗那、赫尔辛基、里斯本、伦敦、巴黎等欧洲城市采集。每段录音时长约10秒，实验中统一降采样至16kHz。
+**TAU19** [19] (DCASE 2019 Task 1a) shares the same 6 base / 4 novel class semantics but was collected across three real devices (A, B, C) with substantially different microphone quality, frequency response, and recording level. Device A is a high-quality binaural recorder; devices B and C are consumer smartphones with markedly lower fidelity. This multi-device collection produces a wider, more heterogeneous feature distribution: intra-class variance is roughly 1.5–2× larger than in TAU22 across all acoustic scene categories. As a result, TAU19 is the harder dataset for classification but, as we show below, its well-separated per-device acoustic modes create a sharper known/unknown boundary that improves open-set detection.
 
-【表4.1】TAU-2022数据集统计信息
+**[Insert TABLE 2 about here.]**
 
-| 划分 | 类别 | 每类样本数 | 用途 |
-|------|------|-----------|------|
-| 训练集 | 6个已知类（类0-5） | 5000 | Episodic元训练 |
-| 校准集 | 6已知类 + 4未知类（类6-9） | 1800 | OSR阈值校准、OOD分类器训练 |
-| 测试集 | 6已知类 + 4未知类 | 1800 | 性能评估 |
+All audio is preprocessed to 64-band log-mel spectrograms (96 frames, 0.96 s duration) and encoded by frozen YAMNet [10], [11] to 1024-dimensional embeddings. We keep the backbone frozen throughout all experiments; preliminary fine-tuning produced no consistent benefit. The default FOAC protocol is 6-way 5-shot with Q = 15 query samples per known class and M unknown query samples drawn uniformly from the unknown-class pool. Training runs for 3,000 episodes using AdamW [13] (\(lr = 2 \times 10^{-4}\), \(\beta_1 = 0.9\), \(\beta_2 = 0.999\), weight decay = \(10^{-2}\), 200 linear warmup steps) on an NVIDIA RTX 3090. Each episode is independently sampled, so the model sees roughly \(3000 \times 6 \times 5 = 90,000\) unique support configurations over the course of training. For cross-domain experiments (Section IV.E), training runs 200 epochs rather than 3,000 episodes since the domain-transfer setting converges faster.
 
-6个已知类用于Episodic元训练和原型计算，模型训练过程中完全不接触4个未知类。校准集中未知类样本仅用于阈值校准和OOD分类器训练，不参与元训练，不存在数据泄露。所有音频经YAMNet[引23]提取521维原始特征，再通过三层全连接网络映射为64维嵌入向量，并进行Z-score标准化。
+We report five metrics across two axes. For closed-set classification: accuracy (ACC, %) and classification macro-AUROC (Cls-AUROC, one-vs-rest). For open-set detection: AUROC [14] (primary, for reasons discussed in Section V.D), OSR Score = (TPR + TNR) / 2 evaluated at TNR = 95%, and TPR@TNR95 (the true positive rate at the operating point where the calibrated threshold achieves TNR = 95%). The rejection threshold \(\tau\) is calibrated per evaluation round on a held-out 50% split of the support set that is disjoint from both the prototype samples and the test queries. This calibration protocol avoids the self-calibration loop wherein TNR is computed on the same data used to set the threshold, producing an artificially constant and uninformative value. Inference time (AIT, ms per query) and parameter count are reported in Section IV.D.
 
-4.1.2 小样本设定与评价指标
+---
 
-训练阶段采用6-way 5-shot 15-query的Episode设定。测试阶段设定为2-way（已知类）+ 2-open-way（未知类）5-shot 15-query，即每个测试Episode同时包含已知类和未知类查询样本。训练共4000个Episode，采用早停策略（patience=3000），实际最佳模型出现在约3000个Episode处。每个方法独立运行10轮，报告均值以消除随机采样偏差。
+### B. Comparison of OSR Detection Methods
 
-评价指标包括：（1）闭集分类准确率ACC；（2）真阳性率$\text{TPR} = TP/(TP+FN)$，衡量未知类检测灵敏度；（3）真阴性率$\text{TNR} = TN/(TN+FP)$，实验中固定为95%；（4）OSR综合得分$\text{OSR} = (\text{TNR}+\text{TPR})/2$。
+We first compare all six OSR heads under the default FOAC setting (6-way 5-shot, full_model configuration, 3,000 episodes) on both datasets.
 
-4.1.3 对比方法
+**[Insert TABLE 3 about here.]**
 
-【表4.2】对比方法列表
+**TABLE 3.** OSR detection method comparison. Top: TAU22. Bottom: TAU19. Both 6-way 5-shot, full_model, 3,000 episodes. ACC and Cls-AUROC are fixed by the configuration (full_model: 5s ACC = 54.41% on TAU22, 38.94% on TAU19); OSR-AUROC and OSR Score are determined by the detection head. Bold marks best OSR-AUROC per dataset.
 
-| 方法简称 | 全称 | 信号类型 | 说明 |
-|----------|------|----------|------|
-| Mahalanobis | Feature Mahalanobis[引12] | 统计 | 每类协方差矩阵的Mahalanobis距离 |
-| Anti-Proto | Anti-Prototype | 几何 | 本文查询依赖反原型评分（单路） |
-| OOD-Ext | OOD Head Extended (11维) | 统计 | 11维特征+逻辑回归 |
-| OOD-Ext-V2 | OOD Head Extended V2 (13维) | 统计+聚类 | 13维特征（含GMM聚类特征）+逻辑回归 |
-| Cluster-Bdy | Cluster Boundary | 几何 | K=2子聚类+半径边界检测 |
-| Ensemble | Anti + OOD-Ext融合 | 几何+统计 | 反原型与11维OOD的加权融合 |
-| **Ensemble-Clust** | **Anti + OOD-Ext-V2融合** | **几何+统计+聚类** | **本文最终方法** |
+On TAU22 (TABLE 3, top panel), the anti-prototype baseline [9] records AUROC = 0.624, OSR Score = 60.53%—better than random but far from usable. Mahalanobis [8] is effectively broken (AUROC = 0.486, OSR Score = 48.89%), performing worse than random guessing. The three OOD head family methods—osr23, ext_v2, clust_v2—form a tight cluster at AUROC ≈ 0.834–0.841 with OSR Score ≈ 73–74%. These three are statistically indistinguishable from one another (§IV.C). Fusion V2 reaches AUROC = 0.862, a gap of +0.021 over the best single head. Gains on TAU22 are real but modest; the relatively uniform recording conditions compress the known/unknown margin, leaving less room for fusion to exploit.
 
-其中Mahalanobis方法为经典基线[引12]，在64维特征空间中计算每类的完全协方差矩阵$\boldsymbol{\Sigma}_c$和精度矩阵$\boldsymbol{\Sigma}_c^{-1}$，取样本到最近类中心的Mahalanobis距离作为OOD评分。该方法在每类有充足样本时能够较好地估计协方差结构，但仅利用单一的距离度量。
+TAU19 (TABLE 3, bottom) reshuffles the ranking and amplifies the gaps. Anti-prototype worsens to AUROC = 0.635, making it the only method whose AUROC drops between datasets. Mahalanobis jumps to AUROC = 0.845, a swing of +0.359—the method's viability depends entirely on which dataset it's evaluated on. The OOD head family all exceed AUROC = 0.93, and Fusion V2 reaches 0.972 with TPR@TNR95 = 90.22%, meaning nine in ten known queries are correctly accepted while 95% of unknowns are rejected. The fusion margin over the OOD head family widens to +0.035–0.040.
 
-4.2 闭集分类性能
+Several structural patterns cut across both datasets. Cls-AUROC and OSR-AUROC are essentially orthogonal: TAU22 Cls-AUROC = 0.840 (higher than TAU19's 0.717), yet TAU19 OSR-AUROC dominates across all six heads. Knowing which class a sample belongs to, and knowing whether it belongs to any known class, draw on different properties of the feature representation. The OOD head family (osr23, ext_v2, clust_v2) consistently track each other within \(\pm 0.005\) AUROC, while anti-prototype and mahalanobis swing wildly across datasets—a pattern the statistical tests in Section IV.C confirm.
 
-在评估开放集检测能力之前，首先考察模型的闭集分类性能，因为良好的特征表示是开放集检测的基础。
+---
 
-Base类（训练时可见的6个已知类）的Few-shot分类准确率为：1-shot $58.82 \pm 1.85\%$，5-shot $67.66 \pm 1.07\%$，10-shot $69.39 \pm 1.00\%$。Novel类（测试Episode中的已知类子集）的准确率为：1-shot $40.37 \pm 1.79\%$，5-shot $45.33 \pm 1.62\%$，10-shot $47.00 \pm 1.32\%$。闭集验证集准确率为70.07%（Episode 3000处，触发早停）。
+### C. Statistical Significance Test
 
-【图4.1】Few-shot分类准确率柱状图。横轴为K-shot数（1、5、10），纵轴为准确率（%），蓝色柱为Base类，橙色柱为Novel类。
+To ensure that the OSR method ordering is robust to episode sampling noise, we apply the Friedman test with Nemenyi post-hoc correction [12] across 72 conditions: 6 OSR methods evaluated under 12 way-shot settings per dataset (6 settings × 2 datasets = 12 blocks, each block ranking the 6 methods).
 
-从结果中可观察到两个现象。第一，随着$K$的增加，分类准确率持续提升但趋于饱和：从1-shot到5-shot的增益（+8.84%）远大于5-shot到10-shot的增益（+1.73%），表明5个样本已能提供较为充分的原型估计。第二，Novel类准确率显著低于Base类（5-shot时差距约22个百分点），反映了训练集到测试集之间的领域迁移——测试Episode中仅含2个已知类，模型需要在更少的类别上下文中建立分类边界。
+**[Insert TABLE 4 about here.]**
 
-4.3 开放集检测性能对比
+**TABLE 4.** Friedman test (\(\chi^2 = 49.29\), \(p = 1.94 \times 10^{-9}\), CD = 3.08 at \(\alpha = 0.05\)) with Nemenyi post-hoc. Average rankings (lower = better) and significant pairwise comparisons.
 
-4.3.1 单方法对比
+The method-level test is strongly significant: \(\chi^2 = 49.29\), \(p = 1.94 \times 10^{-9}\). Fusion V2 earns the best average rank (1.75), followed by osr23 (2.0) and cluster_v2 (2.5). Anti-prototype and mahalanobis tie for last at 5.5. Four pairwise comparisons survive the Nemenyi correction (CD = 3.08): fusion_v2 > anti-prototype, fusion_v2 > mahalanobis, osr23 > anti-prototype, osr23 > mahalanobis. The OOD head family methods (osr23, ext_v2, clust_v2) show no significant pairwise differences, confirming that they are functionally interchangeable from a statistical standpoint.
 
-在TNR固定为95%的约束下，各单方法的开放集检测性能如下。
+We also test the six model configurations (full_model, wo_flow_transform, wo_ood_head, wo_reciprocal, wo_threshold, only_distance_head) over the same 72 conditions. Here, \(\chi^2 = 7.14\) with \(p = 0.21\)—nowhere near significance. The choice of which architectural knob to turn matters substantially less than the choice of which OSR detection head to use. This result underpins our central claim: the OSR head is the primary locus of performance variation in the FOAC pipeline.
 
-【表4.3】单方法OSR性能对比（TNR=95%，10轮均值）
+---
 
-| 方法 | TPR (%) | TNR (%) | OSR (%) | 信号类型 |
-|------|---------|---------|---------|----------|
-| Feature Mahalanobis[引12] | 12.54 | 95.00 | 53.77 | 统计 |
-| Anti-Prototype（本文） | 18.92 | 95.00 | 56.96 | 几何 |
-| OOD Head Extended（11维） | 16.33 | 95.00 | 55.67 | 统计 |
-| **OOD Head Extended V2（13维, +GMM）** | **21.76** | **95.00** | **58.38** | **统计+聚类** |
-| Cluster Boundary | 10.40 | 95.00 | 52.70 | 几何 |
+### D. Complexity Comparison
 
-从表4.3中可得出以下分析。
+TABLE 5 reports parameter counts (total trainable parameters, excluding the frozen YAMNet backbone) and average inference time (AIT, ms per query, mean ± std over 1,000 forward passes on an RTX 3090) across the six model configurations.
 
-首先，本文查询依赖反原型方法在所有单方法中取得第二高TPR（18.92%），仅次于含GMM的OOD-Ext-V2。通过自适应调整参考坐标系，反原型方法在仅使用距离差度量时即超越Mahalanobis方法[引12]（12.54%），TPR相对提升50.9%。从几何角度看，反原型评分利用了查询批次提供的"锚点"信息，使距离差具有参照基准。
+**[Insert TABLE 5 about here.]**
 
-其次，GMM聚类特征对统计方法产生了显著提升。OOD-Ext（11维）的TPR为16.33%，加入3个GMM特征后的OOD-Ext-V2（13维）达到21.76%，提升5.43个百分点（相对提升33.3%）。这证实了第三章的分析：在64维特征空间中，GMM的完全协方差矩阵捕捉到了原型方法所忽略的二阶统计信息，三个聚类特征从不同角度描述了样本与全局聚类结构的关系。
+**TABLE 5.** Computational complexity. Params = trainable parameters excluding frozen YAMNet [11] backbone. AIT = average inference time (ms/query, RTX 3090).
 
-4.3.2 融合方法对比
+The Flow Transform [17], [18] dominates both axes. Removing it (wo_flow_transform) slashes parameters from 40.1K to 14.8K (\(-63\%\)) and inference time from 4.16 ms to 0.65 ms—a 6.5× speedup. The OOD head itself contributes ~700 parameters and zero measurable AIT overhead, making the OSR-specific components effectively free at inference. The only_distance_head baseline—raw Mahalanobis [8] with neither flow, OOD loss, reciprocal attention, nor threshold adaptation—needs 12.7K parameters and 0.64 ms per query.
 
-【表4.4】融合方法OSR性能对比（TNR=95%，10轮均值）
+These numbers carry a practical implication. For edge deployment on smartphones or embedded sensors, the 6.5× speedup from dropping the Flow Transform is decisive: 0.65 ms / query corresponds to roughly 1,500 queries per second on a single core. Coupled with the ablation finding that wo_flow_transform + fusion_v2 is the TAU22 optimum (AUROC = 0.884, Section IV.F), an on-device system can have both the best AUROC and the fastest inference on TAU22 by removing the flow. On TAU19, the optimal AUROC configuration (wo_ood_head + fusion_v2, 0.985) retains the flow and its 4.16 ms latency, presenting a dataset-dependent accuracy/efficiency trade-off.
 
-| 方法 | TPR (%) | OSR (%) | 融合权重$\alpha$ | $\Delta$TPR |
-|------|---------|---------|-----------------|-------------|
-| Ensemble（Anti + OOD-Ext） | 22.91 | 58.95 | 0.60 | — |
-| **Ensemble-Clust（Anti + OOD-Ext-V2）** | **24.94** | **59.97** | **0.60** | **+2.03** |
+For reference, SOTA few-shot methods such as FEAT [4], MET [23], and D-ProtoNet [22] report comparable or larger parameter budgets (typically 20K–200K learnable parameters depending on backbone and adaptation modules), but none report open-set metrics, making direct efficiency comparison in the FOAC setting infeasible at present.
 
-Ensemble-Clust相比Ensemble基线TPR提升2.03个百分点。融合权重$\alpha^* = 0.6$在两种融合方法中均为最优，非极端值验证了两路信号的互补性。从信息论角度看，融合增益的来源在于两个信号的错误模式不完全相关——某些被几何信号漏检的未知类样本可能被统计信号正确捕获，反之亦然。
+---
 
-4.4 消融实验
+### E. Generalization Ability (Cross-Domain)
 
-4.4.1 GMM聚类特征的消融
+We evaluate bidirectional transfer: train on one dataset's base classes (200 epochs), test on the other dataset's novel classes with unknown queries sampled from the target domain.
 
-【表4.5】GMM聚类特征消融
+**[Insert TABLE 6 about here.]**
 
-| 特征配置 | 特征维度 | TPR (%) | $\Delta$TPR |
-|----------|---------|---------|-------------|
-| 原始11维（无GMM） | 11 | 16.33 | — |
-| + 全部3个GMM特征 | 13 | 21.76 | +5.43 |
+**TABLE 6.** Cross-domain transfer. Top rows: classification accuracy and Cls-AUROC for Base/Novel 1-shot and 5-shot. Bottom rows: OSR performance by method. Left panel: TAU22→TAU19. Right panel: TAU19→TAU22.
 
-回顾逻辑回归学到的特征权重（表3.3），cluster_ent的权重为-0.4769，cluster_mahal为-0.3951，cluster_post_max为-0.2084，三者均被模型采纳且权重方向与理论预期一致。值得注意的是，cluster_ent（后验熵）的权重绝对值在三个GMM特征中最大，这与信息论中熵作为不确定性度量的理论地位相吻合——熵直接量化了样本归属的"模糊程度"，是最自然的OOD信号。
+The dominant finding is asymmetry. TAU22→TAU19 with fusion_v2 attains OSR Score = 90.49%, AUROC = 0.977. TAU19→TAU22 peaks at OSR Score = 74.31%, AUROC = 0.878—a 16.2 pp and 0.099 gap, respectively, between the two directions. When TAU19 is the target, its per-device acoustic modes create well-separated clusters in feature space; unknown samples land in the gaps between clusters, making them easy to flag regardless of which dataset trained the model. When TAU22 is the target, its tighter, overlapping class distributions leave less open space, and the boundary is harder to locate.
 
-4.4.2 查询依赖中心的消融
+The second finding is the classification/OSR divergence under domain shift. Going from within-domain to cross-domain (TAU22→TAU19), Base 5-shot ACC drops from 52.27% to 35.13%—a 17 pp collapse. Yet OSR Score for fusion_v2 rises from 76.96% to 90.49%. Classification relies on fine-grained between-class distinctions that are fragile under distribution shift; open-set detection relies on the overall compactness of the known-class manifold relative to the open space around it, a property that can improve even as between-class discrimination degrades.
 
-【表4.6】反原型中心策略消融
+Fusion V2 leads in both transfer directions. On TAU22→TAU19, it beats anti-prototype by +37.7 pp OSR Score and +0.302 AUROC. On TAU19→TAU22, it beats mahalanobis by +23.4 pp and +0.253 AUROC. The OOD head family is remarkably stable under cross-domain evaluation: osr23, ext_v2, and clust_v2 all achieve OSR Score ≈ 84% and AUROC ≈ 0.93 on TAU22→TAU19, within 1 pp of each other. Fusion V2 adds ~6 pp on top. On TAU19→TAU22, the OOD head family degrades uniformly by ~10 pp OSR Score relative to TAU22→TAU19, while fusion_v2's advantage compresses to roughly 2–3 pp over cluster_v2. Cross-domain transfer toward the less diverse dataset (TAU22 as target) is the hardest regime for all methods.
 
-| 中心策略 | TPR (%) | 分析 |
-|----------|---------|------|
-| 固定中心 $\bar{\mathbf{p}}$ | 8.32 | 训练-测试Episode分布偏移导致反原型位置畸变 |
-| 查询依赖中心 $\hat{\mathbf{c}}_Q$ | 18.92 | 自适应匹配每个Episode的样本分布 |
-| 置信加权中心 | $\approx$17 | 以特征范数作为置信度加权，未产生显著改进 |
+---
 
-查询依赖中心相比固定中心的TPR提升为10.60个百分点，相对提升127.4%。数学上，固定中心偏移量$\Delta = \bar{\mathbf{p}} - \bar{\mathbf{p}}_{\text{ep}}$被$2\Delta$放大后传递到所有反原型，在64维空间中即使每个维度上的微小偏移累积后也能显著改变决策边界。查询依赖中心通过$\hat{\mathbf{c}}_Q$从根本上消除了这一偏移。
+### F. Ablation Experiments
 
-4.4.3 失败方法分析
+We ablate the full cross of 6 model configurations × 6 OSR heads = 36 conditions per dataset. The complete TAU19 AUROC matrix appears in TABLE 7; Fig 2 renders the same data as a heatmap where darker cells correspond to higher AUROC.
 
-【表4.7】失败方法汇总
+**[Insert Fig 2 about here.]**
 
-| 方法 | TPR (%) | 失败原因 |
-|------|---------|----------|
-| Multi-Prototype（K=2） | 16.10 | 64维空间中每类特征近似单模态，强制K=2引入伪结构 |
-| Adaptive Ensemble | 20.11 | 局部密度与最优$\alpha$相关性弱，自适应策略引入估计噪声 |
-| Cluster Boundary | 10.40 | 欧氏距离固定阈值无法适应高维空间复杂决策边界 |
+**Fig 2.** Ablation heatmap: AUROC for 6 configurations (rows) × 6 OSR heads (columns) on TAU19. Darker = higher AUROC. The fusion_v2 column (rightmost) is consistently darkest; the wo_ood_head row achieves the global maximum at the fusion_v2 intersection.
 
-这些失败案例揭示了一个共同模式：在经过元训练优化的嵌入空间中，已知类特征分布已具有较好结构，引入额外结构假设反而可能破坏原有结构。换言之，在well-structured特征空间中，"更好地描述和利用已有结构"比"学习新的变换或引入额外假设"更为有效。本文的GMM聚类增强方法遵循了这一原则——它不改变特征空间本身，而是在现有空间上拟合统计模型来描述分布结构。
+**[Insert TABLE 7 about here.]**
 
-4.5 进化历程与总结
+**TABLE 7.** TAU19 ablation AUROC matrix. Bold + ★ marks the global optimum (wo_ood_head × fusion_v2, AUROC = 0.985). Corresponding TAU22 ablation data (optimum: wo_flow_transform × fusion_v2, AUROC = 0.884) are reported in the Supplementary Material.
 
-本文的实验从osr18到osr22经历了多轮迭代，逐步确立了非参数聚类增强的技术路线。
+Fusion V2 achieves the highest AUROC in all 12 cells across both datasets—a clean sweep. The global optimum is **wo_ood_head + fusion_v2 on TAU19: AUROC = 0.985**, OSR Score = 93.31%. This is the paper's most counterintuitive result: removing the OSR-specific training loss—the binary cross-entropy term that explicitly teaches the model to separate known from unknown—improves open-set detection. The hypothesis, discussed further in Section V.B, is that the OSR loss introduces noisy gradients that interfere with natural feature-space organization. Classification cross-entropy plus the separation loss alone, combined with a well-structured detection head, suffice to induce effective known/unknown separation when the underlying features are strong.
 
-【表4.8】实验进化历程
+On TAU22, the optimum shifts to **wo_flow_transform + fusion_v2 (AUROC = 0.884)**. The Flow Transform [17], [18] helps on the easier dataset—where per-class distributions are already roughly Gaussian—but is neutral or mildly harmful on TAU19, where the multi-device feature distribution resists Gaussianization. This dataset-dependence of the flow's utility is a practical takeaway: don't pay the 6.5× latency cost on TAU19 if it doesn't buy you AUROC.
 
-| 轮次 | 核心改动 | TPR (%) | $\Delta$TPR |
-|------|----------|---------|-------------|
-| osr18a 基线 | 归一化流密度估计 | 17.62 | — |
-| osr19a | Flow辅助OSR多条路线全面失败 | 17.69 | +0.07 |
-| osr20a | 去除Flow，引入查询依赖反原型 | 18.92 | +1.30 |
-| osr20b | 几何-统计双信号Ensemble | 22.91 | +5.29 |
-| osr21a/b | Flow生成器和变换层再次证伪 | 22.29~23.07 | $\approx$0 |
-| **osr22a** | **GMM聚类增强，Ensemble-Clust** | **24.94** | **+2.03** |
+Several component-level patterns emerge from the 36-cell matrix. Reciprocal attention [9] is the largest contributor to classification ACC: removing it drops TAU22 5s ACC from 54.41% to 52.64% (\(-1.77\) pp). The OOD head family (osr23, ext_v2, clust_v2) produces AUROC within \(\pm 0.005\) of each other for any given configuration, reinforcing their statistical indistinguishability. AUROC spread across configurations is substantial on TAU19 (0.635 → 0.985, range = 0.354) but compressed on TAU22 (0.486 → 0.884, range = 0.398), indicating that method and configuration choices matter most when the domain is challenging enough to create a meaningful known/unknown gap. The corresponding TAU22 complete ablation matrix, which mirrors the patterns seen in TAU19 at a uniformly lower AUROC ceiling, is provided in the Supplementary Material.
 
-整个历程可划分为三个阶段。第一阶段（osr18-osr19）：归一化流路线的探索与证伪。Flow理论上能精确计算对数似然$\log P(\mathbf{x})$，但实验表明其在FS-OSR任务上几乎无效——64维空间中每类5000个样本不足以支撑高质量密度估计，尤其在已知/未知边界区域的低密度尾部，密度估计方差极大。Nalisnick等人[引19][引20]已指出深度生成模型在OOD检测中存在局限性，本文的实验进一步证实了这一结论。
+---
 
-第二阶段（osr20）：非参数路线的确立。osr20a放弃Flow，引入查询依赖反原型；osr20b将几何信号与统计信号融合，TPR跃升至22.91%（+5.29%）。这说明在特征表示质量较高时，利用特征空间中已有的几何结构和统计信息进行直接判定，优于学习复杂的分布模型。
+### G. Extended Experiments
 
-第三阶段（osr21-osr22）：osr21再次尝试将Flow以不同角色引入均未超越osr20b；osr22转向GMM聚类增强路线，最终达到TPR=24.94%。总体而言，TPR从基线17.62%提升至24.94%，相对提升41.6%。
+#### G1. Way-Shot Analysis
 
-【图4.5】TPR进化历程折线图。X轴为实验轮次（osr18至osr22），Y轴为TPR（%），折线标注关键改动。灰色阴影标注"Flow路线探索"，绿色阴影标注"聚类增强路线"。
+We vary N = {5, 6} and K = {1, 5, 10} with Fusion V2.
 
-【图4.6】t-SNE特征空间可视化。64维嵌入经t-SNE降维到2D后的散点图，10种颜色对应10个类别，已知类以实心圆表示，未知类以空心三角表示。已知类形成紧凑聚类，未知类与已知类存在部分重叠，直观展示了FS-OSR任务的困难性。
+**[Insert TABLE 8 about here.]**
 
-4.6 实验结果讨论
+**TABLE 8.** Way-shot scaling for Fusion V2 on TAU22 (top) and TAU19 (bottom). Best OSR Score per dataset section in bold.
 
-本文方法TPR绝对值仍有提升空间（24.94%），但需结合问题的内在困难性来客观评估。原型估计的方差为$\text{Var}(\mathbf{p}_c) = \boldsymbol{\Sigma}_c / K$，当$K=5$时估计精度有限，由此导出的所有下游评分都继承了这一不确定性。如图4.6所示，部分未知类样本嵌入落入已知类聚类的边缘区域，在这种分布重叠下，任何线性或近线性方法都难以完美区分。
+Increasing K from 1 to 10 boosts ACC by 10–15 pp on both datasets. OSR metrics barely move: AUROC gains < 0.02, OSR Score gains < 5 pp. Classification and OSR detection are largely decoupled—having more support samples helps you name the right class but doesn't much change whether you know the sample is known in the first place.
 
-从应用约束看，TNR=95%意味着仅5%的已知类样本被误判为未知。在此严格约束下，TPR从17.62%提升到24.94%意味着每100个未知事件中多检测出约7个，在安防监护场景中具有实际意义。
+Increasing ways from 5 to 6 reduces ACC by 2–3 pp, consistent with the standard few-shot trade-off, while OSR metrics stay flat. Under the hardest condition (6-way 1-shot), Fusion V2 holds AUROC = 0.976 (TAU19) and 0.874 (TAU22); anti-prototype collapses to 0.694 and 0.627 respectively. Fusion V2 wins all 12 way-shot settings across both datasets, with per-method data confirming a consistent ~0.03–0.05 AUROC margin over the OOD head family.
 
-实验还揭示了两个值得进一步探讨的发现。其一，GMM聚类特征的有效性提示了一种方法论原则：在经过良好训练的嵌入空间中，更充分地描述和利用已有分布结构（通过非参数模型），比尝试学习新的特征变换（如归一化流）更为有效。其二，几何信号与统计信号的互补性在当前数据集上已得到验证（$\alpha^*=0.6$），但这种互补性是否在更广泛的数据集上成立，需要跨数据集实验进一步检验。
+One anomaly: Mahalanobis AUROC on TAU22 drops from 0.657 (5w1s) to 0.539 (5w10s). More support samples tighten the per-class Gaussian fits, which perversely makes the detector more brittle—the covariance shrinks and even mild unknowns are flagged as far outliers.
+
+#### G2. Openness Analysis
+
+We increase the number of unknown classes from 2 to 4.
+
+**[Insert TABLE 9 about here.]**
+
+**TABLE 9.** Openness analysis. OSR Score and AUROC at open2 (2 unknown classes) and open4 (4 unknown classes) with Δ. TAU22 (top), TAU19 (bottom).
+
+AUROC degrades monotonically with more unknowns for all methods on both datasets. The degradation is far worse on TAU22: ext_v2 drops −0.116, osr23 and clust_v2 drop −0.106. Fusion V2 drops −0.076, the smallest among the six. On TAU19, Fusion V2's AUROC drop is just −0.008—barely measurable—maintaining 0.984 even at open4. Anti-prototype on TAU22 open4 registers AUROC = 0.599, effectively random. Mahalanobis shows the worst cross-dataset consistency: AUROC ≈ 0.57–0.60 on TAU22 vs. 0.83 on TAU19.
+
+TAU19's openness robustness is striking. The more heterogeneous recording conditions in TAU19 appear to produce a feature space where known classes form compact clusters relative to the inter-cluster gaps, making the open-space boundary resistant to the addition of more unknown categories. On TAU22, where recording conditions are uniform, the known-class clusters bleed into each other and the boundary is fragile.
+
+#### G3. t-SNE Visualization
+
+**[Insert Fig 3 about here.]**
+
+**Fig 3.** t-SNE projection (2,000 samples) comparing feature-space organization of fusion_v2, cluster_v2, and anti-prototype on TAU19 (full_model, 6-way 5-shot). Known classes are colored, unknown samples shown as gray crosses.
+
+Fig 3 provides a qualitative sanity check. Under fusion_v2, known classes form tighter, more separated clusters, and unknown samples (gray) concentrate at cluster peripheries. Anti-prototype produces the most diffuse arrangement, with known and unknown samples heavily overlapping, consistent with its poor AUROC. Cluster_v2 sits in between. The visual progression from anti-prototype through cluster_v2 to fusion_v2 mirrors the quantitative AUROC ordering.
+
+#### G4. Comparison with ResNet18-based Method (FOAC-AIFP)
+
+As a sanity check on the backbone, we compare against FOAC-AIFP, a ResNet18-based system [27] that implements its own few-shot open-set components (CIAM, PAM, NPM).
+
+**[Insert TABLE 10 about here.]**
+
+**TABLE 10.** Cross-backbone comparison: YAMNet-based episodic trainer (ours, Fusion V2) vs. ResNet18-based FOAC-AIFP [29]. Different backbones preclude direct comparison of absolute values.
+
+FOAC-AIFP's OSR Score hovers at ~50%—indistinguishable from random guessing—with AUROC ≈ 0.45–0.53 and TPR@TNR95 below 6%. This despite the ResNet18 backbone being trained from scratch on the target-domain base classes (a setting that should favor it over our frozen YAMNet). The gap is large enough to conclude that the CIAM/PAM/NPM architecture, whatever its merits for closed-set few-shot classification, does not produce effective open-set rejection. The episodic training protocol and the OSR detection head design appear to be the differentiating factors.

@@ -1,0 +1,10 @@
+Property,TAU22 [20],TAU19 [19]
+Source,DCASE 2022 Task 1,DCASE 2019 Task 1a
+Base classes,"6 (airport, bus, metro, park, public square, shopping mall)","6 (airport, bus, metro, park, public square, shopping mall)"
+Novel classes,"4 (street pedestrian, tram, urban park, pedestrian street)","4 (street pedestrian, tram, urban park, pedestrian street)"
+Recording devices,"Single, controlled","3 devices (A: binaural, B/C: smartphones)"
+Intra-class variance,Low (uniform recording),High (1.5–2× larger)
+Total clips,~10K (1-second),~10K (1-second)
+Split (Base/Novel),70/30,70/30
+Audio features,"64-band log-mel, 96 frames, 0.96s","64-band log-mel, 96 frames, 0.96s"
+Embedding,YAMNet 1024-dim [11],YAMNet 1024-dim [11]

@@ -11,6 +11,7 @@ import yaml
 import argparse
 from datasets.TAU22 import TAU22Pretrain
 from datasets.TAU19 import TAU19Pretrain
+from datasets.DCASE18 import DCASE18Pretrain
 
 
 
@@ -79,7 +80,14 @@ if not args.pretrain:
     full_params = torch.load(args.pretrained_model_path, weights_only=False)
     state_dict = full_params.get('feature_params', full_params.get('params', full_params))
 
-    model.load_state_dict(state_dict,strict=False)
+    # Filter out params with shape mismatch (e.g. fc layer when train_classes differs)
+    model_dict = model.state_dict()
+    filtered_state = {k: v for k, v in state_dict.items()
+                      if k in model_dict and v.shape == model_dict[k].shape}
+    skipped = [k for k in state_dict if k not in filtered_state]
+    if skipped:
+        print(f"  Skipped {len(skipped)} mismatched params: {skipped}")
+    model.load_state_dict(filtered_state, strict=False)
     model.init_representation(full_params)
     tm.train(model, calib_loader)
 else:

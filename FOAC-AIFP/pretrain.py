@@ -11,6 +11,7 @@ from datasets.nsynth import NDS
 from datasets.FMC import FSDCLIPS
 from datasets.librispeech import LBRS
 from datasets.TAU22 import TAU22Pretrain
+from datasets.DCASE18 import DCASE18Pretrain
 import torch.nn.functional as F
 
 
@@ -39,6 +40,9 @@ elif args.dataset == 'FMC':
 elif args.dataset == 'TAU22':
     train_set = TAU22Pretrain(root=args.dataroot, phase="train", index=args.train_classes, base_sess=True)
     save_model_path = os.path.join(args.save_folder, f'pretrain_model_tau22.pth')
+elif args.dataset == 'DCASE18':
+    train_set = DCASE18Pretrain(root=args.dataroot, phase="train", index=args.train_classes, base_sess=True, args=args)
+    save_model_path = os.path.join(args.save_folder, f'pretrain_model_dcase18.pth')
 
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=args.batch_size, shuffle=True,
                                         num_workers=8, pin_memory=True)

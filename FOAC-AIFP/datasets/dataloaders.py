@@ -5,6 +5,7 @@ from .nsynth import Opennds
 from .FMC import Openfmc
 from .TAU22 import OpenTAU22
 from .TAU19 import OpenTAU19
+from .DCASE18 import OpenDCASE18
 
 def meta_train_dataloader(args):
     # Only load base classes from train CSV — avoid data leakage with eval CSV
@@ -20,6 +21,8 @@ def meta_train_dataloader(args):
         trainset = OpenTAU22(args=args, index=class_index, root=args.dataroot, partition='train', fix_seed=True)
     elif args.dataset == 'TAU19':
         trainset = OpenTAU19(args=args, index=class_index, root=args.dataroot, partition='train', fix_seed=True)
+    elif args.dataset == 'DCASE18':
+        trainset = OpenDCASE18(args=args, index=class_index, root=args.dataroot, partition='train', fix_seed=True)
     loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=False,
                                          num_workers=8, pin_memory=True, persistent_workers=True)
 
@@ -33,6 +36,8 @@ def meta_calib_dataloader(args):
         calibset = OpenTAU22(args=args, index=np.arange(10), root=args.dataroot, partition='calib', fix_seed=True)
     elif args.dataset == 'TAU19':
         calibset = OpenTAU19(args=args, index=np.arange(10), root=args.dataroot, partition='calib', fix_seed=True)
+    elif args.dataset == 'DCASE18':
+        calibset = OpenDCASE18(args=args, index=np.arange(9), root=args.dataroot, partition='calib', fix_seed=True)
     else:
         # Non-TAU datasets fall back to test loader
         return meta_test_dataloader(args)
@@ -54,6 +59,8 @@ def meta_test_dataloader(args):
         testset = OpenTAU22(args=args, index=np.arange(10), root=args.dataroot, partition='test', fix_seed=True)
     elif args.dataset == 'TAU19':
         testset = OpenTAU19(args=args, index=np.arange(10), root=args.dataroot, partition='test', fix_seed=True)
+    elif args.dataset == 'DCASE18':
+        testset = OpenDCASE18(args=args, index=np.arange(9), root=args.dataroot, partition='test', fix_seed=True)
 
     loader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False,
                                          num_workers=8, pin_memory=True, persistent_workers=True)
