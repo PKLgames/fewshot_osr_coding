@@ -2,11 +2,11 @@
 
 ### A. Problem Formulation
 
-The FOAC task is defined over three disjoint label sets. **Base classes** \(\mathcal{D}_{\text{base}}\) contain hundreds of labeled examples per class; these are used for training the feature extractor and OSR detection heads, and are never encountered at evaluation time. **Novel classes** \(\mathcal{D}_{\text{novel}}\) are the categories the model must learn to classify from sparse support. They are partitioned into episodes, each constructed by sampling N classes and drawing K support examples and Q query examples per class. **Unknown classes** form a third label pool disjoint from both \(\mathcal{D}_{\text{base}}\) and \(\mathcal{D}_{\text{novel}}\). They appear exclusively at test time as query samples that the model must reject.
+The FOAC task is defined over three disjoint label sets. **Base classes** \(\mathcal{D}_{\text{base}}\) contain hundreds of labeled examples per class for training the feature extractor and OSR heads; they are never encountered at evaluation. **Novel classes** \(\mathcal{D}_{\text{novel}}\) are the categories the model must learn from sparse support, partitioned into episodes each with N classes, K support examples, and Q query examples per class. **Unknown classes** form a third pool disjoint from both \(\mathcal{D}_{\text{base}}\) and \(\mathcal{D}_{\text{novel}}\), appearing only at test time for rejection.
 
-A single evaluation episode is therefore defined by a support set \(\mathcal{S} = \{(\mathbf{x}_{i}, y_{i})\}_{i=1}^{N \times K}\) and a query set \(\mathcal{Q} = \{(\mathbf{x}_{j}, y_{j})\}_{j=1}^{N \times Q} \;\cup\; \{(\mathbf{x}_{k})\}_{k=1}^{M}\) where the first \(N \times Q\) queries carry known-class labels and the trailing M queries are unlabeled unknowns. The M unknown samples are drawn uniformly from the unknown-class pool and are not identified as such to the model; they arrive intermixed with the known queries in random order.
+A single evaluation episode is defined by a support set \(\mathcal{S} = \{(\mathbf{x}_{i}, y_{i})\}_{i=1}^{N \times K}\) and a query set \(\mathcal{Q} = \{(\mathbf{x}_{j}, y_{j})\}_{j=1}^{N \times Q} \;\cup\; \{(\mathbf{x}_{k})\}_{k=1}^{M}\), where the trailing M queries are unlabeled unknowns drawn uniformly from the unknown-class pool, intermixed with known queries in random order.
 
-The model maps each query through a shared feature extractor into an embedding \(\mathbf{h}\), then routes \(\mathbf{h}\) through two parallel heads. A **classification head** produces a distribution \(\hat{\mathbf{y}} \in \Delta^{N}\) over the N known classes via a prototype-based softmax [1]. An **OSR detection head** outputs a scalar \(s_{\text{osr}} \in \mathbb{R}\), where higher values indicate stronger evidence that the query is known. The rejection rule is:
+The model maps each query through a shared feature extractor to an embedding \(\mathbf{h}\), then routes it through two parallel heads. A **classification head** produces a distribution \(\hat{\mathbf{y}} \in \Delta^{N}\) over known classes via prototype-based softmax [1]. An **OSR detection head** outputs a scalar \(s_{\text{osr}} \in \mathbb{R}\) (higher = more likely known). The rejection rule is:
 
 \[
 \text{decision} = \begin{cases}
@@ -15,21 +15,21 @@ The model maps each query through a shared feature extractor into an embedding \
 \end{cases}
 \]
 
-with the threshold \(\tau\) calibrated to achieve TNR = 95% on a held-out split of the support set [5], [8]. The calibration split is disjoint from both the prototypes' support samples and the evaluation queries, which avoids the self-calibration loop that makes TNR artificially constant and uninformative.
+with threshold \(\tau\) calibrated to achieve TNR = 95% on a held-out split of the support set, disjoint from both the prototype samples and evaluation queries [5], [8]. This avoids the self-calibration loop that renders TNR artificially constant.
 
-Performance is measured along two axes. Closed-set classification accuracy (ACC) and classification AUROC (one-vs-rest) are computed over the known-class queries that survive the rejection step. Open-set detection quality is measured by the area under the ROC curve (AUROC) [14], the OSR Score—defined as \(( \text{TPR} + \text{TNR} ) / 2\) at a TNR of 95%—and TPR@TNR95, the true positive rate at the operating point where TNR equals 95%.
+Performance is measured along two axes. Closed-set: classification accuracy (ACC) and macro-AUROC (one-vs-rest) over known queries that survive rejection. Open-set: AUROC [14], OSR Score = (TPR + TNR) / 2 at TNR = 95%, and TPR@TNR95.
 
 ### B. Episodic Training Framework
 
-Training follows the episodic meta-learning protocol [1], [2]. Each training episode is constructed to match the test-time FOAC structure: N classes are drawn from \(\mathcal{D}_{\text{base}}\), K support and Q query samples are sampled per class, and M unknown-class samples—drawn from a disjoint subset of \(\mathcal{D}_{\text{base}}\) unseen by the classifier—are injected into the query batch. The model is trained exclusively on \(\mathcal{D}_{\text{base}}\); no novel-class data appears during training. This gating ensures that evaluation on \(\mathcal{D}_{\text{novel}}\) measures generalization to genuinely unseen categories, not memorization of the base-class distribution.
+Training follows the episodic protocol [1], [2]. Each episode matches the FOAC test structure: N classes drawn from \(\mathcal{D}_{\text{base}}\), K support and Q query samples per class, with M unknown queries injected from a disjoint base subset. Training uses only \(\mathcal{D}_{\text{base}}\); novel-class data never appears, ensuring evaluation measures generalization to genuinely unseen categories.
 
 **[Insert Fig 1 about here.]**
 
 **Fig 1.** FOAC episodic training architecture. An input audio clip is converted to a log-mel spectrogram and encoded by a frozen YAMNet backbone [10], [11] into a 1024-dim embedding \(\mathbf{z}\). An optional Flow Transform [17], [18] (dashed box, ~25K parameters) warps \(\mathbf{z}\) to \(\mathbf{h}\) via four affine coupling layers. The embedding then feeds two parallel branches: a classification branch (top) that computes N class prototypes and scores queries via softmax over Euclidean distances [1], and an OSR branch (bottom, expanded in the dashed inset) that routes the same embedding through one of six detection heads to produce the open-set score \(s_{\text{osr}}\). The final decision applies the rejection rule of Eq. (1): reject if \(s_{\text{osr}} < \tau\), otherwise classify.
 
-Input audio clips are first converted to log-mel spectrograms (64 mel bands, 96 frames, 0.96 s duration) and passed through a frozen YAMNet backbone [11] pretrained on AudioSet [10]; we freeze the backbone throughout. Preliminary runs with backbone fine-tuning produced no consistent gain on TAU22 and a small degradation on TAU19, corroborating the view that AudioSet-pretrained features already span the acoustic invariances relevant to these datasets.
+Input audio is converted to 64-band log-mel spectrograms (96 frames, 0.96 s) and encoded by frozen YAMNet [11] pretrained on AudioSet [10]. Backbone fine-tuning produced no consistent gain on TAU22 and mild degradation on TAU19.
 
-An optional **Flow Transform** module follows the backbone. It stacks four affine coupling layers [17], [18] that map \(\mathbf{z} \in \mathbb{R}^{1024}\) to a warped representation \(\mathbf{h} = f_{\phi}(\mathbf{z})\), where \(f_{\phi}\) is invertible with a tractable log-determinant Jacobian. The flow adds approximately 25K trainable parameters. The intended effect is to Gaussianize the per-class feature distributions, which sharpens the covariance estimates that distance-based detectors rely on. Whether the flow actually delivers this benefit is dataset-dependent; the ablation in Section IV.F shows it helps on TAU22 but is neutral or mildly harmful on TAU19.
+An optional **Flow Transform** stacks four affine coupling layers [17], [18] mapping \(\mathbf{z} \in \mathbb{R}^{1024}\) to \(\mathbf{h} = f_{\phi}(\mathbf{z})\), where \(f_{\phi}\) is invertible with tractable log-determinant Jacobian. The flow adds ~25K parameters and aims to Gaussianize per-class distributions, sharpening covariance estimates for distance-based detectors. Its benefit is dataset-dependent (§IV.F).
 
 The embedding \(\mathbf{h}\)—or \(\mathbf{z}\) directly when the flow is removed—feeds two parallel branches (see Fig 1). The **classification branch** computes N class prototypes via support-set averaging and produces query class scores through a softmax over Euclidean distances to those prototypes [1]. The **OSR branch** routes the same embedding through the active detection head (Section III.C, expanded in the Fig 1 inset) to produce \(s_{\text{osr}}\). Both branches share the same feature representation; there is no separate OSR-specific feature extractor.
 
@@ -37,51 +37,45 @@ The embedding \(\mathbf{h}\)—or \(\mathbf{z}\) directly when the flow is remov
 
 The six heads span distinct operating principles and are shown together in the OSR branch inset of Fig 1. Each head receives the feature representation \(\mathbf{h}\) (post-flow, if the flow is active) and outputs a scalar \(s_{\text{osr}}\); heads that require per-class modeling obtain the support set's class assignments to construct their internal representations.
 
-**1. Anti-Prototype Head (anti_proto).** Following [9], the head learns a single anti-prototype vector \(\mathbf{a} \in \mathbb{R}^{d}\) that serves as a negative center for all known classes. During training, a reciprocal loss pushes \(\mathbf{a}\) away from the known-class support embeddings while the classification loss pulls class prototypes toward their respective support samples. Given N class prototypes \(\{\mathbf{p}_{c}\}_{c=1}^{N}\) computed as the mean of the K support embeddings for class c, the open-set score for a query \(\mathbf{h}\) is:
+**1. Anti-Prototype Head (anti_proto).** Following [9], this head learns an anti-prototype \(\mathbf{a} \in \mathbb{R}^{d}\) as a negative center for all known classes. Given N class prototypes \(\{\mathbf{p}_{c}\}_{c=1}^{N}\) (mean of K support embeddings), the open-set score is:
 
 \[
 s_{\text{anti}} = d(\mathbf{h}, \mathbf{a}) - \min_{c \in \{1,\ldots,N\}} d(\mathbf{h}, \mathbf{p}_{c})
 \]
 
-where \(d(\cdot, \cdot)\) denotes Euclidean distance. A positive score indicates the query is closer to a known prototype than to the anti-prototype and is therefore classified as known; a negative score triggers rejection. The anti-prototype is trained jointly with the backbone via the reciprocal loss described in Section III.D.
+where \(d(\cdot, \cdot)\) is Euclidean distance. A positive score indicates the query is closer to a known prototype than to \(\mathbf{a}\). The anti-prototype is trained via the reciprocal loss (§III.D).
 
-**2. Mahalanobis Distance Head (mahal).** This head fits a multivariate Gaussian \(\mathcal{N}(\boldsymbol{\mu}_{c}, \mathbf{\Sigma}_{c})\) to the support embeddings of each class c [8]. The mean is the sample average of the K support vectors; the covariance is estimated via shrinkage toward a pooled diagonal matrix to stabilize inversion at small K:
-
-\[
-\mathbf{\Sigma}_{c} = (1 - \lambda) \mathbf{S}_{c} + \lambda \mathbf{\Sigma}_{\text{pooled}}
-\]
-
-where \(\mathbf{S}_{c}\) is the empirical per-class covariance and \(\lambda = 0.5\). The open-set score for query \(\mathbf{h}\) is the negative Mahalanobis distance to the nearest class:
+**2. Mahalanobis Distance Head (mahal).** Per-class Gaussian \(\mathcal{N}(\boldsymbol{\mu}_{c}, \mathbf{\Sigma}_{c})\) is fit to support embeddings [8], with shrinkage toward a pooled diagonal for stability at small K: \(\mathbf{\Sigma}_{c} = (1 - \lambda) \mathbf{S}_{c} + \lambda \mathbf{\Sigma}_{\text{pooled}}\) (\(\lambda = 0.5\)). The score is negative Mahalanobis distance to the nearest class:
 
 \[
 s_{\text{mahal}} = -\min_{c} \sqrt{(\mathbf{h} - \boldsymbol{\mu}_{c})^{T} \mathbf{\Sigma}_{c}^{-1} (\mathbf{h} - \boldsymbol{\mu}_{c})}.
 \]
 
-This head involves no learned parameters beyond what the backbone produces; it is the simplest detector in our comparison and serves as the `only_distance_head` baseline in the ablation.
+This head has no learned parameters and serves as the `only_distance_head` baseline.
 
-**3. OOD Head OSR23 (osr23).** A Gaussian Mixture Model with \(G = 4\) components is fit to the aggregated support features of all N known classes [24]. The GMM is trained per episode via expectation-maximization initialized from k-means. The open-set score is the log-likelihood of \(\mathbf{h}\) under the mixture:
+**3. OOD Head OSR23 (osr23).** A GMM with \(G = 4\) components is fit per episode to the aggregated support features of all N known classes via EM initialized from k-means [24]. The score is log-likelihood under the mixture:
 
 \[
 s_{\text{osr23}} = \log \sum_{g=1}^{G} \pi_{g} \, \mathcal{N}(\mathbf{h}; \boldsymbol{\mu}_{g}, \mathbf{\Sigma}_{g})
 \]
 
-where \(\pi_{g}\) are the learned mixing coefficients. This head models the known-class density directly rather than carving a decision boundary; out-of-distribution queries are expected to land in low-density regions under the fitted GMM.
+where \(\pi_{g}\) are mixing coefficients. Unknowns are expected in low-density regions.
 
-**4. OOD Head Extended V2 (ext_v2).** This head augments the Mahalanobis detector with a learned linear transformation \(\mathbf{W} \in \mathbb{R}^{d \times d'}\) that projects features to a lower-dimensional discriminative space before computing distances [8]. The open-set score becomes:
+**4. OOD Head Extended V2 (ext_v2).** Augments the Mahalanobis detector with a learned linear projection \(\mathbf{W} \in \mathbb{R}^{d \times d'}\) to a discriminative subspace [8]:
 
 \[
 s_{\text{ext}} = -\min_{c} \sqrt{(\mathbf{W}\mathbf{h} - \tilde{\boldsymbol{\mu}}_{c})^{T} \tilde{\mathbf{\Sigma}}_{c}^{-1} (\mathbf{W}\mathbf{h} - \tilde{\boldsymbol{\mu}}_{c})}
 \]
 
-where \(\tilde{\boldsymbol{\mu}}_{c} = \mathbf{W}\boldsymbol{\mu}_{c}\) and \(\tilde{\mathbf{\Sigma}}_{c}\) is the covariance in the projected space. The matrix \(\mathbf{W}\) is trained end-to-end with the OSR binary cross-entropy loss so that the projected space separates known from unknown queries. The transformation adds roughly 300 parameters.
+where \(\tilde{\boldsymbol{\mu}}_{c} = \mathbf{W}\boldsymbol{\mu}_{c}\) and \(\tilde{\mathbf{\Sigma}}_{c}\) is the projected-space covariance. \(\mathbf{W}\) is trained end-to-end via the OSR loss (~300 added parameters).
 
-**5. OOD Head Cluster V2 (clust_v2).** This head takes a density estimation approach closer in spirit to osr23 but operates per-class rather than pooling across classes [24]. For each class c, the K support embeddings are treated as cluster centers; the open-set score is the negative distance to the nearest center across all N classes:
+**5. OOD Head Cluster V2 (clust_v2).** Per-class density estimation treating all K support embeddings as cluster centers [24]; the score is the negative distance to the nearest center:
 
 \[
 s_{\text{clust}} = -\min_{c \in \{1,\ldots,N\}} \min_{k \in \{1,\ldots,K\}} \|\mathbf{h} - \mathbf{h}_{c,k}\|_{2}.
 \]
 
-When K = 1, this reduces to nearest-neighbor distance to the single prototype. When K > 1, the head retains access to individual support samples rather than collapsing them into a mean, which can be advantageous when the support set contains outlier samples that would distort a single prototype.
+When K = 1 this reduces to nearest-neighbor distance. For K > 1, retaining individual support samples is advantageous when outliers would distort a mean prototype.
 
 **6. OOD Head Fusion V2 (fusion_v2) — Core Contribution.** The fusion head (see Fig 1, bottom right of OSR inset) combines ext_v2 and clust_v2 through a learned scalar weight \(\alpha \in [0, 1]\):
 
@@ -89,7 +83,7 @@ When K = 1, this reduces to nearest-neighbor distance to the single prototype. W
 s_{\text{fusion}} = \alpha \cdot s_{\text{ext}} + (1 - \alpha) \cdot s_{\text{clust}}.
 \]
 
-The motivation is that ext_v2 and clust_v2 capture complementary failure modes. ext_v2 learns a discriminative boundary in a projected space—it separates known from unknown queries explicitly, conditioned on the episode's support set. clust_v2 provides a generative density estimate: queries landing far from all support points receive low scores regardless of where a learned boundary happens to fall. Discriminative boundaries tend to be brittle when the unknown distribution shifts between training and test domains; density estimates, meanwhile, grow noisy when K is small. Blending the two lets the model lean on the signal that is more reliable for a given domain and shot count. The weight \(\alpha\) is a scalar parameter optimized jointly with the rest of the model through the multi-objective loss. At inference, \(s_{\text{fusion}}\) substitutes for \(s_{\text{osr}}\) in the rejection rule of Section III.A.
+The two heads capture complementary failure modes: ext_v2 learns a discriminative boundary (accurate when test unknowns resemble training, brittle otherwise); clust_v2 provides a generative density estimate (less sensitive to distribution shift but noisier at small K). Blending lets the model favor the more reliable signal per domain and shot count. \(\alpha\) is optimized jointly with the multi-objective loss (§III.D). \(s_{\text{fusion}}\) substitutes for \(s_{\text{osr}}\) at inference (§III.A).
 
 ### D. Training Objectives
 
@@ -99,20 +93,20 @@ The total loss combines four terms:
 \mathcal{L} = \mathcal{L}_{\text{cls}} + \lambda_{\text{osr}} \mathcal{L}_{\text{osr}} + \lambda_{\text{rec}} \mathcal{L}_{\text{rec}} + \lambda_{\text{sep}} \mathcal{L}_{\text{sep}}.
 \]
 
-**Classification loss** \(\mathcal{L}_{\text{cls}}\) is standard cross-entropy over the N known classes, computed on both support and query samples. For support samples, this encourages the backbone to produce well-separated class embeddings; for query samples, it drives the prototype-based classifier toward correct predictions.
+**Classification loss** \(\mathcal{L}_{\text{cls}}\) is cross-entropy over the N known classes on both support and query samples, encouraging well-separated class embeddings and correct prototype-based predictions.
 
-**OSR loss** \(\mathcal{L}_{\text{osr}}\) is binary cross-entropy on the open-set scores [5], [6]: known queries are assigned label 1 (accept), unknown queries label 0 (reject). The loss is applied at the output of the active OSR detection head and is the primary training signal for heads that contain learnable parameters (ext_v2, fusion_v2).
+**OSR loss** \(\mathcal{L}_{\text{osr}}\) is binary cross-entropy on the open-set scores [5], [6]: known queries = 1 (accept), unknown = 0 (reject). This is the primary training signal for heads with learnable parameters (ext_v2, fusion_v2).
 
-**Reciprocal loss** \(\mathcal{L}_{\text{rec}}\) implements the reciprocal point constraint from [9] with weight \(\lambda_{\text{rec}} = 0.3\). It pushes the anti-prototype \(\mathbf{a}\) away from all known-class embeddings while regularizing its norm, ensuring that \(\mathbf{a}\) remains a meaningful negative reference point throughout training.
+**Reciprocal loss** \(\mathcal{L}_{\text{rec}}\) implements the constraint from [9] with \(\lambda_{\text{rec}} = 0.3\), pushing the anti-prototype \(\mathbf{a}\) away from all known-class embeddings while regularizing its norm.
 
-**Separation loss** \(\mathcal{L}_{\text{sep}}\) encourages the feature representations of known and unknown samples to occupy distinct regions of the embedding space [24]. It is implemented as a contrastive term with weight \(\lambda_{\text{sep}} = 0.02\) that penalizes overlap between the two distributions. Gradients are globally clipped to stabilize training, particularly during early episodes when the anti-prototype and class prototypes are poorly initialized.
+**Separation loss** \(\mathcal{L}_{\text{sep}}\) encourages known/unknown feature separation via a contrastive term (\(\lambda_{\text{sep}} = 0.02\)) [24]. Global gradient clipping stabilizes early training when prototypes are poorly initialized.
 
 ### E. Model Configuration Variants
 
 **[Insert TABLE 1 about here.]**
 
-**TABLE 1.** Model configuration variants for ablation experiments. All variants share the YAMNet backbone [11], the episodic sampling protocol, and optimizer settings (AdamW, learning rate \(2 \times 10^{-4}\), 200 warmup steps, 3000 training episodes).
+**TABLE 1.** Model configuration variants for ablation experiments. All variants share the YAMNet backbone [11], the episodic sampling protocol, and optimizer settings (AdamW, lr = \(2 \times 10^{-4}\), 200 warmup steps, 3000 training episodes).
 
-To isolate the contribution of each architectural component, we define six configurations obtained by selectively removing elements from the full model. TABLE 1 lists the variants. The `full_model` includes the Flow Transform, the active OOD head, the reciprocal loss, and per-episode threshold adaptation. Each subsequent variant strips one component: `wo_flow_transform` removes the normalizing flow [17], [18]; `wo_ood_head` disables the OSR-specific training loss, retaining only classification cross-entropy and separation loss; `wo_reciprocal` drops the reciprocal attention term [9]; `wo_threshold` replaces the calibrated per-episode threshold with a fixed percentile; and `only_distance_head` reduces the system to the bare Mahalanobis detector [8] with no flow, no OOD-specific training, and no reciprocal regularization—the simplest configuration in the ablation space.
+To isolate the contribution of each architectural component, we define six configurations by selectively removing elements from the full model (TABLE 1). `full_model` includes the Flow Transform, the active OOD head, reciprocal loss, and per-episode threshold adaptation. Each variant strips one component: `wo_flow_transform` removes the normalizing flow [17], [18]; `wo_ood_head` disables the OSR-specific training loss, retaining only classification and separation loss; `wo_reciprocal` drops reciprocal attention [9]; `wo_threshold` replaces the calibrated threshold with a fixed percentile; `only_distance_head` reduces the system to the bare Mahalanobis detector [8]—no flow, no OOD-specific training, no reciprocal regularization.
 
-All variants share the same YAMNet backbone [11], the same episode sampling procedure, and the same optimizer settings (AdamW, learning rate \(2 \times 10^{-4}\), 200 warmup steps, 3000 training episodes). Cross-configuration comparisons therefore reflect genuine architectural differences rather than confounding factors in the training protocol.
+All variants share the same YAMNet backbone [11], episode sampling procedure, and optimizer settings (AdamW, lr = \(2 \times 10^{-4}\), 200 warmup steps, 3000 training episodes). Cross-configuration comparisons therefore reflect genuine architectural differences rather than confounding training protocol factors.

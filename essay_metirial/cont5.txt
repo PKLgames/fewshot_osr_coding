@@ -2,44 +2,38 @@
 
 ### A. Why Fusion V2 Works
 
-Fusion V2 combines two signals with complementary failure modes. The extended head [8] learns a discriminative boundary explicitly conditioned on the support set; it is accurate when the test-time unknown distribution resembles what was seen during training, and brittle when it doesn't. The cluster head [24] scores queries by proximity to individual support points without learning a boundary, making it less sensitive to unknown distribution shift but noisier at small K. When one signal is weak, the other often compensates.
+Fusion V2 combines complementary signals. The extended head [8] learns a discriminative boundary—accurate when test unknowns resemble training, brittle otherwise. The cluster head [24] scores by proximity to support points—less sensitive to distribution shift but noisier at small K. When one is weak, the other compensates.
 
-The data reflect this complementarity. On TAU19, where per-device acoustic modes create clean gaps between known clusters, the fusion margin over the next-best single head reaches +0.035–0.050 AUROC. On TAU22, where uniform recording blurs class boundaries, the gain shrinks to +0.021. The learned weight \(\alpha\) tilts toward the discriminative signal when the boundary is sharp and toward the density signal when it is not—this adaptivity explains why fusion_v2 wins every cell of the ablation matrix, both datasets, and all way-shot/openness conditions.
-
-A metric note: across the TAU19 ablation, AUROC spread is 0.354 vs. OSR Score spread of 40.5 pp. As a threshold-free metric [14], AUROC captures the full ranking without the variance introduced by per-round calibration at fixed TNR. We return to this in Section V.D.
+The data reflect this. On TAU19, where per-device modes create clean inter-cluster gaps, the fusion margin reaches +0.035–0.050 AUROC; on TAU22, where uniform recording blurs boundaries, only +0.021. The learned weight \(\alpha\) tilts toward discriminative when boundaries are sharp and toward density otherwise—explaining fusion_v2's clean sweep across all conditions. AUROC spread across TAU19 ablation is 0.354 vs. OSR Score spread of 40.5 pp; as a threshold-free metric [14], AUROC captures the full ranking without per-round calibration variance (§V.D).
 
 ### B. The wo_ood_head Surprise
 
-The global optimum across all experiments is wo_ood_head + fusion_v2 on TAU19: AUROC = 0.985. Removing the OSR binary cross-entropy loss—the term explicitly designed to teach known/unknown separation—improves open-set detection.
+The global optimum is wo_ood_head + fusion_v2 on TAU19: AUROC = 0.985. Removing the OSR loss—designed to teach known/unknown separation—improves open-set detection.
 
-Our hypothesis is gradient interference. Early in training, when the feature space is disorganized, the OSR loss pushes \(s_{\text{osr}}\) in directions that conflict with the classification gradient. The reciprocal attention [9] and separation losses already supply a weaker but less noisy separation signal. With a strong pretrained backbone [11], the additional OSR supervision adds more noise than signal.
+We hypothesize gradient interference: early in training, the OSR loss pushes \(s_{\text{osr}}\) in directions conflicting with the classification gradient. Reciprocal attention [9] and separation losses supply a cleaner separation signal; with a strong pretrained backbone [11], OSR supervision adds noise. The effect is asymmetric: wo_ood_head gains +0.010 AUROC on TAU22 (0.872 vs. 0.862) but +0.013 on TAU19 (0.985 vs. 0.972)—the harder dataset benefits more.
 
-The effect is dataset-asymmetric. wo_ood_head vs. full_model gains only +0.010 AUROC on TAU22 (0.872 vs. 0.862) but +0.013 on TAU19 (0.985 vs. 0.972). The harder dataset, where per-device variation demands more from the feature representation, benefits more from removing the conflicting gradient.
-
-The practical moral: with a strong pretrained backbone, a well-chosen head and a clean classification loss can outperform a carefully engineered multi-term objective [5], [6]. Good features beat complicated losses.
+The practical moral: with a strong pretrained backbone, a well-chosen head and clean classification loss beat carefully engineered multi-term objectives [5], [6]. Good features beat complicated losses.
 
 ### C. Cross-Domain Asymmetry
 
-TAU22→TAU19 OSR Score = 90.49% vs. TAU19→TAU22 = 74.31%—a 16.2 pp gap (AUROC: 0.977 vs. 0.878). The explanation lies in target-domain feature geometry. TAU19 [19] spans three recording devices with a wide quality range, producing well-separated per-device sub-clusters with gaps between them. Unknown samples land in these gaps, making detection easy regardless of the training domain. TAU22's uniform recordings produce tighter, overlapping clusters with less open space.
+TAU22→TAU19 OSR Score = 90.49% vs. TAU19→TAU22 = 74.31%—a 16.2 pp gap (AUROC: 0.977 vs. 0.878). The cause is target-domain geometry: TAU19 [19] spans three devices with wide quality range, producing well-separated per-device clusters with clean gaps where unknowns land. TAU22's uniform recordings produce tighter, overlapping clusters with less open space.
 
-The implication for practitioners: if cross-domain OSR robustness matters, train on the acoustically more diverse dataset—even at the cost of within-domain classification accuracy. The wider feature distribution acts as implicit open-set regularization. A direction we haven't explored is deliberately augmenting training with multi-device recordings or background noise to artificially widen the known-class feature distribution.
+Implication: train on the acoustically more diverse dataset—even at the cost of within-domain accuracy—since wider feature distributions act as implicit open-set regularization. Deliberate augmentation with multi-device recordings to widen the known-class distribution is an unexplored direction.
 
 ### D. AUROC vs. OSR Score as Evaluation Metrics
 
-The choice of primary metric shapes conclusions. AUROC consistently discriminates methods better than OSR Score. The three OOD head family methods differ by < 1 pp in OSR Score but show systematic gaps of 0.005–0.010 in AUROC—small but consistent differences that track the statistical ranking. OSR Score is a point estimate at TNR = 95%; its variance includes threshold calibration noise. AUROC [14], as a threshold-free integral over the full ROC, averages this out.
+The choice of primary metric shapes conclusions. AUROC discriminates methods better than OSR Score: the three OOD head methods differ by < 1 pp in OSR Score but show systematic AUROC gaps of 0.005–0.010. OSR Score is a point estimate at TNR = 95% with calibration variance; AUROC [14], a threshold-free integral, averages this out.
 
-Under OSR Score alone, one might conclude osr23, ext_v2, and clust_v2 are interchangeable and their ordering irrelevant. Under AUROC, the ranking osr23 ≈ clust_v2 > ext_v2 is visible across conditions, and the statistical test (Section IV.C) confirms this pattern. We recommend AUROC as the primary FOAC open-set metric, with OSR Score and TPR@TNR95 as supplementary diagnostics.
+Under OSR Score, osr23, ext_v2, clust_v2 appear interchangeable. Under AUROC, osr23 ≈ clust_v2 > ext_v2 is consistently visible and statistically confirmed (§IV.C). We recommend AUROC as the primary FOAC open-set metric, with OSR Score and TPR@TNR95 as supplementary.
 
 ### E. Limitations
 
-Several limitations bound the generality of our conclusions.
+First, we evaluate two datasets from one domain family (DCASE); they share class semantics and spectrotemporal statistics. Validation on cross-domain data—speech [31], musical instruments [30], bioacoustics—is needed.
 
-First, we evaluate two acoustic scene datasets from one domain family (DCASE). While TAU19 and TAU22 differ in recording conditions, they share class semantics and spectrotemporal statistics. Validation on cross-domain data—speech [31], musical instruments [30], bioacoustics—is needed.
+Second, the fusion weight \(\alpha\) is a single scalar. Per-episode weights conditioned on the support set could adapt to episode-level boundary variation.
 
-Second, the fusion weight \(\alpha\) is a single scalar per dataset. Per-episode fusion weights conditioned on the support set could adapt to episode-to-episode variation in the known/unknown boundary.
+Third, YAMNet [11] was pretrained on AudioSet [10], whose categories may overlap with TAU19/TAU22, potentially inflating metrics. A disjoint-data backbone study would quantify this.
 
-Third, YAMNet [11] was pretrained on AudioSet [10], whose 500+ sound classes may overlap with TAU19/TAU22 categories. Known-class leakage through the pretrained backbone could inflate both classification and open-set metrics. A controlled study with a backbone trained on disjoint data would quantify this.
+Fourth, we have not compared against foundation models (CLAP [15], AST [16], PaSST [28]); whether the wo_ood_head finding holds under stronger representations is unknown.
 
-Fourth, we have not compared against foundation models (CLAP [15], AST [16], PaSST [28]). Whether the wo_ood_head finding holds under stronger representations is unknown.
-
-Fifth, the near-saturation of AUROC with increasing shots (Section IV.G1) lacks a theoretical account. Why does K = 1 → 10 gain 10–15 pp ACC but under 0.02 AUROC? A model relating prototype estimation error to open-set score variance would clarify whether this is fundamental to the FOAC formulation or an architectural artifact.
+Fifth, AUROC near-saturation with increasing shots (§IV.G1) lacks theory: K = 1 → 10 gains 10–15 pp ACC but under 0.02 AUROC. Modeling the relation between prototype estimation error and open-set score variance would clarify whether this is fundamental or architectural.

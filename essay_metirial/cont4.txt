@@ -2,79 +2,85 @@
 
 ### A. Experimental Datasets and Setup
 
-We evaluate on two acoustic scene classification benchmarks from the DCASE challenge series, summarized in TABLE 2.
+We evaluate on two DCASE acoustic scene classification benchmarks, summarized in TABLE 2.
 
-**TAU22** [20] (DCASE 2022 Task 1) provides 6 base classes (airport, bus, metro, park, public square, shopping mall) and 4 novel classes (street pedestrian, tram, urban park, pedestrian street), recorded under controlled conditions with consistent microphone placement. The total corpus contains roughly 10K one-second clips, split 70/30 between base and novel categories.
+**TAU22** [20] (DCASE 2022 Task 1) provides 6 base classes (airport, bus, metro, park, public square, shopping mall) and 4 novel classes (street pedestrian, tram, urban park, pedestrian street), recorded under controlled conditions with consistent microphone placement. The corpus contains ~10K one-second clips, split 70/30 between base and novel.
 
-**TAU19** [19] (DCASE 2019 Task 1a) shares the same 6 base / 4 novel class semantics but was collected across three real devices (A, B, C) with substantially different microphone quality, frequency response, and recording level. Device A is a high-quality binaural recorder; devices B and C are consumer smartphones with markedly lower fidelity. This multi-device collection produces a wider, more heterogeneous feature distribution: intra-class variance is roughly 1.5–2× larger than in TAU22 across all acoustic scene categories. As a result, TAU19 is the harder dataset for classification but, as we show below, its well-separated per-device acoustic modes create a sharper known/unknown boundary that improves open-set detection.
+**TAU19** [19] (DCASE 2019 Task 1a) shares the same class semantics but was collected across three devices (A: high-quality binaural; B, C: consumer smartphones) with substantially different microphone quality, producing intra-class variance 1.5–2× larger than TAU22. TAU19 is harder for classification, but its well-separated per-device acoustic modes create a sharper known/unknown boundary that benefits open-set detection.
 
 **[Insert TABLE 2 about here.]**
 
-All audio is preprocessed to 64-band log-mel spectrograms (96 frames, 0.96 s duration) and encoded by frozen YAMNet [10], [11] to 1024-dimensional embeddings. We keep the backbone frozen throughout all experiments; preliminary fine-tuning produced no consistent benefit. The default FOAC protocol is 6-way 5-shot with Q = 15 query samples per known class and M unknown query samples drawn uniformly from the unknown-class pool. Training runs for 3,000 episodes using AdamW [13] (\(lr = 2 \times 10^{-4}\), \(\beta_1 = 0.9\), \(\beta_2 = 0.999\), weight decay = \(10^{-2}\), 200 linear warmup steps) on an NVIDIA RTX 3090. Each episode is independently sampled, so the model sees roughly \(3000 \times 6 \times 5 = 90,000\) unique support configurations over the course of training. For cross-domain experiments (Section IV.E), training runs 200 epochs rather than 3,000 episodes since the domain-transfer setting converges faster.
+Audio is preprocessed to 64-band log-mel spectrograms (96 frames, 0.96 s) and encoded by frozen YAMNet [10], [11] (1024-dim). Default protocol: 6-way 5-shot, Q = 15 queries per known class, M unknowns drawn uniformly from the unknown pool. Training: 3,000 episodes, AdamW [13] (\(lr = 2 \times 10^{-4}\), 200 warmup steps), NVIDIA RTX 3090. Each episode is independently sampled (~90,000 unique support configurations). Cross-domain (§IV.E) uses 200 epochs.
 
-We report five metrics across two axes. For closed-set classification: accuracy (ACC, %) and classification macro-AUROC (Cls-AUROC, one-vs-rest). For open-set detection: AUROC [14] (primary, for reasons discussed in Section V.D), OSR Score = (TPR + TNR) / 2 evaluated at TNR = 95%, and TPR@TNR95 (the true positive rate at the operating point where the calibrated threshold achieves TNR = 95%). The rejection threshold \(\tau\) is calibrated per evaluation round on a held-out 50% split of the support set that is disjoint from both the prototype samples and the test queries. This calibration protocol avoids the self-calibration loop wherein TNR is computed on the same data used to set the threshold, producing an artificially constant and uninformative value. Inference time (AIT, ms per query) and parameter count are reported in Section IV.D.
+We report five metrics. Closed-set: accuracy (ACC, %) and classification macro-AUROC (Cls-AUROC, one-vs-rest). Open-set: AUROC [14] (primary, see §V.D), OSR Score = (TPR + TNR) / 2 at TNR = 95%, and TPR@TNR95. The rejection threshold \(\tau\) is calibrated per round on a held-out 50% support split disjoint from prototypes and test queries, avoiding the self-calibration loop. Inference time (AIT) and parameter count are in §IV.D.
 
 ---
 
 ### B. Comparison of OSR Detection Methods
 
-We first compare all six OSR heads under the default FOAC setting (6-way 5-shot, full_model configuration, 3,000 episodes) on both datasets.
+We compare all six OSR heads under the default FOAC setting (6-way 5-shot, full_model, 3,000 episodes) on both datasets.
 
 **[Insert TABLE 3 about here.]**
 
-**TABLE 3.** OSR detection method comparison. Top: TAU22. Bottom: TAU19. Both 6-way 5-shot, full_model, 3,000 episodes. ACC and Cls-AUROC are fixed by the configuration (full_model: 5s ACC = 54.41% on TAU22, 38.94% on TAU19); OSR-AUROC and OSR Score are determined by the detection head. Bold marks best OSR-AUROC per dataset.
+**TABLE 3.** OSR detection method comparison (6-way 5-shot, full_model, 3,000 episodes). Top: TAU22. Bottom: TAU19. ACC and Cls-AUROC fixed by configuration; OSR-AUROC and OSR Score determined by detection head. Bold = best OSR-AUROC.
 
-On TAU22 (TABLE 3, top panel), the anti-prototype baseline [9] records AUROC = 0.624, OSR Score = 60.53%—better than random but far from usable. Mahalanobis [8] is effectively broken (AUROC = 0.486, OSR Score = 48.89%), performing worse than random guessing. The three OOD head family methods—osr23, ext_v2, clust_v2—form a tight cluster at AUROC ≈ 0.834–0.841 with OSR Score ≈ 73–74%. These three are statistically indistinguishable from one another (§IV.C). Fusion V2 reaches AUROC = 0.862, a gap of +0.021 over the best single head. Gains on TAU22 are real but modest; the relatively uniform recording conditions compress the known/unknown margin, leaving less room for fusion to exploit.
+On TAU22 (TABLE 3 top), anti-prototype [9] records AUROC = 0.624, OSR Score = 60.53%—better than random but far from usable. Mahalanobis [8] is effectively broken (AUROC = 0.486). The three OOD head methods (osr23, ext_v2, clust_v2) cluster tightly at AUROC ≈ 0.834–0.841 with OSR Score ≈ 73–74%; they are statistically indistinguishable (§IV.C). Fusion V2 reaches AUROC = 0.862 (+0.021 over the best single head). Gains are modest on TAU22, where uniform recording conditions compress the known/unknown margin.
 
-TAU19 (TABLE 3, bottom) reshuffles the ranking and amplifies the gaps. Anti-prototype worsens to AUROC = 0.635, making it the only method whose AUROC drops between datasets. Mahalanobis jumps to AUROC = 0.845, a swing of +0.359—the method's viability depends entirely on which dataset it's evaluated on. The OOD head family all exceed AUROC = 0.93, and Fusion V2 reaches 0.972 with TPR@TNR95 = 90.22%, meaning nine in ten known queries are correctly accepted while 95% of unknowns are rejected. The fusion margin over the OOD head family widens to +0.035–0.040.
+TAU19 (TABLE 3 bottom) amplifies the gaps. Anti-prototype worsens to AUROC = 0.635; Mahalanobis jumps to 0.845 (+0.359). The OOD head family all exceed AUROC = 0.93; Fusion V2 reaches 0.972 with TPR@TNR95 = 90.22%. The fusion margin widens to +0.035–0.040.
 
-Several structural patterns cut across both datasets. Cls-AUROC and OSR-AUROC are essentially orthogonal: TAU22 Cls-AUROC = 0.840 (higher than TAU19's 0.717), yet TAU19 OSR-AUROC dominates across all six heads. Knowing which class a sample belongs to, and knowing whether it belongs to any known class, draw on different properties of the feature representation. The OOD head family (osr23, ext_v2, clust_v2) consistently track each other within \(\pm 0.005\) AUROC, while anti-prototype and mahalanobis swing wildly across datasets—a pattern the statistical tests in Section IV.C confirm.
+Cls-AUROC and OSR-AUROC are orthogonal: TAU22 Cls-AUROC = 0.840 (higher than TAU19's 0.717), yet TAU19 OSR-AUROC dominates across all six heads. Classification and open-set detection draw on different properties of the feature representation. The OOD head family tracks within \(\pm 0.005\) AUROC; anti-prototype and Mahalanobis swing wildly—a pattern confirmed in §IV.C.
+
+**[Insert Fig 3 about here.]**
+
+**Fig 3.** Comprehensive AUROC comparison: (a) within-domain, (b) cross-domain, (c) openness, (d) way-shot scaling, (e) ablation stability, (f) method dominance.
 
 ---
 
 ### C. Statistical Significance Test
 
-To ensure that the OSR method ordering is robust to episode sampling noise, we apply the Friedman test with Nemenyi post-hoc correction [12] across 72 conditions: 6 OSR methods evaluated under 12 way-shot settings per dataset (6 settings × 2 datasets = 12 blocks, each block ranking the 6 methods).
+We apply the Friedman test with Nemenyi post-hoc [12] across 72 conditions (6 OSR methods × 12 way-shot settings per dataset).
 
 **[Insert TABLE 4 about here.]**
 
-**TABLE 4.** Friedman test (\(\chi^2 = 49.29\), \(p = 1.94 \times 10^{-9}\), CD = 3.08 at \(\alpha = 0.05\)) with Nemenyi post-hoc. Average rankings (lower = better) and significant pairwise comparisons.
+**TABLE 4.** Friedman test (\(\chi^2 = 49.29\), \(p = 1.94 \times 10^{-9}\), CD = 3.08 at \(\alpha = 0.05\)) with Nemenyi post-hoc. Average rankings (lower = better).
 
-The method-level test is strongly significant: \(\chi^2 = 49.29\), \(p = 1.94 \times 10^{-9}\). Fusion V2 earns the best average rank (1.75), followed by osr23 (2.0) and cluster_v2 (2.5). Anti-prototype and mahalanobis tie for last at 5.5. Four pairwise comparisons survive the Nemenyi correction (CD = 3.08): fusion_v2 > anti-prototype, fusion_v2 > mahalanobis, osr23 > anti-prototype, osr23 > mahalanobis. The OOD head family methods (osr23, ext_v2, clust_v2) show no significant pairwise differences, confirming that they are functionally interchangeable from a statistical standpoint.
+The method-level test is strongly significant: \(\chi^2 = 49.29\), \(p = 1.94 \times 10^{-9}\). Fusion V2 ranks best (1.75), followed by osr23 (2.0), cluster_v2 (2.5); anti-prototype and Mahalanobis tie last (5.5). Four pairwise differences survive Nemenyi correction (CD = 3.08): fusion_v2 > anti-prototype, fusion_v2 > Mahalanobis, osr23 > anti-prototype, osr23 > Mahalanobis. The OOD head family shows no significant pairwise differences, confirming functional interchangeability.
 
-We also test the six model configurations (full_model, wo_flow_transform, wo_ood_head, wo_reciprocal, wo_threshold, only_distance_head) over the same 72 conditions. Here, \(\chi^2 = 7.14\) with \(p = 0.21\)—nowhere near significance. The choice of which architectural knob to turn matters substantially less than the choice of which OSR detection head to use. This result underpins our central claim: the OSR head is the primary locus of performance variation in the FOAC pipeline.
+Testing the six model configurations over the same 72 conditions yields \(\chi^2 = 7.14\), \(p = 0.21\)—not significant. Architectural choices matter far less than OSR head choice. This underpins our central claim: the OSR head is the primary locus of performance variation.
 
 ---
 
 ### D. Complexity Comparison
 
-TABLE 5 reports parameter counts (total trainable parameters, excluding the frozen YAMNet backbone) and average inference time (AIT, ms per query, mean ± std over 1,000 forward passes on an RTX 3090) across the six model configurations.
+TABLE 5 reports trainable parameters (excluding frozen YAMNet) and average inference time (AIT, ms/query, mean ± std over 1,000 forward passes on RTX 3090).
 
 **[Insert TABLE 5 about here.]**
 
-**TABLE 5.** Computational complexity. Params = trainable parameters excluding frozen YAMNet [11] backbone. AIT = average inference time (ms/query, RTX 3090).
+**TABLE 5.** Computational complexity. Params = trainable parameters excluding frozen YAMNet [11] backbone.
 
-The Flow Transform [17], [18] dominates both axes. Removing it (wo_flow_transform) slashes parameters from 40.1K to 14.8K (\(-63\%\)) and inference time from 4.16 ms to 0.65 ms—a 6.5× speedup. The OOD head itself contributes ~700 parameters and zero measurable AIT overhead, making the OSR-specific components effectively free at inference. The only_distance_head baseline—raw Mahalanobis [8] with neither flow, OOD loss, reciprocal attention, nor threshold adaptation—needs 12.7K parameters and 0.64 ms per query.
+The Flow Transform [17], [18] dominates both axes. Removing it slashes parameters from 40.1K to 14.8K (−63%) and AIT from 4.16 ms to 0.65 ms (6.5× speedup). The OOD head adds ~700 parameters with negligible AIT overhead. The only_distance_head baseline requires 12.7K parameters and 0.64 ms/query.
 
-These numbers carry a practical implication. For edge deployment on smartphones or embedded sensors, the 6.5× speedup from dropping the Flow Transform is decisive: 0.65 ms / query corresponds to roughly 1,500 queries per second on a single core. Coupled with the ablation finding that wo_flow_transform + fusion_v2 is the TAU22 optimum (AUROC = 0.884, Section IV.F), an on-device system can have both the best AUROC and the fastest inference on TAU22 by removing the flow. On TAU19, the optimal AUROC configuration (wo_ood_head + fusion_v2, 0.985) retains the flow and its 4.16 ms latency, presenting a dataset-dependent accuracy/efficiency trade-off.
+For edge deployment, the 6.5× speedup from dropping the Flow Transform is decisive: 0.65 ms/query ≈ 1,500 queries/second on a single core. Combined with wo_flow_transform + fusion_v2 achieving the TAU22 optimum (AUROC = 0.884, §IV.F), an on-device system gets both best AUROC and fastest inference by removing the flow. On TAU19, the optimum (wo_ood_head + fusion_v2, AUROC = 0.985) retains the flow at 4.16 ms—a dataset-dependent accuracy/efficiency trade-off. SOTA methods (FEAT [4], MET [23], D-ProtoNet [22]) report comparable or larger parameter budgets but no open-set metrics, precluding direct FOAC efficiency comparison.
 
-For reference, SOTA few-shot methods such as FEAT [4], MET [23], and D-ProtoNet [22] report comparable or larger parameter budgets (typically 20K–200K learnable parameters depending on backbone and adaptation modules), but none report open-set metrics, making direct efficiency comparison in the FOAC setting infeasible at present.
+**[Insert Fig 4 about here.]**
+
+**Fig 4.** Radar chart: 6 configs × 5 dimensions (ACC / AUROC / OSR Score / AIT / Params), normalized 0–1; larger area = better trade-off.
 
 ---
 
 ### E. Generalization Ability (Cross-Domain)
 
-We evaluate bidirectional transfer: train on one dataset's base classes (200 epochs), test on the other dataset's novel classes with unknown queries sampled from the target domain.
+We evaluate bidirectional transfer: train on one dataset's base classes (200 epochs), test on the other's novel classes with target-domain unknowns.
 
 **[Insert TABLE 6 about here.]**
 
-**TABLE 6.** Cross-domain transfer. Top rows: classification accuracy and Cls-AUROC for Base/Novel 1-shot and 5-shot. Bottom rows: OSR performance by method. Left panel: TAU22→TAU19. Right panel: TAU19→TAU22.
+**TABLE 6.** Cross-domain transfer. Classification accuracy and Cls-AUROC for Base/Novel 1-shot and 5-shot (top rows); OSR performance by method (bottom rows). Left: TAU22→TAU19. Right: TAU19→TAU22.
 
-The dominant finding is asymmetry. TAU22→TAU19 with fusion_v2 attains OSR Score = 90.49%, AUROC = 0.977. TAU19→TAU22 peaks at OSR Score = 74.31%, AUROC = 0.878—a 16.2 pp and 0.099 gap, respectively, between the two directions. When TAU19 is the target, its per-device acoustic modes create well-separated clusters in feature space; unknown samples land in the gaps between clusters, making them easy to flag regardless of which dataset trained the model. When TAU22 is the target, its tighter, overlapping class distributions leave less open space, and the boundary is harder to locate.
+The dominant finding is asymmetry. TAU22→TAU19 with fusion_v2 attains OSR Score = 90.49%, AUROC = 0.977; TAU19→TAU22 peaks at OSR Score = 74.31%, AUROC = 0.878—a 16.2 pp and 0.099 gap. When TAU19 is the target, its per-device clusters create well-separated gaps in feature space; unknowns land in the gaps regardless of training domain. When TAU22 is the target, tighter, overlapping class distributions leave less open space.
 
-The second finding is the classification/OSR divergence under domain shift. Going from within-domain to cross-domain (TAU22→TAU19), Base 5-shot ACC drops from 52.27% to 35.13%—a 17 pp collapse. Yet OSR Score for fusion_v2 rises from 76.96% to 90.49%. Classification relies on fine-grained between-class distinctions that are fragile under distribution shift; open-set detection relies on the overall compactness of the known-class manifold relative to the open space around it, a property that can improve even as between-class discrimination degrades.
+Classification and OSR diverge under domain shift. Within-domain to cross-domain (TAU22→TAU19), Base 5-shot ACC drops 17 pp (52.27% → 35.13%), yet fusion_v2 OSR Score rises from 76.96% to 90.49%. Classification relies on fine between-class distinctions fragile under shift; open-set detection depends on compactness of the known-class manifold, which can improve even as between-class discrimination degrades.
 
-Fusion V2 leads in both transfer directions. On TAU22→TAU19, it beats anti-prototype by +37.7 pp OSR Score and +0.302 AUROC. On TAU19→TAU22, it beats mahalanobis by +23.4 pp and +0.253 AUROC. The OOD head family is remarkably stable under cross-domain evaluation: osr23, ext_v2, and clust_v2 all achieve OSR Score ≈ 84% and AUROC ≈ 0.93 on TAU22→TAU19, within 1 pp of each other. Fusion V2 adds ~6 pp on top. On TAU19→TAU22, the OOD head family degrades uniformly by ~10 pp OSR Score relative to TAU22→TAU19, while fusion_v2's advantage compresses to roughly 2–3 pp over cluster_v2. Cross-domain transfer toward the less diverse dataset (TAU22 as target) is the hardest regime for all methods.
+Fusion V2 leads both directions: +37.7 pp OSR Score / +0.302 AUROC over anti-prototype on TAU22→TAU19; +23.4 pp / +0.253 over Mahalanobis on TAU19→TAU22. The OOD head family is stable under cross-domain evaluation (OSR Score ≈ 84%, AUROC ≈ 0.93 on TAU22→TAU19, within 1 pp); fusion_v2 adds ~6 pp. On TAU19→TAU22, all methods degrade ~10 pp—cross-domain toward the less diverse dataset is the hardest regime.
 
 ---
 
@@ -88,13 +94,13 @@ We ablate the full cross of 6 model configurations × 6 OSR heads = 36 condition
 
 **[Insert TABLE 7 about here.]**
 
-**TABLE 7.** TAU19 ablation AUROC matrix. Bold + ★ marks the global optimum (wo_ood_head × fusion_v2, AUROC = 0.985). Corresponding TAU22 ablation data (optimum: wo_flow_transform × fusion_v2, AUROC = 0.884) are reported in the Supplementary Material.
+**TABLE 7.** TAU19 ablation AUROC matrix. Bold + ★ = global optimum (wo_ood_head × fusion_v2, AUROC = 0.985). TAU22 ablation data (optimum: wo_flow_transform × fusion_v2, AUROC = 0.884) in Supplementary Material.
 
-Fusion V2 achieves the highest AUROC in all 12 cells across both datasets—a clean sweep. The global optimum is **wo_ood_head + fusion_v2 on TAU19: AUROC = 0.985**, OSR Score = 93.31%. This is the paper's most counterintuitive result: removing the OSR-specific training loss—the binary cross-entropy term that explicitly teaches the model to separate known from unknown—improves open-set detection. The hypothesis, discussed further in Section V.B, is that the OSR loss introduces noisy gradients that interfere with natural feature-space organization. Classification cross-entropy plus the separation loss alone, combined with a well-structured detection head, suffice to induce effective known/unknown separation when the underlying features are strong.
+Fusion V2 achieves the highest AUROC in all 12 cells across both datasets. The global optimum is **wo_ood_head + fusion_v2 on TAU19: AUROC = 0.985**, OSR Score = 93.31%. This is the paper's most counterintuitive result: removing the OSR-specific training loss improves open-set detection. The hypothesis (§V.B) is that the OSR loss introduces noisy gradients interfering with natural feature organization; classification cross-entropy plus separation loss, with a well-structured head, suffices when features are strong.
 
-On TAU22, the optimum shifts to **wo_flow_transform + fusion_v2 (AUROC = 0.884)**. The Flow Transform [17], [18] helps on the easier dataset—where per-class distributions are already roughly Gaussian—but is neutral or mildly harmful on TAU19, where the multi-device feature distribution resists Gaussianization. This dataset-dependence of the flow's utility is a practical takeaway: don't pay the 6.5× latency cost on TAU19 if it doesn't buy you AUROC.
+On TAU22, the optimum is **wo_flow_transform + fusion_v2 (AUROC = 0.884)**. The Flow Transform [17], [18] helps when per-class distributions are roughly Gaussian but is neutral or mildly harmful on TAU19's multi-device distribution—don't pay the 6.5× latency cost if it doesn't improve AUROC.
 
-Several component-level patterns emerge from the 36-cell matrix. Reciprocal attention [9] is the largest contributor to classification ACC: removing it drops TAU22 5s ACC from 54.41% to 52.64% (\(-1.77\) pp). The OOD head family (osr23, ext_v2, clust_v2) produces AUROC within \(\pm 0.005\) of each other for any given configuration, reinforcing their statistical indistinguishability. AUROC spread across configurations is substantial on TAU19 (0.635 → 0.985, range = 0.354) but compressed on TAU22 (0.486 → 0.884, range = 0.398), indicating that method and configuration choices matter most when the domain is challenging enough to create a meaningful known/unknown gap. The corresponding TAU22 complete ablation matrix, which mirrors the patterns seen in TAU19 at a uniformly lower AUROC ceiling, is provided in the Supplementary Material.
+Key patterns: reciprocal attention [9] is the largest ACC contributor (removing it drops TAU22 5s ACC −1.77 pp). The OOD head family produces AUROC within \(\pm 0.005\) across configurations. AUROC spread is wide on TAU19 (0.635 → 0.985, range = 0.354) but tighter on TAU22 (0.486 → 0.884, range = 0.398)—method and configuration choices matter most in challenging domains. The TAU22 ablation matrix is in Supplementary Material.
 
 ---
 
@@ -106,25 +112,29 @@ We vary N = {5, 6} and K = {1, 5, 10} with Fusion V2.
 
 **[Insert TABLE 8 about here.]**
 
-**TABLE 8.** Way-shot scaling for Fusion V2 on TAU22 (top) and TAU19 (bottom). Best OSR Score per dataset section in bold.
+**TABLE 8.** Way-shot scaling for Fusion V2 on TAU22 (top) and TAU19 (bottom). Best OSR Score in bold.
 
-Increasing K from 1 to 10 boosts ACC by 10–15 pp on both datasets. OSR metrics barely move: AUROC gains < 0.02, OSR Score gains < 5 pp. Classification and OSR detection are largely decoupled—having more support samples helps you name the right class but doesn't much change whether you know the sample is known in the first place.
+Increasing K from 1 to 10 boosts ACC by 10–15 pp; OSR metrics barely move (AUROC < +0.02, OSR Score < +5 pp). Classification and OSR are largely decoupled—more support samples improve class identification but don't substantially change known/unknown discrimination.
 
-Increasing ways from 5 to 6 reduces ACC by 2–3 pp, consistent with the standard few-shot trade-off, while OSR metrics stay flat. Under the hardest condition (6-way 1-shot), Fusion V2 holds AUROC = 0.976 (TAU19) and 0.874 (TAU22); anti-prototype collapses to 0.694 and 0.627 respectively. Fusion V2 wins all 12 way-shot settings across both datasets, with per-method data confirming a consistent ~0.03–0.05 AUROC margin over the OOD head family.
+Increasing ways from 5 to 6 reduces ACC by 2–3 pp while OSR stays flat. Under the hardest condition (6-way 1-shot), Fusion V2 maintains AUROC = 0.976 (TAU19) / 0.874 (TAU22); anti-prototype collapses to 0.694 / 0.627. Fusion V2 wins all 12 way-shot settings with a consistent ~0.03–0.05 AUROC margin over the OOD head family.
 
-One anomaly: Mahalanobis AUROC on TAU22 drops from 0.657 (5w1s) to 0.539 (5w10s). More support samples tighten the per-class Gaussian fits, which perversely makes the detector more brittle—the covariance shrinks and even mild unknowns are flagged as far outliers.
+One anomaly: Mahalanobis AUROC on TAU22 drops from 0.657 (5w1s) to 0.539 (5w10s). More support samples tighten Gaussian fits, perversely making the detector more brittle.
+
+**[Insert Fig 6 about here.]**
+
+**Fig 6.** Way-shot surface: way (5–6) × shot (1–10) × AUROC, 3D surface with Fusion V2 + OOD head family; shot axis shows diminishing returns beyond K = 5.
 
 #### G2. Openness Analysis
 
-We increase the number of unknown classes from 2 to 4.
+We increase unknown classes from 2 to 4.
 
 **[Insert TABLE 9 about here.]**
 
-**TABLE 9.** Openness analysis. OSR Score and AUROC at open2 (2 unknown classes) and open4 (4 unknown classes) with Δ. TAU22 (top), TAU19 (bottom).
+**TABLE 9.** Openness analysis. OSR Score and AUROC at open2/open4 with Δ. TAU22 (top), TAU19 (bottom).
 
-AUROC degrades monotonically with more unknowns for all methods on both datasets. The degradation is far worse on TAU22: ext_v2 drops −0.116, osr23 and clust_v2 drop −0.106. Fusion V2 drops −0.076, the smallest among the six. On TAU19, Fusion V2's AUROC drop is just −0.008—barely measurable—maintaining 0.984 even at open4. Anti-prototype on TAU22 open4 registers AUROC = 0.599, effectively random. Mahalanobis shows the worst cross-dataset consistency: AUROC ≈ 0.57–0.60 on TAU22 vs. 0.83 on TAU19.
+AUROC degrades monotonically with more unknowns. Degradation is worse on TAU22: ext_v2 drops −0.116, osr23/clust_v2 −0.106; Fusion V2 drops −0.076 (smallest). On TAU19, Fusion V2 drops merely −0.008, maintaining 0.984 at open4. Anti-prototype on TAU22 open4 reaches AUROC = 0.599 (near random). Mahalanobis shows the worst cross-dataset consistency (AUROC ≈ 0.57–0.60 on TAU22 vs. 0.83 on TAU19).
 
-TAU19's openness robustness is striking. The more heterogeneous recording conditions in TAU19 appear to produce a feature space where known classes form compact clusters relative to the inter-cluster gaps, making the open-space boundary resistant to the addition of more unknown categories. On TAU22, where recording conditions are uniform, the known-class clusters bleed into each other and the boundary is fragile.
+TAU19's robustness stems from heterogeneous recording conditions producing compact known-class clusters with wide inter-cluster gaps, making the open-space boundary resistant to additional unknowns. On TAU22, uniform conditions produce overlapping clusters and a fragile boundary.
 
 #### G3. t-SNE Visualization
 
@@ -136,10 +146,10 @@ Fig 3 provides a qualitative sanity check. Under fusion_v2, known classes form t
 
 #### G4. Comparison with ResNet18-based Method (FOAC-AIFP)
 
-As a sanity check on the backbone, we compare against FOAC-AIFP, a ResNet18-based system [27] that implements its own few-shot open-set components (CIAM, PAM, NPM).
+We compare against FOAC-AIFP, a ResNet18-based system [27] with its own few-shot open-set components (CIAM, PAM, NPM).
 
 **[Insert TABLE 10 about here.]**
 
 **TABLE 10.** Cross-backbone comparison: YAMNet-based episodic trainer (ours, Fusion V2) vs. ResNet18-based FOAC-AIFP [29]. Different backbones preclude direct comparison of absolute values.
 
-FOAC-AIFP's OSR Score hovers at ~50%—indistinguishable from random guessing—with AUROC ≈ 0.45–0.53 and TPR@TNR95 below 6%. This despite the ResNet18 backbone being trained from scratch on the target-domain base classes (a setting that should favor it over our frozen YAMNet). The gap is large enough to conclude that the CIAM/PAM/NPM architecture, whatever its merits for closed-set few-shot classification, does not produce effective open-set rejection. The episodic training protocol and the OSR detection head design appear to be the differentiating factors.
+FOAC-AIFP's OSR Score hovers at ~50% (random-chance level) with AUROC ≈ 0.45–0.53 and TPR@TNR95 below 6%, despite ResNet18 being trained from scratch on target-domain base classes. The CIAM/PAM/NPM architecture, whatever its closed-set merits, does not produce effective open-set rejection. The episodic training protocol and OSR head design appear to be the differentiating factors.
