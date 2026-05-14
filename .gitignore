@@ -40,4 +40,4 @@ __pycache__/
 .venv/
 venv/
 env/
-.conda/
+.conda/experiment/foac_exp/ablation/train_dcase18.log
