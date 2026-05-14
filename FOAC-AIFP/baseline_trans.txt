@@ -411,3 +411,25 @@ Episode 设置 (适配6基类):
   ├────────────┼──────────────────────┼─────────────────────────┤
   │ 最终测试   │ eval CSV (10类)      │ run_test_fsl + OSR评测  │
   └────────────┴──────────────────────┴─────────────────────────┘   
+
+
+#### 对比 FOAC-AIFP
+  
+  基线模型的核心计算流程是一致的（ResNet18 编码 → spectrogram/logmel → PAM原型聚合 →
+   CIAM条件耦合 → NPM开集原型生成 → cosine度量分类），但 FOAC-AIFP
+  版本做了以下扩展和修改：
+
+  1. 数据集：从 3 个扩展到 6 个，新增 TAU 系列城市声景数据集
+  2. Transformer 交叉注意力：从 MultiHeadAttention
+  简化为手动线性投影注意力（计算上有差异）
+  3. 鲁棒性：增加了动态 n_ways、空张量保护、维度回退等防御性代码
+  4. 消融实验支持：PAM/CIAM/NPM 可分别关闭
+  5. 评估协议：新增 TPR@TNR95 和 OSR Score，严格区分 calib/eval 数据集
+
+  
+  FOAC-AIFP 新增了：
+  - meta_calib_dataloader — 独立的校准数据加载器
+  - calib loader 传给 tm.train(model, calib_loader) 用于模型选择
+  - eval_fsl_nplus1 中的 10 轮 calib/eval 随机分割：已知类分数 50% 用于校准阈值、50%
+   用于评估 TNR
+  - run_osr_eval 中严格区分 calib set（计算原型 + 校准阈值）和 test set（最终评估）

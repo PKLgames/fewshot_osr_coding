@@ -8,6 +8,7 @@ Tests AUROC/OSR performance with varying numbers of unknown classes
 Usage:
   cd /coding
   python episodic_exp_openness.py --dataset TAU22
+  python episodic_exp_openness.py --dataset DCASE18 --fold all
   python episodic_exp_openness.py --quick
 """
 
@@ -24,6 +25,7 @@ from episodic_trainer import (
 )
 from utils.TAU22 import TAUDataset as TAU22Dataset
 from utils.TAU19 import TAUDataset as TAU19Dataset
+from utils.DCASE18 import DCASE18Dataset
 
 
 OPEN_WAY_VALUES = [2, 4]
@@ -97,7 +99,7 @@ def run_openness(train_cache, calib_cache, test_cache, feature_extractor,
 
 def main():
     parser = argparse.ArgumentParser(description='Episodic Openness Sweep')
-    parser.add_argument('--dataset', choices=['TAU22', 'TAU19'], default='TAU22')
+    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'DCASE18'], default='TAU22')
     parser.add_argument('--open_ways', type=int, nargs='*', default=OPEN_WAY_VALUES)
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true')
@@ -105,6 +107,8 @@ def main():
                         help='Comma-separated OSR methods, or "all" for all 6')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
+    parser.add_argument('--fold', type=str, default='1',
+                        help='Fold for DCASE18: 1-4 or "all" for 4-fold CV (default: 1)')
     cl_args = parser.parse_args()
 
     if cl_args.osr_methods == 'all':
@@ -126,32 +130,51 @@ def main():
     feature_extractor = FeatureExtractor(pretrained_path=pretrained_path)
     feature_extractor = feature_extractor.to(device).freeze()
 
-    # Extract features
-    print("Extracting features...")
-    TAUDataset = TAU19Dataset if cl_args.dataset == 'TAU19' else TAU22Dataset
-    train_dataset = TAUDataset(split='train')
-    calib_dataset = TAUDataset(split='calib')
-    test_dataset = TAUDataset(split='test')
-
-    train_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
-    train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
-    calib_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
-    calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
-    test_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
-    test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
-
-    base_classes = [0, 1, 2, 3, 4, 5]
-    all_unknown = [6, 7, 8, 9]
+    if cl_args.dataset == 'DCASE18':
+        from functools import partial
+        base_classes = [0, 1, 2, 3, 4]
+        all_unknown = [5, 6, 7, 8]
+        n_way = 4
+        folds = [1, 2, 3, 4] if cl_args.fold == 'all' else [int(cl_args.fold)]
+    else:
+        base_classes = [0, 1, 2, 3, 4, 5]
+        all_unknown = [6, 7, 8, 9]
+        n_way = 6
+        folds = [None]
 
     all_results = {}
     for n_open in cl_args.open_ways:
-        r = run_openness(
-            train_cache, calib_cache, test_cache, feature_extractor,
-            base_classes, all_unknown, n_open,
-            num_episodes=cl_args.num_episodes, device=device,
-            output_root=cl_args.output_dir, osr_methods=osr_methods)
-        if r:
-            all_results[f'open{n_open}'] = r
+        for fold in folds:
+            # Extract features (per-fold for DCASE18)
+            if cl_args.dataset == 'DCASE18':
+                TAUDataset = partial(DCASE18Dataset, fold=fold)
+                cache_name = f'dcase18_fold{fold}'
+            else:
+                TAUDataset = TAU19Dataset if cl_args.dataset == 'TAU19' else TAU22Dataset
+                cache_name = cl_args.dataset.lower()
+
+            print(f"Extracting features" + (f" (fold={fold})" if fold is not None else "") + "...")
+            train_dataset = TAUDataset(split='train')
+            calib_dataset = TAUDataset(split='calib')
+            test_dataset = TAUDataset(split='test')
+
+            train_cache = FeatureCache(dataset_name=cache_name)
+            train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
+            calib_cache = FeatureCache(dataset_name=cache_name)
+            calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
+            test_cache = FeatureCache(dataset_name=cache_name)
+            test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
+
+            fold_tag = f'_f{fold}' if fold is not None else ''
+            r = run_openness(
+                train_cache, calib_cache, test_cache, feature_extractor,
+                base_classes, all_unknown, n_open, N_way=n_way,
+                num_episodes=cl_args.num_episodes, device=device,
+                output_root=os.path.join(cl_args.output_dir,
+                    f'openness_fold{fold}' if fold is not None else ''),
+                osr_methods=osr_methods)
+            if r:
+                all_results[f'open{n_open}{fold_tag}'] = r
 
     # Save
     os.makedirs(os.path.join(cl_args.output_dir, 'openness'), exist_ok=True)
@@ -164,16 +187,32 @@ def main():
     print(f"\n{'='*60}")
     print("OPENNESS SWEEP SUMMARY")
     print(f"{'='*60}")
-    print(f"  {'OpenWays':>10s} {'AP':>7s} {'Mah':>7s} {'O23':>7s} {'ExtV2':>7s} {'CluV2':>7s} {'FusV2':>7s}")
-    for key, r in sorted(all_results.items()):
-        osr = r.get('osr', {})
-        osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
-        osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
-        osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
-        osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
-        osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
-        osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
-        print(f"  {key:>10s} {osr_ap:>6.2%} {osr_mah:>6.2%} {osr_o23:>6.2%} {osr_ext:>6.2%} {osr_clu:>6.2%} {osr_fv2:>6.2%}")
+    if cl_args.dataset == 'DCASE18' and cl_args.fold == 'all':
+        print(f"  {'OpenWays':>10s} {'AP':>10s} {'Mah':>10s} {'O23':>10s} {'ExtV2':>10s} {'CluV2':>10s} {'FusV2':>10s}")
+        osr_keys = ['anti_prototype', 'feature_mahalanobis', 'ood_head_osr23',
+                   'ood_head_extended_v2', 'ood_head_cluster_v2', 'ood_head_fusion_v2']
+        open_keys = sorted(set(k.rsplit('_f', 1)[0] for k in all_results.keys()))
+        for ok in open_keys:
+            fold_vals = [all_results.get(f'{ok}_f{f}', {}) for f in [1,2,3,4]]
+            fold_vals = [v for v in fold_vals if v]
+            if not fold_vals:
+                continue
+            row = f"  {ok:>10s}"
+            for osk in osr_keys:
+                vals = [v.get('osr', {}).get(osk, {}).get('osr_score', 0) for v in fold_vals]
+                row += f" {np.mean(vals):>9.2%}"
+            print(row)
+    else:
+        print(f"  {'OpenWays':>10s} {'AP':>7s} {'Mah':>7s} {'O23':>7s} {'ExtV2':>7s} {'CluV2':>7s} {'FusV2':>7s}")
+        for key, r in sorted(all_results.items()):
+            osr = r.get('osr', {})
+            osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
+            osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
+            osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
+            osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
+            osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
+            osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
+            print(f"  {key:>10s} {osr_ap:>6.2%} {osr_mah:>6.2%} {osr_o23:>6.2%} {osr_ext:>6.2%} {osr_clu:>6.2%} {osr_fv2:>6.2%}")
 
 
 if __name__ == '__main__':

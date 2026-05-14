@@ -9,6 +9,7 @@ Usage:
   cd /coding/FOAC-AIFP
   python foac_exp_way_shot.py --dataset TAU22 --config tau22_aligned.yml
   python foac_exp_way_shot.py --dataset TAU19 --config tau19_aligned.yml
+  python foac_exp_way_shot.py --dataset DCASE18 --fold all
 """
 
 import os
@@ -88,6 +89,7 @@ def run_way_shot_config(args, n_way, k_shot):
     if os.path.exists(args.pretrained_model_path):
         full_params = torch.load(args.pretrained_model_path, weights_only=False)
         state_dict = full_params.get('feature_params', full_params.get('params', full_params))
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith('fc.')}
         model.load_state_dict(state_dict, strict=False)
         model.init_representation(full_params)
 
@@ -116,29 +118,42 @@ def run_way_shot_config(args, n_way, k_shot):
 
 def main():
     parser = argparse.ArgumentParser(description='FOAC Way-Shot Sweep')
-    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'all'], default='all')
+    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'DCASE18', 'all'], default='all')
     parser.add_argument('--config', type=str, default=None)
     parser.add_argument('--ways', type=int, nargs='*', default=WAY_VALUES)
     parser.add_argument('--shots', type=int, nargs='*', default=SHOT_VALUES)
     parser.add_argument('--quick', action='store_true',
                         help='Only test a few combinations for debugging')
+    parser.add_argument('--fold', type=str, default='1',
+                        help='Fold for DCASE18: 1-4 or "all" for 4-fold CV (default: 1)')
     cl_args = parser.parse_args()
 
     if cl_args.quick:
         cl_args.ways = [5, 6]
         cl_args.shots = [1, 5]
 
-    datasets = ['TAU22', 'TAU19'] if cl_args.dataset == 'all' else [cl_args.dataset]
+    if cl_args.dataset == 'all':
+        datasets = ['TAU22', 'TAU19']
+    else:
+        datasets = [cl_args.dataset]
     all_results = {}
 
     for dataset in datasets:
-        config_path = cl_args.config or f'{dataset.lower()}_aligned.yml'
+        config_path = cl_args.config
+        if config_path is None:
+            if dataset == 'DCASE18':
+                config_path = 'dcase18_aligned.yml'
+            else:
+                config_path = f'{dataset.lower()}_aligned.yml'
         if not os.path.exists(config_path):
             print(f"Config not found: {config_path}, skipping {dataset}")
             continue
 
+        folds = [1, 2, 3, 4] if (dataset == 'DCASE18' and cl_args.fold == 'all') else \
+                [int(cl_args.fold)] if dataset == 'DCASE18' else [None]
+
         print(f"\n{'='*60}")
-        print(f"Way-Shot Sweep: {dataset}")
+        print(f"Way-Shot Sweep: {dataset}" + (f" (folds: {folds})" if folds[0] is not None else ""))
         print(f"  Ways: {cl_args.ways}")
         print(f"  Shots: {cl_args.shots}")
         print(f"{'='*60}")
@@ -147,10 +162,18 @@ def main():
 
         for n_way in cl_args.ways:
             for k_shot in cl_args.shots:
-                args = load_config(config_path)
-                result = run_way_shot_config(args, n_way, k_shot)
-                if result is not None:
-                    all_results[dataset][f"{n_way}w{k_shot}s"] = result
+                for fold in folds:
+                    args = load_config(config_path)
+                    fold_suffix = f'_fold{fold}' if fold is not None else ''
+                    if fold is not None:
+                        args.fold = fold
+                        args.save_folder = args.save_folder.rstrip('/') + fold_suffix
+                        args.pretrained_model_path = args.pretrained_model_path.replace(
+                            'dcase18_aligned/', f'dcase18_aligned_fold{fold}/')
+                    result = run_way_shot_config(args, n_way, k_shot)
+                    if result is not None:
+                        fold_tag = f'_f{fold}' if fold is not None else ''
+                        all_results[dataset][f"{n_way}w{k_shot}s{fold_tag}"] = result
 
     # Save results
     results_path = 'foac_exp_way_shot_results.json'
@@ -164,13 +187,33 @@ def main():
     print(f"{'='*80}")
     for dataset in all_results:
         print(f"\n  Dataset: {dataset}")
-        print(f"  {'Config':<10s} {'ACC':>8s} {'AUROC':>8s} {'OSR':>8s} {'F1':>8s}")
-        for key, r in sorted(all_results[dataset].items()):
-            acc = r.get('acc', [0, 0])
-            auroc = r.get('auroc', [0, 0])
-            osr = r.get('osr', [0, 0])
-            f1 = r.get('fscore', [0, 0])
-            print(f"  {key:<10s} {acc[0]:>7.1f} {auroc[0]:>7.1f} {osr[0]:>7.1f} {f1[0]:>7.1f}")
+        if dataset == 'DCASE18' and cl_args.fold == 'all':
+            # Aggregate across folds per way-shot config
+            print(f"  {'Config':<10s} {'ACC':>12s} {'AUROC':>12s} {'OSR':>12s} {'F1':>12s}")
+            way_shot_combos = sorted(set(
+                k.rsplit('_f', 1)[0] for k in all_results[dataset].keys()))
+            for ws in way_shot_combos:
+                fold_vals = [all_results[dataset].get(f'{ws}_f{f}', {}) for f in [1,2,3,4]]
+                fold_vals = [v for v in fold_vals if v]
+                if not fold_vals:
+                    continue
+                def _ms(vals, k):
+                    vs = [v.get(k, [0,0]) for v in vals]
+                    vs = [x[0] if isinstance(x, (list,tuple)) else x for x in vs]
+                    return np.mean(vs), np.std(vs)
+                acc_m, acc_s = _ms(fold_vals, 'acc')
+                auroc_m, auroc_s = _ms(fold_vals, 'auroc')
+                osr_m, osr_s = _ms(fold_vals, 'osr')
+                f1_m, f1_s = _ms(fold_vals, 'fscore')
+                print(f"  {ws:<10s} {acc_m:>6.1f}±{acc_s:<4.1f} {auroc_m:>6.1f}±{auroc_s:<4.1f} {osr_m:>6.1f}±{osr_s:<4.1f} {f1_m:>6.1f}±{f1_s:<4.1f}")
+        else:
+            print(f"  {'Config':<10s} {'ACC':>8s} {'AUROC':>8s} {'OSR':>8s} {'F1':>8s}")
+            for key, r in sorted(all_results[dataset].items()):
+                acc = r.get('acc', [0, 0])
+                auroc = r.get('auroc', [0, 0])
+                osr = r.get('osr', [0, 0])
+                f1 = r.get('fscore', [0, 0])
+                print(f"  {key:<10s} {acc[0]:>7.1f} {auroc[0]:>7.1f} {osr[0]:>7.1f} {f1[0]:>7.1f}")
 
 
 if __name__ == '__main__':

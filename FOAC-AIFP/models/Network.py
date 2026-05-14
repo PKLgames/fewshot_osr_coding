@@ -16,8 +16,9 @@ class Backbone(nn.Module):
     def __init__(self,args):
         super(Backbone,self).__init__()
         self.args = args
-        self.encoder = resnet18(True,args)
-        self.fc = nn.Linear(512,self.args.train_classes, bias=True)
+        rw = getattr(args, 'resnet_width', 64)
+        self.encoder = resnet18(True, base_width=rw)
+        self.fc = nn.Linear(int(512 * rw / 64), self.args.train_classes, bias=True)
         self.set_module_for_audio()
         
     def forward(self, x):
@@ -72,11 +73,13 @@ class My_Net(nn.Module):
         self.way = self.args.train_way
         self.resnet = self.args.resnet
         self.metric  = Metric_Cosine()
-        self.num_channel = 512
-        self.dim = 512 * 52
-        self.encoder = resnet18(True,args)
+        # resnet_width: default 64 (standard); set to 32 for half-width small model
+        rw = getattr(self.args, 'resnet_width', 64)
+        self.num_channel = int(512 * rw / 64)
+        self.dim = 512 * 52  # kept for compatibility
+        self.encoder = resnet18(True, base_width=rw)
         self.PAM = PrototypeDynamicAggregation(self.num_channel) if use_pam else None
-        self.CIAM = ConditionalInformationCouplingModule(512,512,1) if use_ciam else None
+        self.CIAM = ConditionalInformationCouplingModule(self.num_channel, self.num_channel, 1) if use_ciam else None
         self.NPM = OpenSetGenerater(self.num_channel, n_head=1,agg='mlp') if use_npm else None
         # Fallback for ablation: simple mean pool when PAM is off
         self.gap = nn.AdaptiveAvgPool2d((1, 1)) 

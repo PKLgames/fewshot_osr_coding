@@ -4,7 +4,7 @@ from tqdm import tqdm
 from sklearn import metrics
 import numpy as np
 
-def default_train(train_loader, model, optimizer, writer, iter_counter, args):
+def default_train(train_loader, model, optimizer, writer, iter_counter, args, grad_monitor=None):
 
     avg_loss = 0
     avg_acc = 0
@@ -38,7 +38,14 @@ def default_train(train_loader, model, optimizer, writer, iter_counter, args):
            
             optimizer.zero_grad()
             loss_total.backward()
+
+            if grad_monitor is not None:
+                grad_monitor.capture_param_grads()
+
             optimizer.step()
+
+            if grad_monitor is not None:
+                grad_monitor.log_step(iter_counter)
             loss_value = loss_total.item()
 
             ### Closed Set Accuracy

@@ -2,7 +2,7 @@
 """
 episodic_exp_cross_domain.py — Cross-Domain Evaluation for Episodic Trainer
 
-Train on one dataset (TAU22), extract features from another (TAU19),
+Train on one dataset (TAU22), extract features from another (TAU19/DCASE18),
 evaluate few-shot + OSR performance under domain shift.
 
 The key insight: the backbone (YAMNet) is shared, so we can extract
@@ -11,6 +11,7 @@ features from any dataset and evaluate the trained classifier on them.
 Usage:
   cd /coding
   python episodic_exp_cross_domain.py --source TAU22 --target TAU19
+  python episodic_exp_cross_domain.py --source TAU22 --target DCASE18 --target_fold 1
   python episodic_exp_cross_domain.py --all
 """
 
@@ -28,14 +29,30 @@ from episodic_trainer import (
 )
 from utils.TAU22 import TAUDataset as TAU22Dataset
 from utils.TAU19 import TAUDataset as TAU19Dataset
+from utils.DCASE18 import DCASE18Dataset
 
 
 ALL_OSR_METHODS = ['anti_prototype', 'feature_mahalanobis', 'ood_head_osr23',
                     'ood_head_extended_v2', 'ood_head_cluster_v2', 'ood_head_fusion_v2']
 
 
-def get_dataset_cls(name):
+def get_dataset_cls(name, fold=1):
+    from functools import partial
+    if name == 'DCASE18':
+        return partial(DCASE18Dataset, fold=fold)
     return TAU22Dataset if name == 'TAU22' else TAU19Dataset
+
+
+def get_cache_name(name, fold=1):
+    if name == 'DCASE18':
+        return f'dcase18_fold{fold}'
+    return name.lower()
+
+
+def get_base_unknown(name):
+    if name == 'DCASE18':
+        return [0, 1, 2, 3, 4], [5, 6, 7, 8], 4
+    return [0, 1, 2, 3, 4, 5], [6, 7, 8, 9], 6
 
 
 def find_best_checkpoint(experiment_dir):
@@ -52,7 +69,7 @@ def find_best_checkpoint(experiment_dir):
 
 def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
                       N_way=6, K_shot=5, feature_dim=64, device='cuda', quick=False,
-                      osr_methods=None):
+                      osr_methods=None, source_fold=1, target_fold=1):
     num_rounds = 3 if quick else 5
     """
     1. Load classifier trained on source
@@ -61,15 +78,31 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
     """
     print(f"\n{'='*60}")
     print(f"Cross-Domain: {source_name} -> {target_name}")
+    if source_name == 'DCASE18':
+        print(f"  Source fold: {source_fold}")
+    if target_name == 'DCASE18':
+        print(f"  Target fold: {target_fold}")
     print(f"{'='*60}")
 
     # --- Load trained classifier from source ---
-    source_dirs = [
-        f'experiment/yamnet_realfewshot_osr24' if source_name == 'TAU22' else f'experiment/yamnet_realfewshot_osr24_tau19',
-        f'experiment/yamnet_fewshot_osr22_fewshot',
-        f'experiment/yamnet_fewshot_osr22',
-        f'experiment/yamnet_fewshot_osr13',
-    ]
+    if source_name == 'DCASE18':
+        source_dirs = [
+            f'experiment/yamnet_realfewshot_osr24_dcase18_fold{source_fold}',
+            f'experiment/yamnet_realfewshot_osr24_dcase18',
+        ]
+    elif source_name == 'TAU22':
+        source_dirs = [
+            'experiment/yamnet_realfewshot_osr24',
+            'experiment/yamnet_fewshot_osr22_fewshot',
+            'experiment/yamnet_fewshot_osr22',
+            'experiment/yamnet_fewshot_osr13',
+        ]
+    else:
+        source_dirs = [
+            'experiment/yamnet_realfewshot_osr24_tau19',
+            'experiment/yamnet_fewshot_osr22_fewshot',
+            'experiment/yamnet_fewshot_osr22',
+        ]
     ckpt_path = None
     for d in source_dirs:
         p = os.path.join(d, 'fewshot_final.pth')
@@ -106,20 +139,21 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
     feature_extractor = feature_extractor.to(device).freeze()
 
     # --- Extract features from target dataset ---
-    TargetDataset = get_dataset_cls(target_name)
+    TargetDataset = get_dataset_cls(target_name, fold=target_fold)
+    target_cache_name = get_cache_name(target_name, fold=target_fold)
     print(f"  Extracting features from {target_name}...")
 
     target_train = TargetDataset(split='train')
     target_calib = TargetDataset(split='calib')
     target_test = TargetDataset(split='test')
 
-    train_cache = FeatureCache(dataset_name=target_name.lower())
+    train_cache = FeatureCache(dataset_name=target_cache_name)
     train_cache.extract_and_cache(feature_extractor, target_train, 'train', device, batch_size=64)
 
-    calib_cache = FeatureCache(dataset_name=target_name.lower())
+    calib_cache = FeatureCache(dataset_name=target_cache_name)
     calib_cache.extract_and_cache(feature_extractor, target_calib, 'calib', device, batch_size=64)
 
-    test_cache = FeatureCache(dataset_name=target_name.lower())
+    test_cache = FeatureCache(dataset_name=target_cache_name)
     test_cache.extract_and_cache(feature_extractor, target_test, 'test', device, batch_size=64)
 
     # --- Few-shot evaluation on target ---
@@ -173,15 +207,17 @@ def cross_domain_eval(source_name, target_name, base_classes, unknown_classes,
 
 def main():
     parser = argparse.ArgumentParser(description='Episodic Cross-Domain Evaluation')
-    parser.add_argument('--source', choices=['TAU22', 'TAU19'], default=None)
-    parser.add_argument('--target', choices=['TAU22', 'TAU19'], default=None)
-    parser.add_argument('--all', action='store_true')
+    parser.add_argument('--source', choices=['TAU22', 'TAU19', 'DCASE18'], default=None)
+    parser.add_argument('--target', choices=['TAU22', 'TAU19', 'DCASE18'], default=None)
+    parser.add_argument('--all', action='store_true', help='Run TAU22↔TAU19 both directions')
     parser.add_argument('--quick', action='store_true',
                         help='Quick mode: fewer evaluation rounds')
     parser.add_argument('--osr_methods', type=str, default='all',
                         help='Comma-separated OSR methods, or "all" for all 6')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
+    parser.add_argument('--source_fold', type=int, default=1, help='Fold for source DCASE18')
+    parser.add_argument('--target_fold', type=int, default=1, help='Fold for target DCASE18')
     cl_args = parser.parse_args()
 
     if cl_args.osr_methods == 'all':
@@ -198,14 +234,18 @@ def main():
         return
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    base_classes = [0, 1, 2, 3, 4, 5]
-    unknown_classes = [6, 7, 8, 9]
 
     all_results = {}
     for source, target in pairs:
         key = f"{source}->{target}"
-        r = cross_domain_eval(source, target, base_classes, unknown_classes,
-                              device=device, quick=cl_args.quick, osr_methods=osr_methods)
+        s_base, s_unknown, s_nway = get_base_unknown(source)
+        t_base, t_unknown, t_nway = get_base_unknown(target)
+        r = cross_domain_eval(source, target, t_base, t_unknown,
+                              N_way=t_nway,
+                              device=device, quick=cl_args.quick,
+                              osr_methods=osr_methods,
+                              source_fold=cl_args.source_fold,
+                              target_fold=cl_args.target_fold)
         if r:
             all_results[key] = r
 

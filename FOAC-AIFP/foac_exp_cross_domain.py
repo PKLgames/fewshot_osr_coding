@@ -2,7 +2,7 @@
 """
 foac_exp_cross_domain.py — Cross-Domain (Generalizability) Evaluation
 
-Train on one dataset (e.g. TAU22), test on another (e.g. TAU19),
+Train on one dataset (e.g. TAU22), test on another (e.g. TAU19, DCASE18),
 to evaluate model generalization under domain shift.
 
 Protocol:
@@ -14,7 +14,8 @@ Usage:
   cd /coding/FOAC-AIFP
   python foac_exp_cross_domain.py --source TAU22 --target TAU19
   python foac_exp_cross_domain.py --source TAU19 --target TAU22
-  python foac_exp_cross_domain.py --all   # both directions
+  python foac_exp_cross_domain.py --source TAU22 --target DCASE18 --target_fold 1
+  python foac_exp_cross_domain.py --all   # TAU22↔TAU19 both directions
 """
 
 import os
@@ -191,10 +192,16 @@ def cross_domain_eval(model, target_loader, args, device=None):
     return result
 
 
-def run_cross_domain(source, target):
+def _get_config_path(dataset):
+    if dataset == 'DCASE18':
+        return 'dcase18_aligned.yml'
+    return f'{dataset.lower()}_aligned.yml'
+
+
+def run_cross_domain(source, target, target_fold=1, source_fold=1):
     """Run one cross-domain experiment."""
-    source_config = f'{source.lower()}_aligned.yml'
-    target_config = f'{target.lower()}_aligned.yml'
+    source_config = _get_config_path(source)
+    target_config = _get_config_path(target)
 
     if not os.path.exists(source_config):
         print(f"Source config not found: {source_config}")
@@ -206,8 +213,21 @@ def run_cross_domain(source, target):
     src_args = load_config(source_config)
     tgt_args = load_config(target_config)
 
+    # Apply fold for DCASE18 datasets
+    if source == 'DCASE18':
+        src_args.fold = source_fold
+        src_args.save_folder = src_args.save_folder.rstrip('/') + f'_fold{source_fold}'
+        src_args.pretrained_model_path = src_args.pretrained_model_path.replace(
+            'dcase18_aligned/', f'dcase18_aligned_fold{source_fold}/')
+    if target == 'DCASE18':
+        tgt_args.fold = target_fold
+
     print(f"\n{'='*60}")
     print(f"Cross-Domain: {source} -> {target}")
+    if source == 'DCASE18':
+        print(f"  Source fold: {source_fold}")
+    if target == 'DCASE18':
+        print(f"  Target fold: {target_fold}")
     print(f"{'='*60}")
 
     # Load source model (best checkpoint)
@@ -219,6 +239,7 @@ def run_cross_domain(source, target):
     if os.path.exists(src_args.pretrained_model_path):
         pretrain_ckpt = torch.load(src_args.pretrained_model_path, weights_only=False)
         state_dict = pretrain_ckpt.get('feature_params', pretrain_ckpt.get('params', pretrain_ckpt))
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith('fc.')}
         model.load_state_dict(state_dict, strict=False)
         model.init_representation(pretrain_ckpt)
 
@@ -226,8 +247,14 @@ def run_cross_domain(source, target):
     if not os.path.exists(ckpt_path):
         ckpt_path = os.path.join(src_args.save_folder, f'model_{source}_max_osr.pth')
     if not os.path.exists(ckpt_path):
-        print(f"  No trained model found at {src_args.save_folder}")
-        return None
+        # Also try without fold suffix
+        base_folder = src_args.save_folder.rsplit('_fold', 1)[0] if '_fold' in src_args.save_folder else src_args.save_folder
+        alt_ckpt = os.path.join(base_folder, f'model_{source}_max_acc.pth')
+        if os.path.exists(alt_ckpt):
+            ckpt_path = alt_ckpt
+        else:
+            print(f"  No trained model found at {src_args.save_folder}")
+            return None
 
     print(f"  Loading: {ckpt_path}")
     state_dict = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -258,9 +285,11 @@ def main():
     import scipy
 
     parser = argparse.ArgumentParser(description='FOAC Cross-Domain Evaluation')
-    parser.add_argument('--source', choices=['TAU22', 'TAU19'], default=None)
-    parser.add_argument('--target', choices=['TAU22', 'TAU19'], default=None)
-    parser.add_argument('--all', action='store_true', help='Run both directions')
+    parser.add_argument('--source', choices=['TAU22', 'TAU19', 'DCASE18'], default=None)
+    parser.add_argument('--target', choices=['TAU22', 'TAU19', 'DCASE18'], default=None)
+    parser.add_argument('--all', action='store_true', help='Run TAU22↔TAU19 both directions')
+    parser.add_argument('--source_fold', type=int, default=1, help='Fold for source DCASE18')
+    parser.add_argument('--target_fold', type=int, default=1, help='Fold for target DCASE18')
     cl_args = parser.parse_args()
 
     if cl_args.all:
@@ -274,7 +303,9 @@ def main():
     all_results = {}
     for source, target in pairs:
         key = f"{source}->{target}"
-        result = run_cross_domain(source, target)
+        result = run_cross_domain(source, target,
+                                  target_fold=cl_args.target_fold,
+                                  source_fold=cl_args.source_fold)
         if result:
             all_results[key] = result
 

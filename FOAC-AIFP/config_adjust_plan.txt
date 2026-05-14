@@ -1,0 +1,319 @@
+================================================================================
+  FoAC-AIFP 梯度监视调参方案
+================================================================================
+
+一、当前监视的梯度清单
+================================================================================
+
+  [A] backward hook — 模块输出端梯度 (grad_output)
+  ─────────────────────────────────────────────────
+  近输入层:
+    spectrogram_extractor    STFT 频谱图输出梯度
+    logmel_extractor         Log-Mel 滤波器组输出梯度
+    bn0                      BatchNorm2d(mel_bins) 输出梯度
+    enc_conv1                ResNet18 第一层 Conv2d(3→64, 7×7) 输出梯度
+    enc_bn1                  ResNet18 第一个 BN 输出梯度
+
+  ResNet 残差阶段:
+    enc_layer1               BasicBlock×2, 通道=64
+    enc_layer2               BasicBlock×2, 通道=128, stride=2
+    enc_layer3               BasicBlock×2, 通道=256, stride=2
+    enc_layer4               BasicBlock×2, 通道=512, stride=2
+
+  任务模块:
+    PAM                      PrototypeDynamicAggregation 输出梯度
+    CIAM                     ConditionalInformationCoupling 输出梯度
+    NPM                      OpenSetGenerater 输出梯度
+    fc                       Linear(512, train_classes) 输出梯度
+
+  [B] .grad 捕获 — 参数梯度 (param grad)
+  ─────────────────────────────────────────────────
+    enc_conv1_weight         ResNet conv1 权重梯度
+    fc_weight                分类头 Linear 权重梯度
+    weight_base              基类原型嵌入参数梯度
+    weight_base_open         开集负原型参数梯度
+
+  [C] 每层记录的指标
+  ─────────────────────────────────────────────────
+    mean, std, min, max, l2_norm
+    pos_ratio (正值比例)
+    neg_ratio (负值比例)
+    zero_ratio (近零比例, |g| ≤ 1e-8)
+    sign_flip (与上一步比符号翻转比例)
+
+  日志频率: TensorBoard 每 step 写入; logger 每 grad_monitor_interval 行文本
+
+
+二、方案 a: 观察梯度正负变化 → 决定 warming up / 余弦退火
+================================================================================
+
+  ┌─ 阶段 1: 训练初期 (epoch 0~3) ─────────────────────────────────────────┐
+  │                                                                          │
+  │  现象特征（需在 TensorBoard 观察）:                                       │
+  │    • grad_output/*/mean 绝对值很大 (>> 1e-2)                              │
+  │    • grad_output/*/sign_flip > 0.30 (30%+ 的梯度元素符号每次翻转)          │
+  │    • grad_param/fc_weight/mean 剧烈震荡，正负交替                          │
+  │    • loss 曲线锯齿状抖动，val_acc 停滞                                     │
+  │                                                                          │
+  │  根因: 随机初始化的权重使初期梯度方向高度不稳定，                             │
+  │        前几个 step 的大梯度可能将参数推向不利区域                              │
+  │                                                                          │
+  │  对策 → Linear Warmup:                                                   │
+  │    warmup_epochs: 5          # 前 N 个 epoch 做 warmup                    │
+  │    warmup_start_lr: 1.0e-5   # 起始学习率                                  │
+  │    lr: 0.001                 # 目标学习率 (warmup 结束后到达)              │
+  │                                                                          │
+  │  预期效果:                                                                │
+  │    • sign_flip 在 warmup 结束后降至 0.10~0.20                              │
+  │    • grad_output 的 std 趋于稳定                                           │
+  │    • loss 曲线平滑下降                                                     │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ 阶段 2: 过拟合期 (epoch > 训练中后期) ─────────────────────────────────┐
+  │                                                                          │
+  │  现象特征:                                                                │
+  │    • grad_output/enc_layer3|4/mean → 0，而 enc_conv1|layer1 仍有信号      │
+  │    • grad_output/*/sign_flip 再次升高 (> 0.25)，但 mean 绝对值极小          │
+  │      (说明梯度已经是纯噪声，不再提供有效学习信号)                             │
+  │    • grad_param/weight_base/pos_ratio 趋近 0.5 (随机分布)                  │
+  │    • train_acc 持续上升但 val_acc/val_auroc 停滞或回落                      │
+  │    • 关键区分: 起初 sign_flip 高 + mean 大 = 探索期                          │
+  │                过拟合 sign_flip 高 + mean 趋零 + std 缩小 = 噪声期           │
+  │                                                                          │
+  │  对策 → Cosine Annealing:                                                │
+  │    lr_scheduler: 'cosine'    # 余弦退火替代 MultiStepLR                    │
+  │    lr: 0.001                 # 初始学习率                                  │
+  │    T_max: 20                 # 半周期长度 = epoch 数                       │
+  │    eta_min: 1.0e-6           # 最小学习率                                  │
+  │                                                                          │
+  │  预期效果:                                                                │
+  │    • 平滑的 LR 衰减避免 "LR 阶梯下降导致梯度方向剧烈跳变"                    │
+  │    • sign_flip 在退火末期趋于稳定                                           │
+  │    • val_auroc 在退火过程中可能继续提升                                     │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ 阶段 3: 训练末期 — SWA 平滑 ─────────────────────────────────────────┐
+  │                                                                          │
+  │  现象特征:                                                                │
+  │    • cosine annealing 末期，grad_output/*/std 仍波动 > 均值 3x             │
+  │    • grad_output/*/sign_flip 在最后几个 epoch 维持在 0.15~0.25             │
+  │                                                                          │
+  │  对策 → SWA (Stochastic Weight Averaging):                               │
+  │    在最后 5 个 epoch，每个 epoch 结束时保存模型参数的 EMA，                   │
+  │    最终使用平均参数做推理。可降低子优解附近的梯度随机噪声                      │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+三、方案 b: 近输入层梯度异常小 → 减少隐藏层维度
+================================================================================
+
+  ┌─ 诊断信号 ──────────────────────────────────────────────────────────────┐
+  │                                                                          │
+  │  在 TensorBoard 观察 grad_output:                                         │
+  │                                                                          │
+  │  正常梯度分布 (健康训练):                                                  │
+  │    spectrogram_extractor : mean ≈ 1e-4 ~ 1e-3, std ≈ 1e-3               │
+  │    logmel_extractor      : mean ≈ 1e-4 ~ 1e-3, std ≈ 1e-3               │
+  │    bn0                   : mean ≈ 1e-3 ~ 1e-2                           │
+  │    enc_conv1             : mean ≈ 1e-3 ~ 1e-2                           │
+  │    enc_layer4            : mean ≈ 1e-2 ~ 1e-1                           │
+  │    PAM/CIAM/NPM          : mean ≈ 1e-2 ~ 1e-1                           │
+  │                                                                          │
+  │  异常模式 A: "前端冻死"                                                    │
+  │    spectrogram_extractor: mean < 1e-7, std < 1e-6                        │
+  │    logmel_extractor     : mean < 1e-7, std < 1e-6                        │
+  │    bn0                  : mean < 1e-6                                    │
+  │    但 enc_layer3/4, PAM 等仍有正常梯度                                      │
+  │                                                                          │
+  │    → 音频前端参数过多 (mel_bins=128, window_size=1024)                     │
+  │      前端已将有效信息压入极高维空间，Encoder 只需少量通道即可工作                │
+  │                                                                          │
+  │    对策:                                                                  │
+  │      (1) 减少 mel_bins: 128 → 64                                         │
+  │      (2) 增大 hop_size: 256 → 512 (减少时间帧数)                           │
+  │      (3) 降低 fmax: 8000 → 4000 (减少高频分量)                            │
+  │      预期: 前端信息密度提高 → 输入侧梯度恢复                                 │
+  │                                                                          │
+  │  异常模式 B: "全层微弱"                                                    │
+  │    spectrogram_extractor ~ enc_layer4 所有层 mean < 1e-6                  │
+  │    仅 PAM/NPM/fc 有微弱梯度                                                │
+  │                                                                          │
+  │    → Encoder 容量过大 (512-d ResNet18 for 2-way 5-shot 太深)              │
+  │      梯度在反向传播中被残差连接逐层稀释                                       │
+  │                                                                          │
+  │    对策:                                                                  │
+  │      (1) 减小 ResNet 宽度: base_width 64 → 32                             │
+  │          影响: layer1=32ch, layer2=64ch, layer3=128ch, layer4=256ch       │
+  │      (2) 或去掉 layer4 (仅用 layer1~3)                                    │
+  │      (3) 或换用 ResNet10 (BasicBlock×[1,1,1,1])，4 层主干                  │
+  │      预期: per-layer 梯度均值恢复至 1e-4 以上                               │
+  │                                                                          │
+  │  异常模式 C: "深层截断"                                                    │
+  │    enc_conv1/layer1 梯度正常，但 layer3/layer4 梯度消失                     │
+  │                                                                          │
+  │    → 残差网络太深，浅层学到足够特征后深层无信号可学                              │
+  │                                                                          │
+  │    对策:                                                                  │
+  │      (1) 增加 layer3/layer4 的 LR 倍数 (当前 encoder 整体 0.0002)          │
+  │      (2) 或减少残差块数 → ResNet10                                         │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+四、综合调参决策树
+================================================================================
+
+  启用 grad_monitor: true, 运行训练
+
+  epoch 0~3:
+  ├─ sign_flip > 0.30 AND mean_grad > 1e-2  → 启用 Linear Warmup
+  └─ sign_flip < 0.15 AND mean_grad > 1e-4  → 当前 LR / 初始化合理
+
+  epoch 3~10:
+  ├─ grad_output/spectrogram/mean < 1e-7    → 梯度前端冻死，执行方案 b-A
+  ├─ grad_output/*/mean 均 < 1e-6           → 梯度全层微弱，执行方案 b-B
+  ├─ grad_output/enc_layer3,4/mean < 1e-7
+  │  但 enc_conv1/layer1 正常               → 梯度深层截断，执行方案 b-C
+  └─ 所有层 mean 在 1e-4~1e-1 之间           → 结构合理
+
+  epoch 10+:
+  ├─ train_acc ↑ 但 val_auroc ↓
+  │   且 grad_output/*/sign_flip > 0.25
+  │   且 grad_output/*/mean 趋近 0           → 过拟合噪声期，启用 Cosine Annealing
+  ├─ grad_output/*/std 波动 > 3x mean         → 梯度不稳定，考虑 SWA
+  └─ 正常收束                                 → 无需干预
+
+
+五、推荐 YAML 配置模板
+================================================================================
+
+  [保守方案 - 当前发现问题后启用]
+
+    # Stable SGD baseline
+    opt: 'sgd'
+    lr: 0.001
+    lr_scheduler: 'multistep'      # 默认
+    lr_decay_epochs: '10,18'
+    lr_decay_rate: 0.1
+    nesterov: true
+    epoch: 20
+    grad_monitor: true
+    grad_monitor_interval: 5
+
+  [Warmup + Cosine 方案 - 怀疑梯度不稳定时启用]
+
+    opt: 'sgd'
+    lr: 0.001
+    lr_scheduler: 'cosine_warmup'  # 新调度器 (需实现)
+    warmup_epochs: 5
+    warmup_start_lr: 1.0e-5
+    T_max: 20                      # cosine 周期
+    eta_min: 1.0e-6
+    nesterov: true
+    epoch: 20
+    grad_monitor: true
+    grad_monitor_interval: 1       # warmup 期每步记录，之后可调大
+
+  [小模型方案 - 怀疑 encoder 过深时启用]
+
+    extractor:
+      mel_bins: 64                 # 128 → 64
+      fmax: 4000                   # 8000 → 4000
+    resnet_width: 32               # 新增参数: base_width (默认 64)
+    epoch: 15                      # 小模型收敛快，减少 epoch
+    grad_monitor: true
+
+
+六、梯度监视补充建议
+================================================================================
+
+  当前监视覆盖了 output_grad 和 param_grad，建议额外补充:
+
+  (1) 梯度范数比 (grad_norm_ratio):
+      每层 grad_output.l2 / 上一层 grad_output.l2
+      → 发现梯度消失/爆炸发生的精确层
+
+  (2) 输入数据梯度 (grad_input of spectrogram_extractor):
+      register_full_backward_hook 的 grad_input[0]
+      → 最接近原始波形的梯度，判断数据本身的信噪比
+
+  (3) PAM 内部 attention 权重的梯度:
+      PAM 模块内的 cosine_similarity 计算结果作为中间激活
+      → 判断原型聚合是否退化到简单平均
+
+  (4) Metric_Cosine.temp 参数的梯度:
+      温度参数是否被有效更新，温度退火策略是否需要调整
+
+
+七、实验历史记录与经验教训 (2026-05-14 更新)
+================================================================================
+
+  [实验历史]
+
+  tau22_v2 (唯一成功基线):
+    配置: resnet_width=64, mel_bins=128, fmax=8000, epoch=80 (仅跑完1 epoch)
+          pretrain: save_tau22/pretrain_model_tau22.pth
+    结果: epoch 1: train_acc=86.7%, val_auroc=64.76%  ← 可以作为基线
+
+  exp1 (诊断):
+    配置: 与 tau22_aligned 相同 + grad_monitor
+    结果: val_auroc 58→47 持续退化, 梯度全层接近零
+    结论: 该 pretrain 权重不工作, 不是 scheduler 问题
+
+  exp3 三轮迭代:
+    v1: resnet_width=32, multistep               → 峰值 53.09, epoch10 过拟合
+    v2: resnet_width=32, cosine                   → 峰值 48.90, 稳定但更低
+    v3: resnet_width=32, cosine, fmax=4000, enc_lr=0.0005
+                                                  → 峰值 56.22, train_acc=98.9% 极度过拟合
+
+  [关键教训]
+
+  1. resnet_width=32 是错误方向
+     通道减半后模型容量不足以支撑 6-way + 4-open-way 分类
+     即使叠加 fmax 缩减 / encoder_lr 提升, 峰值也仅 56%
+
+  2. 预训练权重是关键变量
+     tau22_v2 用 save_tau22 预训练权重, epoch 1 即达 64.76%
+     exp1 用 tau22_aligned 预训练权重, 持续退化
+     exp3 从 scratch 预训练 (mel_bins=64, width=32), 容量不足
+     → 必须先锁定可用预训练权重, 再调整 episodic 参数
+
+  3. 梯度监视器对诊断有效, 但须在模型能学习的前提下
+     bn0: mean ~1e-8, pos_ratio=0.50 → 全层微弱 判断正确
+     但根因不是 encoder 太深, 而是预训练不匹配
+     在 tau22_v2 上启用 grad_monitor 才是正确诊断方式
+
+  4. Cosine annealing 在过拟合时平滑了曲线
+     但模型容量不足时 cosine 无法弥补容量缺陷
+
+
+八、本阶段目标: 建立工作基线 (为下阶段消融实验做准备)
+================================================================================
+
+  本阶段只做一件事: 将训练过程调整到健康状态, 得到一个能稳定输出
+  val_auroc > 60% 的基线模型。不涉及消融实验。
+
+  基线配置 (已创建 tau22_baseline.yml):
+    - 继承 tau22_aligned 的核心配置 (resnet_width=64, mel_bins=128)
+    - 使用 save_tau22/pretrain_model_tau22.pth (tau22_v2 验证有效)
+    - lr_scheduler: 'cosine' (替代 multistep, 训练更平滑)
+    - epoch: 40, T_max: 40, eta_min: 1e-6
+    - grad_monitor: true (观察健康训练的梯度分布作为参照)
+
+  基线验证标准:
+    [ ] epoch 1 val_auroc ≥ 60% (对标 tau22_v2 的 64.76%)
+    [ ] val_auroc 在 40 epoch 内不退化 (cosine 下缓缓上升或平稳)
+    [ ] grad_output/bn0/mean 不低于 1e-6 (参照第六节正常值)
+    [ ] train_acc 与 val_auroc 差距不过大 (不出现 98% vs 56% 的极端过拟合)
+
+  若不达标, 按优先级排查:
+    1. pretrain 权重匹配: 确认 save_tau22/pretrain_model_tau22.pth 与当前模型结构一致
+    2. 与 tau22_v2 逐项对比: epoch/episode/runs/shot/way 是否有差异
+    3. 检查 calib_loader vs eval_loader 的 label 分配是否正确
+    4. 若梯度仍异常: 在健康模型上重新启用 grad_monitor 获取正常参照
+
+  ──────────────────────────────────────────────────────────────────────────
+
+  下阶段 (基线稳定后) 再做:
+    - 三模块消融 (CIAM/PAM/NPM on/off, 四组)
+    - open_weight_sum_cali 敏感性
+    - 跨数据集泛化 (TAU19, DCASE18)

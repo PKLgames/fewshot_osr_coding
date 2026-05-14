@@ -1,0 +1,256 @@
+[05/13 03:36:20] start training!
+[05/13 03:36:49] 
+[05/13 03:36:49] epoch 1/20, iter 400:
+[05/13 03:36:49] train_loss: 1.97398
+[05/13 03:36:49] train_acc: 0.913
+[05/13 03:36:49] train_auroc: 0.824
+[05/13 03:36:57] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:36:57] val_5-way-5-shot_acc: 84.787	0.630
+[05/13 03:36:57] val_5-way-5-shot_auroc: 77.148	0.767
+[05/13 03:36:57] val_5-way-5-shot_fscore: 67.407	0.817
+[05/13 03:36:57] val_5-way-5-shot_tpr@tnr95: 24.843	1.347
+[05/13 03:36:57] val_5-way-5-shot_osr: 59.847	0.639
+[05/13 03:36:57] BEST ACC!
+[05/13 03:36:57] BEST Auroc!
+[05/13 03:36:57] BEST Fscore!
+[05/13 03:36:57] BEST OSR Score!
+[05/13 03:37:25] 
+[05/13 03:37:25] epoch 2/20, iter 800:
+[05/13 03:37:25] train_loss: 1.85338
+[05/13 03:37:25] train_acc: 0.933
+[05/13 03:37:25] train_auroc: 0.869
+[05/13 03:37:31] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:37:31] val_5-way-5-shot_acc: 86.047	0.596
+[05/13 03:37:31] val_5-way-5-shot_auroc: 79.933	0.704
+[05/13 03:37:31] val_5-way-5-shot_fscore: 70.141	0.762
+[05/13 03:37:31] val_5-way-5-shot_tpr@tnr95: 27.096	1.394
+[05/13 03:37:31] val_5-way-5-shot_osr: 60.928	0.672
+[05/13 03:37:32] BEST ACC!
+[05/13 03:37:32] BEST Auroc!
+[05/13 03:37:32] BEST Fscore!
+[05/13 03:37:32] BEST OSR Score!
+[05/13 03:38:00] 
+[05/13 03:38:00] epoch 3/20, iter 1200:
+[05/13 03:38:00] train_loss: 1.79003
+[05/13 03:38:00] train_acc: 0.941
+[05/13 03:38:00] train_auroc: 0.893
+[05/13 03:38:06] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:38:06] val_5-way-5-shot_acc: 86.540	0.594
+[05/13 03:38:06] val_5-way-5-shot_auroc: 81.292	0.658
+[05/13 03:38:06] val_5-way-5-shot_fscore: 71.541	0.687
+[05/13 03:38:06] val_5-way-5-shot_tpr@tnr95: 28.408	1.454
+[05/13 03:38:06] val_5-way-5-shot_osr: 61.573	0.697
+[05/13 03:38:06] BEST ACC!
+[05/13 03:38:07] BEST Auroc!
+[05/13 03:38:07] BEST Fscore!
+[05/13 03:38:07] BEST OSR Score!
+[05/13 03:38:34] 
+[05/13 03:38:34] epoch 4/20, iter 1600:
+[05/13 03:38:34] train_loss: 1.73617
+[05/13 03:38:34] train_acc: 0.948
+[05/13 03:38:34] train_auroc: 0.908
+[05/13 03:38:40] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:38:40] val_5-way-5-shot_acc: 86.793	0.579
+[05/13 03:38:40] val_5-way-5-shot_auroc: 82.351	0.609
+[05/13 03:38:40] val_5-way-5-shot_fscore: 72.778	0.627
+[05/13 03:38:40] val_5-way-5-shot_tpr@tnr95: 29.738	1.491
+[05/13 03:38:40] val_5-way-5-shot_osr: 62.217	0.717
+[05/13 03:38:40] BEST ACC!
+[05/13 03:38:40] BEST Auroc!
+[05/13 03:38:41] BEST Fscore!
+[05/13 03:38:41] BEST OSR Score!
+[05/13 03:39:08] 
+[05/13 03:39:08] epoch 5/20, iter 2000:
+[05/13 03:39:08] train_loss: 1.68557
+[05/13 03:39:08] train_acc: 0.953
+[05/13 03:39:08] train_auroc: 0.919
+[05/13 03:39:14] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:39:14] val_5-way-5-shot_acc: 86.913	0.582
+[05/13 03:39:14] val_5-way-5-shot_auroc: 82.923	0.572
+[05/13 03:39:14] val_5-way-5-shot_fscore: 73.104	0.604
+[05/13 03:39:14] val_5-way-5-shot_tpr@tnr95: 30.687	1.529
+[05/13 03:39:14] val_5-way-5-shot_osr: 62.704	0.740
+[05/13 03:39:14] BEST ACC!
+[05/13 03:39:15] BEST Auroc!
+[05/13 03:39:15] BEST Fscore!
+[05/13 03:39:15] BEST OSR Score!
+[05/13 03:39:43] 
+[05/13 03:39:43] epoch 6/20, iter 2400:
+[05/13 03:39:43] train_loss: 1.63541
+[05/13 03:39:43] train_acc: 0.958
+[05/13 03:39:43] train_auroc: 0.928
+[05/13 03:39:49] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:39:49] val_5-way-5-shot_acc: 86.940	0.587
+[05/13 03:39:49] val_5-way-5-shot_auroc: 83.232	0.544
+[05/13 03:39:49] val_5-way-5-shot_fscore: 73.215	0.586
+[05/13 03:39:49] val_5-way-5-shot_tpr@tnr95: 31.565	1.533
+[05/13 03:39:49] val_5-way-5-shot_osr: 63.169	0.744
+[05/13 03:39:49] BEST ACC!
+[05/13 03:39:49] BEST Auroc!
+[05/13 03:39:50] BEST Fscore!
+[05/13 03:39:50] BEST OSR Score!
+[05/13 03:40:18] 
+[05/13 03:40:18] epoch 7/20, iter 2800:
+[05/13 03:40:18] train_loss: 1.58465
+[05/13 03:40:18] train_acc: 0.963
+[05/13 03:40:18] train_auroc: 0.935
+[05/13 03:40:24] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:40:24] val_5-way-5-shot_acc: 86.853	0.589
+[05/13 03:40:24] val_5-way-5-shot_auroc: 83.340	0.523
+[05/13 03:40:24] val_5-way-5-shot_fscore: 73.341	0.569
+[05/13 03:40:24] val_5-way-5-shot_tpr@tnr95: 32.283	1.514
+[05/13 03:40:24] val_5-way-5-shot_osr: 63.529	0.735
+[05/13 03:40:24] BEST Auroc!
+[05/13 03:40:24] BEST Fscore!
+[05/13 03:40:24] BEST OSR Score!
+[05/13 03:40:53] 
+[05/13 03:40:53] epoch 8/20, iter 3200:
+[05/13 03:40:53] train_loss: 1.53228
+[05/13 03:40:53] train_acc: 0.967
+[05/13 03:40:53] train_auroc: 0.941
+[05/13 03:40:59] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:40:59] val_5-way-5-shot_acc: 86.807	0.587
+[05/13 03:40:59] val_5-way-5-shot_auroc: 83.407	0.508
+[05/13 03:40:59] val_5-way-5-shot_fscore: 73.185	0.572
+[05/13 03:40:59] val_5-way-5-shot_tpr@tnr95: 32.815	1.494
+[05/13 03:40:59] val_5-way-5-shot_osr: 63.819	0.723
+[05/13 03:40:59] BEST Auroc!
+[05/13 03:40:59] BEST OSR Score!
+[05/13 03:41:27] 
+[05/13 03:41:27] epoch 9/20, iter 3600:
+[05/13 03:41:27] train_loss: 1.47808
+[05/13 03:41:27] train_acc: 0.971
+[05/13 03:41:27] train_auroc: 0.946
+[05/13 03:41:33] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:41:33] val_5-way-5-shot_acc: 86.620	0.575
+[05/13 03:41:33] val_5-way-5-shot_auroc: 83.421	0.499
+[05/13 03:41:33] val_5-way-5-shot_fscore: 73.074	0.571
+[05/13 03:41:33] val_5-way-5-shot_tpr@tnr95: 33.230	1.482
+[05/13 03:41:33] val_5-way-5-shot_osr: 64.003	0.715
+[05/13 03:41:33] BEST Auroc!
+[05/13 03:41:33] BEST OSR Score!
+[05/13 03:42:01] 
+[05/13 03:42:01] epoch 10/20, iter 4000:
+[05/13 03:42:01] train_loss: 1.42191
+[05/13 03:42:01] train_acc: 0.975
+[05/13 03:42:01] train_auroc: 0.952
+[05/13 03:42:07] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:42:07] val_5-way-5-shot_acc: 86.440	0.565
+[05/13 03:42:07] val_5-way-5-shot_auroc: 83.248	0.492
+[05/13 03:42:07] val_5-way-5-shot_fscore: 72.793	0.557
+[05/13 03:42:07] val_5-way-5-shot_tpr@tnr95: 33.212	1.468
+[05/13 03:42:07] val_5-way-5-shot_osr: 63.989	0.708
+[05/13 03:42:35] 
+[05/13 03:42:35] epoch 11/20, iter 4400:
+[05/13 03:42:35] train_loss: 1.37839
+[05/13 03:42:35] train_acc: 0.978
+[05/13 03:42:35] train_auroc: 0.956
+[05/13 03:42:42] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:42:42] val_5-way-5-shot_acc: 86.680	0.557
+[05/13 03:42:42] val_5-way-5-shot_auroc: 82.756	0.500
+[05/13 03:42:42] val_5-way-5-shot_fscore: 72.489	0.570
+[05/13 03:42:42] val_5-way-5-shot_tpr@tnr95: 32.053	1.473
+[05/13 03:42:42] val_5-way-5-shot_osr: 63.410	0.702
+[05/13 03:43:10] 
+[05/13 03:43:10] epoch 12/20, iter 4800:
+[05/13 03:43:10] train_loss: 1.36750
+[05/13 03:43:10] train_acc: 0.978
+[05/13 03:43:10] train_auroc: 0.957
+[05/13 03:43:16] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:43:16] val_5-way-5-shot_acc: 86.693	0.561
+[05/13 03:43:16] val_5-way-5-shot_auroc: 82.669	0.501
+[05/13 03:43:16] val_5-way-5-shot_fscore: 72.415	0.575
+[05/13 03:43:16] val_5-way-5-shot_tpr@tnr95: 32.031	1.472
+[05/13 03:43:16] val_5-way-5-shot_osr: 63.408	0.701
+[05/13 03:43:45] 
+[05/13 03:43:45] epoch 13/20, iter 5200:
+[05/13 03:43:45] train_loss: 1.35964
+[05/13 03:43:45] train_acc: 0.979
+[05/13 03:43:45] train_auroc: 0.957
+[05/13 03:43:51] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:43:51] val_5-way-5-shot_acc: 86.720	0.565
+[05/13 03:43:51] val_5-way-5-shot_auroc: 82.647	0.502
+[05/13 03:43:51] val_5-way-5-shot_fscore: 72.341	0.569
+[05/13 03:43:51] val_5-way-5-shot_tpr@tnr95: 32.005	1.475
+[05/13 03:43:51] val_5-way-5-shot_osr: 63.388	0.703
+[05/13 03:44:19] 
+[05/13 03:44:19] epoch 14/20, iter 5600:
+[05/13 03:44:19] train_loss: 1.35230
+[05/13 03:44:19] train_acc: 0.979
+[05/13 03:44:19] train_auroc: 0.958
+[05/13 03:44:25] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:44:25] val_5-way-5-shot_acc: 86.740	0.560
+[05/13 03:44:25] val_5-way-5-shot_auroc: 82.635	0.501
+[05/13 03:44:25] val_5-way-5-shot_fscore: 72.378	0.572
+[05/13 03:44:25] val_5-way-5-shot_tpr@tnr95: 32.097	1.481
+[05/13 03:44:25] val_5-way-5-shot_osr: 63.421	0.706
+[05/13 03:44:53] 
+[05/13 03:44:53] epoch 15/20, iter 6000:
+[05/13 03:44:53] train_loss: 1.34514
+[05/13 03:44:53] train_acc: 0.980
+[05/13 03:44:53] train_auroc: 0.959
+[05/13 03:44:59] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:44:59] val_5-way-5-shot_acc: 86.760	0.558
+[05/13 03:44:59] val_5-way-5-shot_auroc: 82.633	0.500
+[05/13 03:44:59] val_5-way-5-shot_fscore: 72.348	0.576
+[05/13 03:44:59] val_5-way-5-shot_tpr@tnr95: 32.077	1.479
+[05/13 03:44:59] val_5-way-5-shot_osr: 63.407	0.705
+[05/13 03:45:27] 
+[05/13 03:45:27] epoch 16/20, iter 6400:
+[05/13 03:45:27] train_loss: 1.33805
+[05/13 03:45:27] train_acc: 0.980
+[05/13 03:45:27] train_auroc: 0.959
+[05/13 03:45:33] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:45:33] val_5-way-5-shot_acc: 86.733	0.555
+[05/13 03:45:33] val_5-way-5-shot_auroc: 82.643	0.499
+[05/13 03:45:33] val_5-way-5-shot_fscore: 72.356	0.567
+[05/13 03:45:33] val_5-way-5-shot_tpr@tnr95: 32.164	1.479
+[05/13 03:45:33] val_5-way-5-shot_osr: 63.451	0.705
+[05/13 03:46:02] 
+[05/13 03:46:02] epoch 17/20, iter 6800:
+[05/13 03:46:02] train_loss: 1.33103
+[05/13 03:46:02] train_acc: 0.980
+[05/13 03:46:02] train_auroc: 0.960
+[05/13 03:46:08] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:46:08] val_5-way-5-shot_acc: 86.707	0.556
+[05/13 03:46:08] val_5-way-5-shot_auroc: 82.651	0.498
+[05/13 03:46:08] val_5-way-5-shot_fscore: 72.348	0.558
+[05/13 03:46:08] val_5-way-5-shot_tpr@tnr95: 32.226	1.479
+[05/13 03:46:08] val_5-way-5-shot_osr: 63.479	0.704
+[05/13 03:46:36] 
+[05/13 03:46:36] epoch 18/20, iter 7200:
+[05/13 03:46:36] train_loss: 1.32404
+[05/13 03:46:36] train_acc: 0.981
+[05/13 03:46:36] train_auroc: 0.960
+[05/13 03:46:42] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:46:42] val_5-way-5-shot_acc: 86.680	0.553
+[05/13 03:46:42] val_5-way-5-shot_auroc: 82.651	0.497
+[05/13 03:46:42] val_5-way-5-shot_fscore: 72.385	0.553
+[05/13 03:46:42] val_5-way-5-shot_tpr@tnr95: 32.288	1.482
+[05/13 03:46:42] val_5-way-5-shot_osr: 63.519	0.706
+[05/13 03:47:11] 
+[05/13 03:47:11] epoch 19/20, iter 7600:
+[05/13 03:47:11] train_loss: 1.32251
+[05/13 03:47:11] train_acc: 0.981
+[05/13 03:47:11] train_auroc: 0.961
+[05/13 03:47:17] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:47:17] val_5-way-5-shot_acc: 86.673	0.561
+[05/13 03:47:17] val_5-way-5-shot_auroc: 82.654	0.497
+[05/13 03:47:17] val_5-way-5-shot_fscore: 72.422	0.557
+[05/13 03:47:17] val_5-way-5-shot_tpr@tnr95: 32.333	1.502
+[05/13 03:47:17] val_5-way-5-shot_osr: 63.541	0.717
+[05/13 03:47:45] 
+[05/13 03:47:45] epoch 20/20, iter 8000:
+[05/13 03:47:45] train_loss: 1.32025
+[05/13 03:47:45] train_acc: 0.981
+[05/13 03:47:45] train_auroc: 0.961
+[05/13 03:47:51] Summary name val_5-way-5-shot_tpr@tnr95 is illegal; using val_5-way-5-shot_tpr_tnr95 instead.
+[05/13 03:47:51] val_5-way-5-shot_acc: 86.627	0.549
+[05/13 03:47:51] val_5-way-5-shot_auroc: 82.664	0.497
+[05/13 03:47:51] val_5-way-5-shot_fscore: 72.459	0.555
+[05/13 03:47:51] val_5-way-5-shot_tpr@tnr95: 32.389	1.507
+[05/13 03:47:51] val_5-way-5-shot_osr: 63.556	0.718
+[05/13 03:47:51] training finished!
+[05/13 03:47:51] ------------------------
+[05/13 03:47:51] the best epoch is 9/20
+[05/13 03:47:51] the best 5-way 5-shot val acc is 86.940

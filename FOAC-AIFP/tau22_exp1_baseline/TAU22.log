@@ -1,0 +1,88 @@
+[05/14 03:30:00] start training!
+[05/14 03:30:03] [GradMonitor step=5] near-input: bn0: mean=-2.38e-07 std=6.54e-04 pos=0.50 | enc_conv1: mean=1.29e-13 std=5.74e-04 pos=0.42
+[05/14 03:30:03] [GradMonitor step=5] deep/task: enc_layer4: mean=1.67e-06 std=1.66e-05 | PAM: mean=3.56e-05 std=3.58e-04 | CIAM: mean=1.67e-06 std=1.66e-05
+[05/14 03:30:03] [GradMonitor step=5] param-grad: weight_base: mean=9.40e-06 std=6.12e-04 | weight_base_open: mean=5.83e-04 std=1.89e-02 | enc_conv1_weight: mean=-1.53e-02 std=1.12e-01
+[05/14 03:30:03] [GradMonitor step=10] near-input: bn0: mean=-1.15e-07 std=5.80e-04 pos=0.50 | enc_conv1: mean=-1.60e-13 std=4.54e-04 pos=0.39
+[05/14 03:30:03] [GradMonitor step=10] deep/task: enc_layer4: mean=1.43e-06 std=1.57e-05 | PAM: mean=3.08e-05 std=3.36e-04 | CIAM: mean=1.43e-06 std=1.57e-05
+[05/14 03:30:03] [GradMonitor step=10] param-grad: weight_base: mean=2.25e-06 std=1.42e-04 | weight_base_open: mean=7.12e-04 std=1.42e-02 | enc_conv1_weight: mean=-1.08e-02 std=1.17e-01
+[05/14 03:30:04] [GradMonitor step=15] near-input: bn0: mean=-1.38e-07 std=6.30e-04 pos=0.50 | enc_conv1: mean=4.54e-14 std=3.50e-04 pos=0.37
+[05/14 03:30:04] [GradMonitor step=15] deep/task: enc_layer4: mean=1.24e-06 std=1.63e-05 | PAM: mean=2.63e-05 std=3.49e-04 | CIAM: mean=1.24e-06 std=1.63e-05
+[05/14 03:30:04] [GradMonitor step=15] param-grad: weight_base: mean=7.98e-05 std=1.73e-03 | weight_base_open: mean=2.25e-04 std=7.56e-03 | enc_conv1_weight: mean=4.07e-03 std=7.96e-02
+[05/14 03:30:04] [GradMonitor step=20] near-input: bn0: mean=5.00e-07 std=4.81e-04 pos=0.50 | enc_conv1: mean=6.39e-15 std=2.30e-04 pos=0.41
+[05/14 03:30:04] [GradMonitor step=20] deep/task: enc_layer4: mean=7.71e-07 std=1.39e-05 | PAM: mean=1.64e-05 std=2.98e-04 | CIAM: mean=7.71e-07 std=1.39e-05
+[05/14 03:30:04] [GradMonitor step=20] param-grad: weight_base: mean=6.98e-05 std=1.68e-03 | weight_base_open: mean=-4.81e-05 std=5.91e-03 | enc_conv1_weight: mean=-2.73e-03 std=5.40e-02
+[05/14 03:30:05] [GradMonitor step=25] near-input: bn0: mean=-3.87e-08 std=6.77e-04 pos=0.50 | enc_conv1: mean=5.53e-14 std=2.66e-04 pos=0.40
+[05/14 03:30:05] [GradMonitor step=25] deep/task: enc_layer4: mean=1.10e-08 std=1.47e-05 | PAM: mean=3.62e-07 std=3.14e-04 | CIAM: mean=1.10e-08 std=1.47e-05
+[05/14 03:30:05] [GradMonitor step=25] param-grad: weight_base: mean=2.27e-05 std=4.55e-04 | weight_base_open: mean=2.57e-04 std=5.09e-03 | enc_conv1_weight: mean=-1.56e-04 std=3.77e-02
+[05/14 03:30:05] [GradMonitor step=30] near-input: bn0: mean=2.00e-07 std=5.88e-04 pos=0.50 | enc_conv1: mean=-9.63e-14 std=2.39e-04 pos=0.41
+[05/14 03:30:05] [GradMonitor step=30] deep/task: enc_layer4: mean=-2.57e-07 std=1.50e-05 | PAM: mean=-5.47e-06 std=3.22e-04 | CIAM: mean=-2.57e-07 std=1.50e-05
+[05/14 03:30:05] [GradMonitor step=30] param-grad: weight_base: mean=2.59e-05 std=5.32e-04 | weight_base_open: mean=1.34e-04 std=5.95e-03 | enc_conv1_weight: mean=8.26e-04 std=3.55e-02
+[05/14 03:30:05] [GradMonitor step=35] near-input: bn0: mean=2.57e-08 std=5.52e-04 pos=0.50 | enc_conv1: mean=8.05e-14 std=2.18e-04 pos=0.43
+[05/14 03:30:05] [GradMonitor step=35] deep/task: enc_layer4: mean=6.71e-08 std=1.51e-05 | PAM: mean=1.42e-06 std=3.21e-04 | CIAM: mean=6.71e-08 std=1.51e-05
+[05/14 03:30:05] [GradMonitor step=35] param-grad: weight_base: mean=1.57e-05 std=3.36e-04 | weight_base_open: mean=1.09e-04 std=6.80e-03 | enc_conv1_weight: mean=1.31e-03 std=3.68e-02
+[05/14 03:30:06] [GradMonitor step=40] near-input: bn0: mean=-1.16e-07 std=5.74e-04 pos=0.50 | enc_conv1: mean=-9.36e-14 std=2.14e-04 pos=0.40
+[05/14 03:30:06] [GradMonitor step=40] deep/task: enc_layer4: mean=-2.39e-07 std=1.47e-05 | PAM: mean=-4.85e-06 std=3.14e-04 | CIAM: mean=-2.39e-07 std=1.47e-05
+[05/14 03:30:06] [GradMonitor step=40] param-grad: weight_base: mean=2.32e-05 std=5.61e-04 | weight_base_open: mean=9.73e-05 std=3.70e-03 | enc_conv1_weight: mean=-4.08e-03 std=3.35e-02
+[05/14 03:30:06] [GradMonitor step=45] near-input: bn0: mean=9.10e-08 std=6.25e-04 pos=0.50 | enc_conv1: mean=-5.34e-14 std=2.32e-04 pos=0.39
+[05/14 03:30:06] [GradMonitor step=45] deep/task: enc_layer4: mean=-2.92e-07 std=1.58e-05 | PAM: mean=-6.01e-06 std=3.38e-04 | CIAM: mean=-2.92e-07 std=1.58e-05
+[05/14 03:30:06] [GradMonitor step=45] param-grad: weight_base: mean=5.55e-06 std=1.41e-04 | weight_base_open: mean=1.78e-04 std=4.95e-03 | enc_conv1_weight: mean=3.47e-03 std=2.95e-02
+[05/14 03:30:07] [GradMonitor step=50] near-input: bn0: mean=-1.05e-07 std=6.04e-04 pos=0.50 | enc_conv1: mean=1.59e-14 std=2.26e-04 pos=0.44
+[05/14 03:30:07] [GradMonitor step=50] deep/task: enc_layer4: mean=-8.37e-08 std=1.56e-05 | PAM: mean=-1.84e-06 std=3.32e-04 | CIAM: mean=-8.38e-08 std=1.56e-05
+[05/14 03:30:07] [GradMonitor step=50] param-grad: weight_base: mean=-4.50e-06 std=2.03e-04 | weight_base_open: mean=4.83e-04 std=5.04e-03 | enc_conv1_weight: mean=2.96e-03 std=3.28e-02
+[05/14 03:30:07] [GradMonitor step=55] near-input: bn0: mean=-9.73e-08 std=5.64e-04 pos=0.50 | enc_conv1: mean=3.74e-14 std=1.99e-04 pos=0.37
+[05/14 03:30:07] [GradMonitor step=55] deep/task: enc_layer4: mean=-8.31e-07 std=1.49e-05 | PAM: mean=-1.75e-05 std=3.19e-04 | CIAM: mean=-8.31e-07 std=1.49e-05
+[05/14 03:30:07] [GradMonitor step=55] param-grad: weight_base: mean=2.80e-05 std=6.10e-04 | weight_base_open: mean=1.42e-04 std=6.08e-03 | enc_conv1_weight: mean=3.30e-03 std=3.50e-02
+[05/14 03:30:08] [GradMonitor step=60] near-input: bn0: mean=8.86e-09 std=5.19e-04 pos=0.50 | enc_conv1: mean=4.79e-14 std=1.83e-04 pos=0.39
+[05/14 03:30:08] [GradMonitor step=60] deep/task: enc_layer4: mean=-3.38e-07 std=1.48e-05 | PAM: mean=-7.10e-06 std=3.14e-04 | CIAM: mean=-3.38e-07 std=1.48e-05
+[05/14 03:30:08] [GradMonitor step=60] param-grad: weight_base: mean=1.43e-05 std=3.17e-04 | weight_base_open: mean=-5.76e-05 std=3.82e-03 | enc_conv1_weight: mean=4.89e-05 std=3.50e-02
+[05/14 03:30:08] [GradMonitor step=65] near-input: bn0: mean=1.21e-08 std=5.92e-04 pos=0.50 | enc_conv1: mean=6.88e-16 std=2.12e-04 pos=0.35
+[05/14 03:30:08] [GradMonitor step=65] deep/task: enc_layer4: mean=-6.54e-07 std=1.44e-05 | PAM: mean=-1.38e-05 std=3.07e-04 | CIAM: mean=-6.54e-07 std=1.44e-05
+[05/14 03:30:08] [GradMonitor step=65] param-grad: weight_base: mean=-6.87e-05 std=1.68e-03 | weight_base_open: mean=2.39e-04 std=4.92e-03 | enc_conv1_weight: mean=-5.69e-04 std=2.72e-02
+[05/14 03:30:09] [GradMonitor step=70] near-input: bn0: mean=1.97e-07 std=6.11e-04 pos=0.50 | enc_conv1: mean=-7.78e-14 std=2.25e-04 pos=0.40
+[05/14 03:30:09] [GradMonitor step=70] deep/task: enc_layer4: mean=-8.16e-07 std=1.54e-05 | PAM: mean=-1.70e-05 std=3.27e-04 | CIAM: mean=-8.16e-07 std=1.54e-05
+[05/14 03:30:09] [GradMonitor step=70] param-grad: weight_base: mean=3.36e-05 std=8.27e-04 | weight_base_open: mean=-3.78e-05 std=3.92e-03 | enc_conv1_weight: mean=1.40e-03 std=3.70e-02
+[05/14 03:30:09] [GradMonitor step=75] near-input: bn0: mean=-1.71e-07 std=5.48e-04 pos=0.50 | enc_conv1: mean=-6.92e-14 std=2.00e-04 pos=0.36
+[05/14 03:30:09] [GradMonitor step=75] deep/task: enc_layer4: mean=-8.06e-07 std=1.62e-05 | PAM: mean=-1.67e-05 std=3.45e-04 | CIAM: mean=-8.06e-07 std=1.62e-05
+[05/14 03:30:09] [GradMonitor step=75] param-grad: weight_base: mean=-2.09e-05 std=6.06e-04 | weight_base_open: mean=-1.42e-04 std=5.08e-03 | enc_conv1_weight: mean=-2.60e-03 std=2.76e-02
+[05/14 03:30:09] [GradMonitor step=80] near-input: bn0: mean=-1.48e-07 std=4.93e-04 pos=0.50 | enc_conv1: mean=-2.33e-14 std=1.86e-04 pos=0.35
+[05/14 03:30:09] [GradMonitor step=80] deep/task: enc_layer4: mean=-1.12e-06 std=1.69e-05 | PAM: mean=-2.34e-05 std=3.59e-04 | CIAM: mean=-1.12e-06 std=1.69e-05
+[05/14 03:30:09] [GradMonitor step=80] param-grad: weight_base: mean=4.45e-05 std=1.03e-03 | weight_base_open: mean=1.62e-04 std=4.62e-03 | enc_conv1_weight: mean=-4.52e-04 std=3.26e-02
+[05/14 03:30:10] [GradMonitor step=85] near-input: bn0: mean=-2.27e-07 std=5.34e-04 pos=0.50 | enc_conv1: mean=-1.46e-14 std=1.88e-04 pos=0.40
+[05/14 03:30:10] [GradMonitor step=85] deep/task: enc_layer4: mean=-5.02e-07 std=1.52e-05 | PAM: mean=-1.04e-05 std=3.25e-04 | CIAM: mean=-5.02e-07 std=1.52e-05
+[05/14 03:30:10] [GradMonitor step=85] param-grad: weight_base: mean=5.27e-05 std=1.29e-03 | weight_base_open: mean=-4.39e-05 std=4.16e-03 | enc_conv1_weight: mean=-1.63e-05 std=3.07e-02
+[05/14 03:30:10] [GradMonitor step=90] near-input: bn0: mean=-9.21e-08 std=5.93e-04 pos=0.50 | enc_conv1: mean=-7.38e-14 std=2.04e-04 pos=0.34
+[05/14 03:30:10] [GradMonitor step=90] deep/task: enc_layer4: mean=-1.20e-06 std=1.61e-05 | PAM: mean=-2.56e-05 std=3.44e-04 | CIAM: mean=-1.20e-06 std=1.61e-05
+[05/14 03:30:10] [GradMonitor step=90] param-grad: weight_base: mean=-1.98e-04 std=5.21e-03 | weight_base_open: mean=2.34e-04 std=7.09e-03 | enc_conv1_weight: mean=-5.57e-03 std=3.31e-02
+[05/14 03:30:11] [GradMonitor step=95] near-input: bn0: mean=2.52e-08 std=6.85e-04 pos=0.50 | enc_conv1: mean=3.05e-14 std=2.46e-04 pos=0.39
+[05/14 03:30:11] [GradMonitor step=95] deep/task: enc_layer4: mean=-8.58e-07 std=1.70e-05 | PAM: mean=-1.78e-05 std=3.63e-04 | CIAM: mean=-8.58e-07 std=1.70e-05
+[05/14 03:30:11] [GradMonitor step=95] param-grad: weight_base: mean=6.00e-05 std=1.54e-03 | weight_base_open: mean=9.13e-06 std=3.65e-03 | enc_conv1_weight: mean=3.19e-03 std=2.89e-02
+[05/14 03:30:11] [GradMonitor step=100] near-input: bn0: mean=-2.49e-07 std=6.22e-04 pos=0.50 | enc_conv1: mean=5.05e-14 std=2.19e-04 pos=0.44
+[05/14 03:30:11] [GradMonitor step=100] deep/task: enc_layer4: mean=-9.65e-07 std=1.47e-05 | PAM: mean=-2.03e-05 std=3.12e-04 | CIAM: mean=-9.65e-07 std=1.47e-05
+[05/14 03:30:11] [GradMonitor step=100] param-grad: weight_base: mean=-6.14e-05 std=1.59e-03 | weight_base_open: mean=4.89e-05 std=4.83e-03 | enc_conv1_weight: mean=8.25e-04 std=2.94e-02
+[05/14 03:30:12] [GradMonitor step=105] near-input: bn0: mean=-4.62e-08 std=4.73e-04 pos=0.50 | enc_conv1: mean=3.06e-15 std=1.75e-04 pos=0.38
+[05/14 03:30:12] [GradMonitor step=105] deep/task: enc_layer4: mean=-8.21e-07 std=1.55e-05 | PAM: mean=-1.68e-05 std=3.30e-04 | CIAM: mean=-8.21e-07 std=1.55e-05
+[05/14 03:30:12] [GradMonitor step=105] param-grad: weight_base: mean=-8.34e-05 std=2.18e-03 | weight_base_open: mean=2.98e-04 std=5.31e-03 | enc_conv1_weight: mean=-1.03e-03 std=3.46e-02
+[05/14 03:30:12] [GradMonitor step=110] near-input: bn0: mean=1.70e-08 std=5.67e-04 pos=0.50 | enc_conv1: mean=-1.01e-13 std=1.96e-04 pos=0.40
+[05/14 03:30:12] [GradMonitor step=110] deep/task: enc_layer4: mean=-1.80e-06 std=1.67e-05 | PAM: mean=-3.84e-05 std=3.57e-04 | CIAM: mean=-1.80e-06 std=1.67e-05
+[05/14 03:30:12] [GradMonitor step=110] param-grad: weight_base: mean=6.01e-07 std=1.41e-04 | weight_base_open: mean=2.05e-04 std=3.15e-03 | enc_conv1_weight: mean=1.22e-04 std=2.95e-02
+[05/14 03:30:12] [GradMonitor step=115] near-input: bn0: mean=-1.15e-07 std=5.83e-04 pos=0.50 | enc_conv1: mean=1.53e-14 std=2.22e-04 pos=0.41
+[05/14 03:30:12] [GradMonitor step=115] deep/task: enc_layer4: mean=-1.12e-06 std=1.60e-05 | PAM: mean=-2.39e-05 std=3.42e-04 | CIAM: mean=-1.12e-06 std=1.60e-05
+[05/14 03:30:12] [GradMonitor step=115] param-grad: weight_base: mean=-3.08e-05 std=6.95e-04 | weight_base_open: mean=-1.66e-04 std=4.56e-03 | enc_conv1_weight: mean=6.49e-04 std=3.51e-02
+[05/14 03:30:13] [GradMonitor step=120] near-input: bn0: mean=-3.30e-07 std=6.21e-04 pos=0.50 | enc_conv1: mean=5.00e-14 std=2.10e-04 pos=0.42
+[05/14 03:30:13] [GradMonitor step=120] deep/task: enc_layer4: mean=-9.91e-07 std=1.67e-05 | PAM: mean=-2.09e-05 std=3.57e-04 | CIAM: mean=-9.91e-07 std=1.67e-05
+[05/14 03:30:13] [GradMonitor step=120] param-grad: weight_base: mean=2.76e-06 std=1.11e-04 | weight_base_open: mean=3.16e-04 std=4.12e-03 | enc_conv1_weight: mean=-2.96e-03 std=2.90e-02
+[05/14 03:30:13] [GradMonitor step=125] near-input: bn0: mean=1.73e-07 std=6.29e-04 pos=0.50 | enc_conv1: mean=-2.15e-14 std=1.98e-04 pos=0.39
+[05/14 03:30:13] [GradMonitor step=125] deep/task: enc_layer4: mean=-6.92e-07 std=1.52e-05 | PAM: mean=-1.43e-05 std=3.25e-04 | CIAM: mean=-6.92e-07 std=1.52e-05
+[05/14 03:30:13] [GradMonitor step=125] param-grad: weight_base: mean=-1.70e-04 std=4.20e-03 | weight_base_open: mean=2.37e-04 std=5.24e-03 | enc_conv1_weight: mean=-3.80e-03 std=2.96e-02
+[05/14 03:30:14] [GradMonitor step=130] near-input: bn0: mean=-2.45e-08 std=6.37e-04 pos=0.50 | enc_conv1: mean=1.10e-14 std=2.14e-04 pos=0.39
+[05/14 03:30:14] [GradMonitor step=130] deep/task: enc_layer4: mean=-9.90e-07 std=1.64e-05 | PAM: mean=-2.07e-05 std=3.48e-04 | CIAM: mean=-9.89e-07 std=1.64e-05
+[05/14 03:30:14] [GradMonitor step=130] param-grad: weight_base: mean=-2.94e-05 std=7.59e-04 | weight_base_open: mean=-8.35e-05 std=3.76e-03 | enc_conv1_weight: mean=-6.18e-03 std=2.89e-02
+[05/14 03:30:14] [GradMonitor step=135] near-input: bn0: mean=-4.33e-08 std=6.17e-04 pos=0.50 | enc_conv1: mean=-1.82e-14 std=2.08e-04 pos=0.42
+[05/14 03:30:14] [GradMonitor step=135] deep/task: enc_layer4: mean=-1.20e-06 std=1.56e-05 | PAM: mean=-2.53e-05 std=3.31e-04 | CIAM: mean=-1.20e-06 std=1.56e-05
+[05/14 03:30:14] [GradMonitor step=135] param-grad: weight_base: mean=-6.01e-05 std=1.42e-03 | weight_base_open: mean=7.12e-06 std=5.16e-03 | enc_conv1_weight: mean=-3.95e-03 std=2.81e-02
+[05/14 03:30:14] [GradMonitor step=140] near-input: bn0: mean=-2.37e-07 std=6.95e-04 pos=0.50 | enc_conv1: mean=-6.59e-14 std=2.52e-04 pos=0.41
+[05/14 03:30:14] [GradMonitor step=140] deep/task: enc_layer4: mean=-5.17e-07 std=1.60e-05 | PAM: mean=-1.08e-05 std=3.40e-04 | CIAM: mean=-5.17e-07 std=1.60e-05
+[05/14 03:30:14] [GradMonitor step=140] param-grad: weight_base: mean=-2.07e-04 std=5.32e-03 | weight_base_open: mean=1.19e-04 std=5.76e-03 | enc_conv1_weight: mean=1.01e-03 std=3.23e-02
+[05/14 03:30:15] [GradMonitor step=145] near-input: bn0: mean=-8.84e-08 std=6.00e-04 pos=0.50 | enc_conv1: mean=-1.93e-14 std=2.11e-04 pos=0.38
+[05/14 03:30:15] [GradMonitor step=145] deep/task: enc_layer4: mean=-1.26e-06 std=1.64e-05 | PAM: mean=-2.67e-05 std=3.49e-04 | CIAM: mean=-1.26e-06 std=1.64e-05
+[05/14 03:30:15] [GradMonitor step=145] param-grad: weight_base: mean=3.97e-05 std=9.50e-04 | weight_base_open: mean=-5.97e-06 std=4.43e-03 | enc_conv1_weight: mean=-3.73e-03 std=3.89e-02

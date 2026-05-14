@@ -1,0 +1,102 @@
+# ==============================================================================
+# 实验 1: 基线 + 梯度监视 (诊断用)
+#
+# 目的: 使用与 tau22_aligned 完全相同的超参数训练，仅开启 grad_monitor
+#       收集梯度统计数据，确认是否存在梯度不稳定/消失问题。
+#
+# 运行: python main.py --config ./tau22_exp1_baseline_gradmon.yml
+#
+# 观察重点 (TensorBoard + 日志):
+#   epoch 0~3:
+#     grad_output/enc_conv1/sign_flip  > 0.30  → 梯度方向剧烈震荡 → 启用 exp2
+#     grad_output/spectrogram_extractor/mean  < 1e-7 → 前端冻死 → 启用 exp3
+#     grad_output/enc_layer4/mean vs enc_conv1/mean 比值 < 0.01 → 梯度消失 → 启用 exp3
+#
+#   epoch 10+:
+#     train_acc 持续上升但 val_auroc 停滞，且 sign_flip > 0.25 → 过拟合噪声期 → 启用 exp2
+#     grad_output/*/mean 趋近 0, std 缩小 → 学习停滞 → 启用 exp2
+#
+#   grad_param/weight_base/mean  vs weight_base_open/mean:
+#     若二者符号始终相同 → 开集原型无法区分正负 → 检查 loss 权重
+# ==============================================================================
+train:
+  # ========== Audio feature extractor (unchanged) ==========
+  extractor:
+    window_size: 1024
+    hop_size: 256
+    sample_rate: 16000
+    mel_bins: 128
+    fmin: 0
+    fmax: 8000
+    window: 'hann'
+
+  # ========== Episode structure ==========
+  n_ways: 6
+  n_open_ways: 4
+  test_n_ways: 6
+  test_n_open_ways: 4
+  n_shots: 5
+  n_queries: 15
+  train_classes: 6
+
+  n_train_runs: 400
+  n_test_runs: 200
+  test_times: 200
+
+  # ========== Training hyper-parameters (baseline MultiStep) ==========
+  epoch: 20
+  epochs_pre: 80
+  batch_size: 256
+  learning_rate: 0.05
+  lr: 0.001
+  gamma: 0.1
+  weight_decay: 5.0e-4
+  lr_decay_epochs: '10,18'
+  lr_decay_rate: 0.1
+  nesterov: true
+  seed: 42
+  val_epoch: 1
+
+  # ========== Model ==========
+  test_way: 6
+  train_way: 6
+  train_shot: 5
+  test_shot:
+    - 5
+  train_query_shot: 15
+  test_query_shot: 15
+  resnet: true
+  resnet_width: 64              # 标准宽度 (之后实验可改为 32)
+
+  temp: 10.0
+  weight_pl: 0.2
+  beta: 0.05
+  open_weight_sum_cali: 0.3
+
+  # ========== Paths ==========
+  save_folder: './tau22_exp1_baseline'
+  dataroot: '/coding/TAU-urban-acoustic-scenes-2022-mobile-development'
+  pretrained_model_path1: ''
+  pretrained_model_path: './save_tau22/pretrain_model_tau22.pth'
+
+  # ========== Loss ==========
+  num-centers: 1
+
+  # ========== OSR evaluation ==========
+  osr_num_rounds: 10
+  osr_k_shot: 5
+
+  # ========== Misc ==========
+  dataset: 'TAU22'
+  pretrain: false
+  test: false
+  finetune: false
+  no_val: false
+
+  # ========== Gradient Monitor (DIAGNOSTIC MODE) ==========
+  grad_monitor: true
+  grad_monitor_interval: 5      # 每 5 iter 记录一行日志
+
+  # ========== Scheduler (baseline) ==========
+  # lr_scheduler: 'multistep'   # 默认, 无需显式设置
+  # warmup_epochs: 0            # 暂不启用 warmup

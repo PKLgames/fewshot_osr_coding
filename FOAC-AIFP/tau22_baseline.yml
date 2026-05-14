@@ -1,0 +1,90 @@
+# ==============================================================================
+# TAU22 基线模型 (基于 tau22_v2 的成功经验)
+#
+# 来源: tau22_aligned 核心配置 + tau22_v2 验证的预训练权重
+# 改进: cosine annealing 替代 multistep, 梯度监视器
+# 用途: 验证基线稳定后, 用于消融实验对比 (CIAM/PAM/NPM)
+#
+# 验证标准: val_auroc > 60% 且趋势不退化 → 基线可用
+# ==============================================================================
+train:
+  # ========== Audio feature extractor (standard) ==========
+  extractor:
+    window_size: 1024
+    hop_size: 256
+    sample_rate: 16000
+    mel_bins: 128
+    fmin: 0
+    fmax: 8000
+    window: 'hann'
+
+  # ========== Episode structure ==========
+  n_ways: 6
+  n_open_ways: 4
+  test_n_ways: 6
+  test_n_open_ways: 4
+  n_shots: 5
+  n_queries: 15
+  train_classes: 6
+
+  n_train_runs: 400            
+  n_test_runs: 200
+  test_times: 200
+
+  # ========== Training hyper-parameters (Cosine Annealing) ==========
+  epoch: 40
+  epochs_pre: 80
+  batch_size: 256
+  learning_rate: 0.05
+  lr: 0.001
+  weight_decay: 5.0e-4
+  lr_scheduler: 'cosine'         # 平滑退火替代阶梯衰减
+  T_max: 40                      # cosine 半周期 = epoch 总数
+  eta_min: 1.0e-6                # 退火最低学习率
+  nesterov: true
+  seed: 42
+  val_epoch: 1
+
+  # ========== Model ==========
+  test_way: 6
+  train_way: 6
+  train_shot: 5
+  test_shot:
+    - 5
+  train_query_shot: 15
+  test_query_shot: 15
+  resnet: true
+  resnet_width: 64               # 标准宽度 (tau22_v2 验证)
+
+  temp: 10.0
+  weight_pl: 0.2
+  beta: 0.05
+  open_weight_sum_cali: 0.3
+
+  # ========== Paths ==========
+  save_folder: './tau22_baseline'
+  dataroot: '/coding/TAU-urban-acoustic-scenes-2022-mobile-development'
+  pretrained_model_path1: ''
+  pretrained_model_path: './tau22_baseline/pretrain_model_tau22.pth'
+
+  # ========== Loss ==========
+  num-centers: 1
+
+  # ========== OSR evaluation ==========
+  osr_num_rounds: 10
+  osr_k_shot: 5
+
+  # ========== DataLoader ==========
+  num_workers: 8            
+  prefetch_factor: 2            # 每 worker 预取 6 个 episode (默认 2)
+
+  # ========== Misc ==========
+  dataset: 'TAU22'
+  pretrain: false
+  test: false
+  finetune: false
+  no_val: false
+
+  # ========== Gradient Monitor ==========
+  grad_monitor: true
+  grad_monitor_interval: 10      # 40 epoch 共 16000 iter, 每10步记录避免刷屏

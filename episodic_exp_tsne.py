@@ -8,6 +8,7 @@ EpisodicFlowClassifier's feature space. Can compare full model vs baseline.
 Usage:
   cd /coding
   python episodic_exp_tsne.py
+  python episodic_exp_tsne.py --dataset DCASE18 --fold 1
   python episodic_exp_tsne.py --compare_ablation
 """
 
@@ -26,6 +27,11 @@ from episodic_trainer import (
 CLASS_NAMES = {
     0: 'Airport', 1: 'Shopping Mall', 2: 'Metro Station', 3: 'Street Pedestrian',
     4: 'Public Square', 5: 'Street Traffic', 6: 'Tram', 7: 'Bus', 8: 'Metro', 9: 'Park',
+}
+
+CLASS_NAMES_DCASE18 = {
+    0: 'absence', 1: 'cooking', 2: 'social_activity', 3: 'watching_tv',
+    4: 'working', 5: 'dishwashing', 6: 'eating', 7: 'other', 8: 'vacuum_cleaner',
 }
 
 
@@ -71,8 +77,10 @@ def extract_projected_features(classifier, cache, classes, device='cuda',
 
 
 def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title='',
-              quick=False):
+              quick=False, class_names=None):
     """Generate t-SNE plot."""
+    if class_names is None:
+        class_names = CLASS_NAMES
     try:
         from sklearn.manifold import TSNE
         import matplotlib
@@ -101,7 +109,7 @@ def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title=
         mask = labels == c
         ax.scatter(embedded[mask, 0], embedded[mask, 1],
                    c=[cmap_base[i]], marker='o', alpha=0.6, s=15,
-                   label=f'{CLASS_NAMES.get(c, c)} (known)')
+                   label=f'{class_names.get(c, c)} (known)')
 
     # Unknown classes (triangles)
     cmap_unk = plt.cm.Set1(np.linspace(0, 1, max(len(unknown_classes), 1)))
@@ -109,7 +117,7 @@ def plot_tsne(features, labels, base_classes, unknown_classes, save_path, title=
         mask = labels == c
         ax.scatter(embedded[mask, 0], embedded[mask, 1],
                    c=[cmap_unk[i]], marker='^', alpha=0.6, s=25,
-                   label=f'{CLASS_NAMES.get(c, c)} (unknown)')
+                   label=f'{class_names.get(c, c)} (unknown)')
 
     ax.legend(fontsize=7, loc='best', ncol=2)
     ax.set_title(title)
@@ -126,18 +134,35 @@ def main():
     parser = argparse.ArgumentParser(description='Episodic t-SNE Visualization')
     parser.add_argument('--experiment_dir', type=str,
                         default='experiment/yamnet_realfewshot_osr24')
-    parser.add_argument('--dataset', choices=['TAU22', 'TAU19'], default='TAU22')
+    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'DCASE18'], default='TAU22')
     parser.add_argument('--compare_ablation', action='store_true',
                         help='Compare full model vs baseline (no extras)')
     parser.add_argument('--quick', action='store_true',
                         help='Quick mode: fewer samples, faster t-SNE')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
+    parser.add_argument('--fold', type=int, default=1, help='Fold for DCASE18 (1-4)')
     cl_args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    base_classes = [0, 1, 2, 3, 4, 5]
-    unknown_classes = [6, 7, 8, 9]
+
+    if cl_args.dataset == 'DCASE18':
+        base_classes = [0, 1, 2, 3, 4]
+        unknown_classes = [5, 6, 7, 8]
+        class_names = CLASS_NAMES_DCASE18
+        from functools import partial
+        from utils.DCASE18 import DCASE18Dataset
+        TAUDataset = partial(DCASE18Dataset, fold=cl_args.fold)
+        cache_name = f'dcase18_fold{cl_args.fold}'
+    else:
+        base_classes = [0, 1, 2, 3, 4, 5]
+        unknown_classes = [6, 7, 8, 9]
+        class_names = CLASS_NAMES
+        if cl_args.dataset == 'TAU22':
+            from utils.TAU22 import TAUDataset
+        else:
+            from utils.TAU19 import TAUDataset
+        cache_name = cl_args.dataset.lower()
 
     # Load features (reuse cache if available)
     backbone_path = os.path.join(cl_args.experiment_dir, 'base_feature_extractor.pth')
@@ -148,19 +173,13 @@ def main():
     feature_extractor = FeatureExtractor(pretrained_path=backbone_path)
     feature_extractor = feature_extractor.to(device).freeze()
 
-    # Load dataset
-    if cl_args.dataset == 'TAU22':
-        from utils.TAU22 import TAUDataset
-    else:
-        from utils.TAU19 import TAUDataset
-
     train_dataset = TAUDataset(split='train')
     test_dataset = TAUDataset(split='test')
 
-    train_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
+    train_cache = FeatureCache(dataset_name=cache_name)
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train',
                                    device, batch_size=64)
-    test_cache = FeatureCache(dataset_name=cl_args.dataset.lower())
+    test_cache = FeatureCache(dataset_name=cache_name)
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test',
                                   device, batch_size=64)
 
@@ -182,7 +201,7 @@ def main():
         plot_tsne(all_feats, all_labels, base_classes, unknown_classes,
                   os.path.join(save_dir, f'{cl_args.dataset}_full_model.png'),
                   title=f'{cl_args.dataset} — Full Model (Episodic Trainer)',
-                  quick=cl_args.quick)
+                  quick=cl_args.quick, class_names=class_names)
 
     # --- Baseline comparison ---
     if cl_args.compare_ablation:
@@ -210,7 +229,8 @@ def main():
 
         plot_tsne(all_feats, all_labels, base_classes, unknown_classes,
                   os.path.join(save_dir, f'{cl_args.dataset}_baseline.png'),
-                  title=f'{cl_args.dataset} — Baseline (Distance Head Only)')
+                  title=f'{cl_args.dataset} — Baseline (Distance Head Only)',
+                  class_names=class_names)
 
 
 if __name__ == '__main__':

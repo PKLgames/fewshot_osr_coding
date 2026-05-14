@@ -28,7 +28,7 @@ train:
   test_times: 200
 
   # ========== Training hyper-parameters (aligned baseline) ==========
-  epoch: 80
+  epoch: 20
   epochs_pre: 80
   batch_size: 256
   learning_rate: 0.05

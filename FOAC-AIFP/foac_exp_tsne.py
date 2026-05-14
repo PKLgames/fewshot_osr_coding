@@ -10,6 +10,7 @@ Usage:
   cd /coding/FOAC-AIFP
   python foac_exp_tsne.py --config tau22_aligned.yml
   python foac_exp_tsne.py --config tau19_aligned.yml --compare_ablation
+  python foac_exp_tsne.py --config dcase18_aligned.yml --fold 1
 """
 
 import os
@@ -31,6 +32,11 @@ from datasets import dataloaders
 CLASS_NAMES_TAU = {
     0: 'Airport', 1: 'Shopping Mall', 2: 'Metro Station', 3: 'Street Pedestrian',
     4: 'Public Square', 5: 'Street Traffic', 6: 'Tram', 7: 'Bus', 8: 'Metro', 9: 'Park'
+}
+
+CLASS_NAMES_DCASE18 = {
+    0: 'absence', 1: 'cooking', 2: 'social_activity', 3: 'watching_tv',
+    4: 'working', 5: 'dishwashing', 6: 'eating', 7: 'other', 8: 'vacuum_cleaner'
 }
 
 
@@ -168,13 +174,23 @@ def main():
                         help='Checkpoint path (default: auto-detect)')
     parser.add_argument('--compare_ablation', action='store_true',
                         help='Generate comparison plots: full model vs baseline')
+    parser.add_argument('--fold', type=int, default=1, help='Fold for DCASE18 (1-4)')
     cl_args = parser.parse_args()
 
     args = load_config(cl_args.config)
     dataset = args.dataset
-    base_classes = list(range(args.train_classes))  # 0-5
-    unknown_classes = list(range(args.train_classes, 10))  # 6-9
-    class_names = CLASS_NAMES_TAU
+    if dataset == 'DCASE18':
+        args.fold = cl_args.fold
+        args.save_folder = args.save_folder.rstrip('/') + f'_fold{cl_args.fold}'
+        args.pretrained_model_path = args.pretrained_model_path.replace(
+            'dcase18_aligned/', f'dcase18_aligned_fold{cl_args.fold}/')
+        base_classes = list(range(args.train_classes))  # 0-4
+        unknown_classes = list(range(args.train_classes, 9))  # 5-8
+        class_names = CLASS_NAMES_DCASE18
+    else:
+        base_classes = list(range(args.train_classes))  # 0-5
+        unknown_classes = list(range(args.train_classes, 10))  # 6-9
+        class_names = CLASS_NAMES_TAU
 
     save_dir = os.path.join(args.save_folder, 'tsne')
     os.makedirs(save_dir, exist_ok=True)

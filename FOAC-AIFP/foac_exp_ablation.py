@@ -3,13 +3,15 @@
 foac_exp_ablation.py — Ablation Experiment Runner
 
 Systematically toggles core components (CIAM, PAM, NPM) to validate
-each component's contribution. Runs on TAU22 and TAU19.
+each component's contribution. Runs on TAU22, TAU19, and DCASE18.
 
 Usage:
   cd /coding/FOAC-AIFP
   python foac_exp_ablation.py --dataset TAU22 --config tau22_aligned.yml
   python foac_exp_ablation.py --dataset TAU19 --config tau19_aligned.yml
-  python foac_exp_ablation.py --all   # run both datasets
+  python foac_exp_ablation.py --dataset DCASE18 --fold all   # 4-fold CV
+  python foac_exp_ablation.py --dataset DCASE18 --fold 1     # single fold
+  python foac_exp_ablation.py --all   # run TAU22 + TAU19
 """
 
 import os
@@ -20,6 +22,7 @@ from functools import partial
 from datetime import datetime
 
 import torch
+import numpy as np
 import yaml
 
 from trainers import trainer, C2_Net_train
@@ -90,6 +93,8 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm, test_only
     if os.path.exists(args.pretrained_model_path):
         full_params = torch.load(args.pretrained_model_path, weights_only=False)
         state_dict = full_params.get('feature_params', full_params.get('params', full_params))
+        # Filter fc.* from pretrained checkpoint: pretrain n_ways ≠ downstream n_ways
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith('fc.')}
         model.load_state_dict(state_dict, strict=False)
         model.init_representation(full_params)
 
@@ -134,7 +139,7 @@ def run_single_ablation(args, config_name, use_ciam, use_pam, use_npm, test_only
 
 def main():
     parser = argparse.ArgumentParser(description='FOAC Ablation Experiments')
-    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'all'], default='all')
+    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'DCASE18', 'all'], default='all')
     parser.add_argument('--config', type=str, default=None,
                         help='Override config path (e.g. tau22_aligned.yml)')
     parser.add_argument('--configs', type=str, nargs='*', default=None,
@@ -143,6 +148,8 @@ def main():
                         help='Quick mode: fewer test runs (50 instead of 200)')
     parser.add_argument('--test_only', action='store_true',
                         help='Skip training, only evaluate existing checkpoints')
+    parser.add_argument('--fold', type=str, default='1',
+                        help='Fold for DCASE18: 1-4 or "all" for 4-fold CV (default: 1)')
     args = parser.parse_args()
 
     all_results = {}
@@ -156,26 +163,46 @@ def main():
     for dataset in datasets:
         config_path = args.config
         if config_path is None:
-            config_path = f'{dataset.lower()}_aligned.yml'
+            if dataset == 'DCASE18':
+                config_path = 'dcase18_aligned.yml'
+            else:
+                config_path = f'{dataset.lower()}_aligned.yml'
         if not os.path.exists(config_path):
             print(f"Config not found: {config_path}, skipping {dataset}")
             continue
 
-        cfg = load_config(config_path)
+        # Determine folds to run
+        if dataset == 'DCASE18':
+            folds = [1, 2, 3, 4] if args.fold == 'all' else [int(args.fold)]
+        else:
+            folds = [None]  # TAU datasets have no fold
+
         all_results[dataset] = {}
 
-        for name, use_ciam, use_pam, use_npm in ABLATION_CONFIGS:
-            if args.configs and name not in args.configs:
-                continue
-            # Reload config fresh each run
-            run_cfg = load_config(config_path)
-            results = run_single_ablation(run_cfg, name, use_ciam, use_pam, use_npm, test_only=args.test_only)
-            all_results[dataset][name] = {
-                'use_ciam': use_ciam, 'use_pam': use_pam, 'use_npm': use_npm,
-                'results': {k: {kk: (vv[0] if isinstance(vv, tuple) else vv)
-                                for kk, vv in v.items()}
-                            for k, v in results.items()}
-            }
+        for fold in folds:
+            fold_suffix = f'_fold{fold}' if fold is not None else ''
+            fold_key = f'fold{fold}' if fold is not None else 'default'
+
+            for name, use_ciam, use_pam, use_npm in ABLATION_CONFIGS:
+                if args.configs and name not in args.configs:
+                    continue
+                # Reload config fresh each run
+                run_cfg = load_config(config_path)
+                if fold is not None:
+                    run_cfg.fold = fold
+                    run_cfg.save_folder = run_cfg.save_folder.rstrip('/') + fold_suffix
+                    # Update pretrained_model_path to match fold-specific save_folder
+                    run_cfg.pretrained_model_path = run_cfg.pretrained_model_path.replace(
+                        'dcase18_aligned/', f'dcase18_aligned_fold{fold}/')
+                results = run_single_ablation(run_cfg, name, use_ciam, use_pam, use_npm, test_only=args.test_only)
+                result_key = f"{name}{fold_suffix}" if fold is not None else name
+                all_results[dataset][result_key] = {
+                    'use_ciam': use_ciam, 'use_pam': use_pam, 'use_npm': use_npm,
+                    'fold': fold,
+                    'results': {k: {kk: (vv[0] if isinstance(vv, tuple) else vv)
+                                    for kk, vv in v.items()}
+                                for k, v in results.items()}
+                }
 
     # Save summary
     summary_path = 'foac_exp_ablation_results.json'
@@ -189,18 +216,43 @@ def main():
     print(f"{'='*80}")
     for dataset in all_results:
         print(f"\n  Dataset: {dataset}")
-        print(f"  {'Config':<25s} {'ACC':>8s} {'AUROC':>8s} {'OSR':>8s} {'F1':>8s}")
-        for name, data in all_results[dataset].items():
-            # Use max_acc checkpoint
-            key = f'model_{dataset}_max_acc.pth'
-            r = data['results'].get(key, {})
-            if not r:
-                key = f'model_{dataset}_max_osr.pth'
+        if dataset == 'DCASE18':
+            # Print per-fold then mean±std across folds
+            print(f"  {'Config':<25s} {'ACC':>8s} {'AUROC':>8s} {'OSR':>8s} {'F1':>8s}")
+            config_names = [c[0] for c in ABLATION_CONFIGS]
+            for name in config_names:
+                fold_results = []
+                for fold in [1, 2, 3, 4]:
+                    rk = f'{name}_fold{fold}'
+                    data = all_results[dataset].get(rk, {})
+                    key = f'model_{dataset}_max_acc.pth'
+                    r = data.get('results', {}).get(key, {})
+                    if not r:
+                        key = f'model_{dataset}_max_osr.pth'
+                        r = data.get('results', {}).get(key, {})
+                    fold_results.append(r)
+                def _mean_std(vals, k):
+                    vs = [v.get(k, 0) for v in fold_results]
+                    vs = [x[0] if isinstance(x, (list, tuple)) else x for x in vs]
+                    return np.mean(vs), np.std(vs)
+                if any(fold_results):
+                    acc_m, acc_s = _mean_std(fold_results, 'acc')
+                    auroc_m, auroc_s = _mean_std(fold_results, 'auroc')
+                    osr_m, osr_s = _mean_std(fold_results, 'osr')
+                    f1_m, f1_s = _mean_std(fold_results, 'fscore')
+                    print(f"  {name:<25s} {acc_m:>6.1f}±{acc_s:<4.1f} {auroc_m:>6.1f}±{auroc_s:<4.1f} {osr_m:>6.1f}±{osr_s:<4.1f} {f1_m:>6.1f}±{f1_s:<4.1f}")
+        else:
+            print(f"  {'Config':<25s} {'ACC':>8s} {'AUROC':>8s} {'OSR':>8s} {'F1':>8s}")
+            for name, data in all_results[dataset].items():
+                key = f'model_{dataset}_max_acc.pth'
                 r = data['results'].get(key, {})
-            def _v(d, k):
-                val = d.get(k, 0)
-                return val[0] if isinstance(val, (list, tuple)) else val
-            print(f"  {name:<25s} {_v(r,'acc'):>7.1f} {_v(r,'auroc'):>7.1f} {_v(r,'osr'):>7.1f} {_v(r,'fscore'):>7.1f}")
+                if not r:
+                    key = f'model_{dataset}_max_osr.pth'
+                    r = data['results'].get(key, {})
+                def _v(d, k):
+                    val = d.get(k, 0)
+                    return val[0] if isinstance(val, (list, tuple)) else val
+                print(f"  {name:<25s} {_v(r,'acc'):>7.1f} {_v(r,'auroc'):>7.1f} {_v(r,'osr'):>7.1f} {_v(r,'fscore'):>7.1f}")
 
 
 if __name__ == '__main__':

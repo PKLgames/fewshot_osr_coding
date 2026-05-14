@@ -1,0 +1,80 @@
+train:
+  # ========== Audio feature extractor (unchanged) ==========
+  extractor:
+    window_size: 1024
+    hop_size: 256
+    sample_rate: 16000
+    mel_bins: 128
+    fmin: 0
+    fmax: 8000
+    window: 'hann'
+
+  # ========== Episode structure (aligned with tau*_aligned.yml) ==========
+  # DCASE18: 5 base classes (absence/cooking/social_activity/watching_tv/working)
+  #          + 4 novel classes (dishwashing/eating/other/vacuum_cleaner)
+  # Train: 3 closed + 2 pseudo-open from 5 base classes (same 60% ratio)
+  # Test:  5 closed + 4 open (all classes, like TAU's 6+4)
+  n_ways: 3
+  n_open_ways: 2
+  test_n_ways: 5            # All 5 base classes as closed-set
+  test_n_open_ways: 4       # All 4 novel classes as open-set
+  n_shots: 5
+  n_queries: 15             # Calib novel classes only 3 files × 10s = 30 segments
+  train_classes: 5
+
+  # Meta-train / meta-test episode counts
+  n_train_runs: 400
+  n_test_runs: 200
+  test_times: 200
+
+  # ========== Training hyper-parameters (aligned baseline) ==========
+  epoch: 20
+  epochs_pre: 80
+  batch_size: 256
+  learning_rate: 0.05
+  lr: 0.001
+  gamma: 0.1
+  weight_decay: 5.0e-4
+  lr_decay_epochs: '10,18'
+  lr_decay_rate: 0.1
+  nesterov: true
+  seed: 42
+  val_epoch: 1
+
+  # ========== Model (aligned baseline) ==========
+  test_way: 5
+  train_way: 3
+  train_shot: 5
+  test_shot:
+    - 5
+  train_query_shot: 15
+  test_query_shot: 15
+  resnet: true
+
+  temp: 10.0
+  weight_pl: 0.2
+  beta: 0.05
+  open_weight_sum_cali: 0.3
+
+  # ========== Paths ==========
+  save_folder: './dcase18_aligned_fold1'
+  dataroot: '/coding/DCASE2018-task5-dev'
+  pretrained_model_path1: ''
+  pretrained_model_path: './dcase18_aligned_fold1/pretrain_model_dcase18.pth'
+
+  # ========== Loss ==========
+  num-centers: 1
+
+  # ========== OSR evaluation protocol (matching episodic_trainer.py) ==========
+  osr_num_rounds: 10
+  osr_k_shot: 5  # fewshot: novel classes only 3 files in calib
+
+  # ========== DCASE18-specific ==========
+  fold: 1
+
+  # ========== Misc ==========
+  dataset: 'DCASE18'
+  pretrain: true
+  test: false
+  finetune: false
+  no_val: false

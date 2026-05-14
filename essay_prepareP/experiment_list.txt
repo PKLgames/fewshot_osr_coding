@@ -454,6 +454,48 @@ G. 扩展实验 ── 脚本已创建
         cd /coding && python episodic_exp_tsne.py --compare_ablation --dataset TAU22 2>&1 | tee experiment/episodic_exp/tsne/train_TAU22.log
         cd /coding && python episodic_exp_tsne.py --compare_ablation --dataset TAU19 2>&1 | tee experiment/episodic_exp/tsne/train_TAU19.log
 
+  ── Episodic Trainer DCASE18 ── (4-fold CV, 新增 2026-05-13)
+  所有脚本支持 --dataset DCASE18 + --fold {1-4, all}
+
+  初始化:
+        cd /coding && mkdir -p experiment/episodic_exp/{ablation,wayshot,openness,complexity,cross_domain,statistical,tsne}
+
+  EP_DC0 ── 预训练 Backbone (每 fold 独立)
+        cd /coding
+        for fold in 1 2 3 4; do
+          python episodic_trainer.py --dataset dcase18 --fold $fold --epochs 80 \
+            2>&1 | tee experiment/episodic_exp/pretrain_fold${fold}.log
+        done
+
+  EP_DC1 ── 消融实验 (6配置 × 6OSR方法, --fold all = 4-fold CV)
+        cd /coding && python episodic_exp_ablation.py --dataset DCASE18 --fold all \
+          2>&1 | tee experiment/episodic_exp/ablation/train_dcase18.log
+
+  EP_DC2a ── Way-Shot 扫描
+        cd /coding && python episodic_exp_way_shot.py --dataset DCASE18 --fold all \
+          2>&1 | tee experiment/episodic_exp/wayshot/train_dcase18.log
+
+  EP_DC2b ── Openness 扫描
+        cd /coding && python episodic_exp_openness.py --dataset DCASE18 --fold all \
+          2>&1 | tee experiment/episodic_exp/openness/train_dcase18.log
+
+  EP_DC3a ── 跨域 (4方向, 逐对执行)
+        cd /coding
+        python episodic_exp_cross_domain.py --source DCASE18 --target TAU22 --source_fold 1 2>&1 | tee experiment/episodic_exp/cross_domain/train_dcase18_tau22.log
+        python episodic_exp_cross_domain.py --source DCASE18 --target TAU19 --source_fold 1 2>&1 | tee experiment/episodic_exp/cross_domain/train_dcase18_tau19.log
+        python episodic_exp_cross_domain.py --source TAU22 --target DCASE18 --target_fold 1 2>&1 | tee experiment/episodic_exp/cross_domain/train_tau22_dcase18.log
+        python episodic_exp_cross_domain.py --source TAU19 --target DCASE18 --target_fold 1 2>&1 | tee experiment/episodic_exp/cross_domain/train_tau19_dcase18.log
+
+  EP_DC3c ── 统计检验 (依赖 EP_DC1)
+        cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode config 2>&1 | tee experiment/episodic_exp/statistical/train_dcase18_config.log
+        cd /coding && python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode osr --metric osr_score 2>&1 | tee experiment/episodic_exp/statistical/train_dcase18_osr.log
+
+  EP_DC4 ── t-SNE 可视化
+        cd /coding
+        for fold in 1 2 3 4; do
+          python episodic_exp_tsne.py --dataset DCASE18 --fold $fold 2>&1 | tee experiment/episodic_exp/tsne/train_dcase18_fold${fold}.log
+        done
+
   ── FOAC-AIFP 执行顺序 ── (输出统一至 experiment/foac_exp/)
   注: 脚本 results.json 硬编码在 FOAC-AIFP/ 根目录，通过 shell 移动到统一目录
       checkpoint 仍在 save_folder 衍生路径 (tau22_aligned_ablation/ 等)
@@ -482,6 +524,62 @@ G. 扩展实验 ── 脚本已创建
   FP4 ── t-SNE 可视化  ✅ TAU22+TAU19 均已完成 (2026-05-12, 脚本修复后重跑)
         cd /coding/FOAC-AIFP && python foac_exp_tsne.py --config tau22_aligned.yml --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/tau22_train.log
         cd /coding/FOAC-AIFP && python foac_exp_tsne.py --config tau19_aligned.yml --compare_ablation 2>&1 | tee ../experiment/foac_exp/tsne/tau19_train.log
+
+  ── FOAC-AIFP DCASE18 ── (4-fold CV, 新增 2026-05-13)
+  所有脚本支持 --dataset DCASE18 + --fold {1-4, all}
+
+  初始化:
+        mkdir -p experiment/foac_exp/{ablation,wayshot,openness,complexity,cross_domain,statistical,tsne}
+
+  FP_DC0 ── 预训练 Backbone (每 fold 独立, 改 yml 后运行 main.py)
+        # 三阶段: pretrain:true test:false → main.py (预训练)
+        #         pretrain:false test:false → main.py (训练)
+        #         pretrain:false test:true → main.py (评估)
+        cd /coding/FOAC-AIFP
+        for fold in 1 2 3 4; do
+          cp dcase18_aligned.yml dcase18_aligned_fold${fold}.yml
+          sed -i "s/pretrain: false/pretrain: true/" dcase18_aligned_fold${fold}.yml
+          sed -i "s/test: true/test: false/" dcase18_aligned_fold${fold}.yml
+          sed -i "s/fold: .*/fold: ${fold}/" dcase18_aligned_fold${fold}.yml
+          sed -i "s|save_folder: .*|save_folder: './dcase18_aligned_fold${fold}'|" dcase18_aligned_fold${fold}.yml
+          sed -i "s|pretrained_model_path: .*|pretrained_model_path: './dcase18_aligned_fold${fold}/pretrain_model_dcase18.pth'|" dcase18_aligned_fold${fold}.yml
+          python main.py --config dcase18_aligned_fold${fold}.yml \
+            2>&1 | tee ../experiment/foac_exp/pretrain_fold${fold}.log
+        done
+
+  FP_DC1 ── 消融实验 (6配置 CIAM/PAM/NPM on/off, --fold all = 4-fold CV)
+        cd /coding/FOAC-AIFP && python foac_exp_ablation.py --dataset DCASE18 --fold all \
+          2>&1 | tee ../experiment/foac_exp/ablation/train_dcase18.log
+        mv foac_exp_ablation_results.json ../experiment/foac_exp/ablation/results_dcase18.json
+
+  FP_DC2a ── Way-Shot 扫描
+        cd /coding/FOAC-AIFP && python foac_exp_way_shot.py --dataset DCASE18 --fold all \
+          2>&1 | tee ../experiment/foac_exp/wayshot/train_dcase18.log
+        mv foac_exp_way_shot_results.json ../experiment/foac_exp/wayshot/results_dcase18.json
+
+  FP_DC2b ── Openness 扫描
+        cd /coding/FOAC-AIFP && python foac_exp_openness.py --dataset DCASE18 --fold all \
+          2>&1 | tee ../experiment/foac_exp/openness/train_dcase18.log
+        mv foac_exp_openness_results.json ../experiment/foac_exp/openness/results_dcase18.json
+
+  FP_DC3a ── 跨域 (4方向, 逐对执行)
+        cd /coding/FOAC-AIFP
+        python foac_exp_cross_domain.py --source DCASE18 --target TAU22 --source_fold 1 2>&1 | tee ../experiment/foac_exp/cross_domain/train_dcase18_tau22.log
+        python foac_exp_cross_domain.py --source DCASE18 --target TAU19 --source_fold 1 2>&1 | tee ../experiment/foac_exp/cross_domain/train_dcase18_tau19.log
+        python foac_exp_cross_domain.py --source TAU22 --target DCASE18 --target_fold 1 2>&1 | tee ../experiment/foac_exp/cross_domain/train_tau22_dcase18.log
+        python foac_exp_cross_domain.py --source TAU19 --target DCASE18 --target_fold 1 2>&1 | tee ../experiment/foac_exp/cross_domain/train_tau19_dcase18.log
+        mv foac_exp_cross_domain_results.json ../experiment/foac_exp/cross_domain/results_dcase18.json
+
+  FP_DC3c ── 统计检验 (依赖 FP_DC1)
+        cd /coding/FOAC-AIFP && python foac_exp_statistical.py --results ../experiment/foac_exp/ablation/results_dcase18.json \
+          2>&1 | tee ../experiment/foac_exp/statistical/train_dcase18.log
+
+  FP_DC4 ── t-SNE 可视化
+        cd /coding/FOAC-AIFP
+        for fold in 1 2 3 4; do
+          python foac_exp_tsne.py --config dcase18_aligned.yml --fold $fold \
+            2>&1 | tee ../experiment/foac_exp/tsne/train_dcase18_fold${fold}.log
+        done
 
 
 快速验证命令 (均以 cd /coding 为前提)
@@ -512,6 +610,23 @@ G. 扩展实验 ── 脚本已创建
   # Openness
   cd /coding/FOAC-AIFP && python foac_exp_openness.py --quick 2>&1 | tee debug.log
 
+  DC (DCASE18 单 fold 快速验证):
+  【Episodic】
+  python episodic_exp_ablation.py --dataset DCASE18 --fold 1 --quick \
+    2>&1 | tee debug_dcase18_ablation.log
+  python episodic_exp_way_shot.py --dataset DCASE18 --fold 1 --quick \
+    --osr_methods anti_prototype,ood_head_fusion_v2 2>&1 | tee debug_dcase18_wayshot.log
+  python episodic_exp_openness.py --dataset DCASE18 --fold 1 --quick \
+    --osr_methods anti_prototype,ood_head_fusion_v2 2>&1 | tee debug_dcase18_openness.log
+  python episodic_exp_cross_domain.py --source DCASE18 --target TAU22 \
+    --source_fold 1 --quick 2>&1 | tee debug_dcase18_cross.log
+
+  【FOAC-AIFP】
+  cd /coding/FOAC-AIFP
+  python foac_exp_ablation.py --dataset DCASE18 --fold 1 --quick 2>&1 | tee debug_dcase18.log
+  python foac_exp_way_shot.py --dataset DCASE18 --fold 1 --quick 2>&1 | tee debug_dcase18.log
+  python foac_exp_openness.py --dataset DCASE18 --fold 1 --quick 2>&1 | tee debug_dcase18.log
+
 ================================================================================
 五、脚本清单
 ================================================================================
@@ -519,29 +634,41 @@ G. 扩展实验 ── 脚本已创建
   FOAC-AIFP (位于 FOAC-AIFP/, 前缀 foac_exp_)
   输出目录: experiment/foac_exp/ (通过 shell mv 统一)
   ─────────────────────────────────────────────
-  foac_exp_ablation.py      python foac_exp_ablation.py && mv foac_exp_ablation_results.json ../experiment/foac_exp/ablation/results.json
-  foac_exp_way_shot.py      python foac_exp_way_shot.py --dataset all && mv foac_exp_way_shot_results.json ../experiment/foac_exp/wayshot/results.json
-  foac_exp_openness.py      python foac_exp_openness.py --dataset all && mv foac_exp_openness_results.json ../experiment/foac_exp/openness/results.json
-  foac_exp_complexity.py    python foac_exp_complexity.py --all_ablation && mv foac_exp_complexity_results.json ../experiment/foac_exp/complexity/results.json
-  foac_exp_cross_domain.py  python foac_exp_cross_domain.py --all && mv foac_exp_cross_domain_results.json ../experiment/foac_exp/cross_domain/results.json
+  foac_exp_ablation.py      python foac_exp_ablation.py --dataset all
+                            python foac_exp_ablation.py --dataset DCASE18 --fold all
+  foac_exp_way_shot.py      python foac_exp_way_shot.py --dataset all
+                            python foac_exp_way_shot.py --dataset DCASE18 --fold all
+  foac_exp_openness.py      python foac_exp_openness.py --dataset all
+                            python foac_exp_openness.py --dataset DCASE18 --fold all
+  foac_exp_complexity.py    python foac_exp_complexity.py --all_ablation
+  foac_exp_cross_domain.py  python foac_exp_cross_domain.py --all
+                            python foac_exp_cross_domain.py --source DCASE18 --target TAU22
   foac_exp_statistical.py   python foac_exp_statistical.py --results ../experiment/foac_exp/ablation/results.json
   foac_exp_tsne.py          python foac_exp_tsne.py --compare_ablation
+                            python foac_exp_tsne.py --config dcase18_aligned.yml --fold 1
 
   Episodic Trainer (位于 /coding/, 前缀 episodic_exp_)
   输出统一目录: experiment/episodic_exp/ (可通过 --output_dir 自定义)
   已应用训练稳定性修复: reciprocal 3.0→0.3, separation 0.05→0.02, lr→2e-4
   ─────────────────────────────────────────────────────
-  episodic_exp_ablation.py      python episodic_exp_ablation.py --dataset all 2>&1 | tee experiment/episodic_exp/ablation/train.log
-  episodic_exp_way_shot.py      python episodic_exp_way_shot.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/wayshot/train.log
-  episodic_exp_openness.py      python episodic_exp_openness.py --dataset TAU22 2>&1 | tee experiment/episodic_exp/openness/train.log
-  episodic_exp_statistical.py   python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode osr --metric osr_score 2>&1 | tee experiment/episodic_exp/statistical/train_osr.log
-  episodic_exp_complexity.py    python episodic_exp_complexity.py --all_ablation 2>&1 | tee experiment/episodic_exp/complexity/train.log
-  episodic_exp_cross_domain.py  python episodic_exp_cross_domain.py --all 2>&1 | tee experiment/episodic_exp/cross_domain/train.log
-  episodic_exp_tsne.py          python episodic_exp_tsne.py --compare_ablation --dataset TAU22 2>&1 | tee experiment/episodic_exp/tsne/train.log
+  episodic_exp_ablation.py      python episodic_exp_ablation.py --dataset all
+                                python episodic_exp_ablation.py --dataset DCASE18 --fold all
+  episodic_exp_way_shot.py      python episodic_exp_way_shot.py --dataset TAU22
+                                python episodic_exp_way_shot.py --dataset DCASE18 --fold all
+  episodic_exp_openness.py      python episodic_exp_openness.py --dataset TAU22
+                                python episodic_exp_openness.py --dataset DCASE18 --fold all
+  episodic_exp_statistical.py   python episodic_exp_statistical.py --results experiment/episodic_exp/ablation/results.json --mode osr --metric osr_score
+  episodic_exp_complexity.py    python episodic_exp_complexity.py --all_ablation
+  episodic_exp_cross_domain.py  python episodic_exp_cross_domain.py --all
+                                python episodic_exp_cross_domain.py --source DCASE18 --target TAU22
+  episodic_exp_tsne.py          python episodic_exp_tsne.py --compare_ablation --dataset TAU22
+                                python episodic_exp_tsne.py --dataset DCASE18 --fold 1
 
   带 --quick 的脚本: ablation / way_shot / openness (减少 episodes/ways/shots 用于调试)
   OSR 方法覆盖: 全部4脚本均评估6种 (anti_prototype/mahalanobis/osr23/extended_v2/cluster_v2/fusion_v2)
   各脚本支持 --osr_methods 参数 (默认 all, 可指定逗号分隔方法名, quick模式可用2-3种加速调试)
+  DCASE18 参数: --dataset DCASE18  --fold {1-4, all}  --source_fold/--target_fold (跨域)
+  DCASE18 base=5 (0-4), novel=4 (5-8), N_way=4 (Episodic) / test_n_ways=5 (FOAC)
 
   FOAC-AIFP 统一输出目录结构:
   ─────────────────────────────────────────────
@@ -624,6 +751,12 @@ G. 扩展实验 ── 脚本已创建
      - EP4 t-SNE ✅: TAU22 + TAU19, Full_Model + Baseline 各一图
      - ⬜ 仅剩: 论文制表脚本 / AUROC曲线图 / 雷达图等汇总输出
        (注: per-method AUROC 数值已补全至消融/Openness/跨域各节, 2026-05-12)
+  8. DCASE18 实验支持已添加 (2026-05-13):
+     - 10个实验脚本均已修改, 支持 --dataset DCASE18 + --fold {1-4, all}
+     - DCASE18 为 4-fold CV, 每 fold 独立训练+评估, 最终报告 4-fold 均值±标准差
+     - DCASE18: 9类 (5 base + 4 novel), 类别/way数与TAU不同 (见 experiment_list_dcase18only.txt)
+     - 跨域新增4方向: DCASE18↔TAU22, DCASE18↔TAU19
+     - ⬜ EP_DC0-4 + FP_DC0-4 待执行
 
 
 ================================================================================
@@ -648,13 +781,10 @@ G. 扩展实验 ── 脚本已创建
 
   ── A. 数据集 ──
   论文: FSC-89 / NSynth-100 / LS-100 三数据集, 跨域 (环境音/乐器/语音)
-  当前: TAU22 + TAU19 两个同域声景数据集
-  缺失: 第3个跨域数据集
-  影响:
-    - 大纲 E (泛化能力) 仅能做 TAU22↔TAU19 同域交叉, 缺少真正的分布外跨域验证
-    - 统计检验 N 不足 (Friedman 需要多个独立数据集/条件作为行)
-    - 论文审稿人会期望至少3个不同领域的数据集
-  状态: 代码已支持 FMC/NSynth/LibriSpeech (见 FOAC-AIFP 数据加载), 待决定启用
+  当前: TAU22 + TAU19 + DCASE18 (2026-05-13 新增)
+  ⬜ DCASE18 实验待跑: EP_DC0-4 + FP_DC0-4 全部待执行
+  优势: DCASE18 (家居环境) 与 TAU22/TAU19 (声景) 域差异大, 跨域论证加强
+  状态: 代码已支持 FMC/NSynth/LibriSpeech, DCASE18 脚本支持已完成
 
   ── B. 对比实验 (SOTA 方法) ──
   论文: 与 8 种 SOTA 方法对比 (FEAT, L³-Net, D-ProtoNet, MET 等)

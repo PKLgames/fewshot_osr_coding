@@ -1,0 +1,1060 @@
+{
+  "DCASE18": {
+    "full_model_fold1": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 1,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 81.153,
+          "auroc": 79.563,
+          "fscore": 70.311,
+          "tnr": 94.767,
+          "tpr": 23.948,
+          "osr": 59.357,
+          "loss": "0.96567"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 80.987,
+          "auroc": 79.396,
+          "fscore": 70.104,
+          "tnr": 94.647,
+          "tpr": 24.69,
+          "osr": 59.669,
+          "loss": "0.96679"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 81.153,
+          "auroc": 79.563,
+          "fscore": 70.311,
+          "tnr": 94.767,
+          "tpr": 23.948,
+          "osr": 59.357,
+          "loss": "0.96567"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 81.1,
+          "auroc": 79.342,
+          "fscore": 70.37,
+          "tnr": 94.829,
+          "tpr": 23.025,
+          "osr": 58.927,
+          "loss": "0.96906"
+        }
+      }
+    },
+    "wo_CIAM_fold1": {
+      "use_ciam": false,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 1,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 81.513,
+          "auroc": 80.193,
+          "fscore": 70.933,
+          "tnr": 94.799,
+          "tpr": 24.446,
+          "osr": 59.622,
+          "loss": "0.96436"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 81.373,
+          "auroc": 80.118,
+          "fscore": 70.548,
+          "tnr": 94.721,
+          "tpr": 25.924,
+          "osr": 60.323,
+          "loss": "0.97052"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 81.507,
+          "auroc": 80.349,
+          "fscore": 70.904,
+          "tnr": 94.642,
+          "tpr": 25.048,
+          "osr": 59.845,
+          "loss": "0.96377"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 81.507,
+          "auroc": 80.347,
+          "fscore": 71.037,
+          "tnr": 94.671,
+          "tpr": 24.749,
+          "osr": 59.71,
+          "loss": "0.96316004"
+        }
+      }
+    },
+    "wo_PAM_fold1": {
+      "use_ciam": true,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 1,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 81.233,
+          "auroc": 80.098,
+          "fscore": 70.644,
+          "tnr": 94.622,
+          "tpr": 25.829,
+          "osr": 60.226,
+          "loss": "0.96625"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 81.193,
+          "auroc": 80.056,
+          "fscore": 70.607,
+          "tnr": 94.651,
+          "tpr": 25.8,
+          "osr": 60.226,
+          "loss": "0.96696"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 81.233,
+          "auroc": 80.098,
+          "fscore": 70.644,
+          "tnr": 94.622,
+          "tpr": 25.829,
+          "osr": 60.226,
+          "loss": "0.96625"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 80.96,
+          "auroc": 79.871,
+          "fscore": 70.837,
+          "tnr": 94.864,
+          "tpr": 24.139,
+          "osr": 59.502,
+          "loss": "0.97161"
+        }
+      }
+    },
+    "wo_NPM_fold1": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": false,
+      "fold": 1,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 81.267,
+          "auroc": 79.172,
+          "fscore": 69.719,
+          "tnr": 94.641,
+          "tpr": 24.382,
+          "osr": 59.511,
+          "loss": "0.96683997"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 81.16,
+          "auroc": 79.166,
+          "fscore": 69.719,
+          "tnr": 94.62,
+          "tpr": 24.423,
+          "osr": 59.522,
+          "loss": "0.96931"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 81.02,
+          "auroc": 79.461,
+          "fscore": 70.133,
+          "tnr": 94.726,
+          "tpr": 23.772,
+          "osr": 59.249,
+          "loss": "0.96725"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 81.14,
+          "auroc": 79.256,
+          "fscore": 70.163,
+          "tnr": 94.754,
+          "tpr": 23.264,
+          "osr": 59.009,
+          "loss": "0.96869004"
+        }
+      }
+    },
+    "only_NPM_fold1": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 1,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 81.433,
+          "auroc": 80.029,
+          "fscore": 70.548,
+          "tnr": 94.674,
+          "tpr": 24.957,
+          "osr": 59.815,
+          "loss": "0.97019994"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 81.327,
+          "auroc": 80.054,
+          "fscore": 70.556,
+          "tnr": 94.689,
+          "tpr": 25.78,
+          "osr": 60.235,
+          "loss": "0.96939003"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 81.347,
+          "auroc": 80.136,
+          "fscore": 70.837,
+          "tnr": 94.772,
+          "tpr": 24.762,
+          "osr": 59.767,
+          "loss": "0.96717"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 81.347,
+          "auroc": 80.136,
+          "fscore": 70.837,
+          "tnr": 94.772,
+          "tpr": 24.762,
+          "osr": 59.767,
+          "loss": "0.96717"
+        }
+      }
+    },
+    "baseline_no_modules_fold1": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": false,
+      "fold": 1,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 81.313,
+          "auroc": 79.697,
+          "fscore": 70.215,
+          "tnr": 94.701,
+          "tpr": 25.04,
+          "osr": 59.871,
+          "loss": "0.96990997"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 81.26,
+          "auroc": 79.826,
+          "fscore": 70.274,
+          "tnr": 94.705,
+          "tpr": 25.594,
+          "osr": 60.15,
+          "loss": "0.96819"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 81.173,
+          "auroc": 80.046,
+          "fscore": 70.437,
+          "tnr": 94.667,
+          "tpr": 25.417,
+          "osr": 60.042,
+          "loss": "0.97620004"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 80.893,
+          "auroc": 79.471,
+          "fscore": 70.541,
+          "tnr": 94.889,
+          "tpr": 23.487,
+          "osr": 59.188,
+          "loss": "0.97433996"
+        }
+      }
+    },
+    "full_model_fold2": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 2,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 80.267,
+          "auroc": 73.65,
+          "fscore": 65.719,
+          "tnr": 94.813,
+          "tpr": 17.98,
+          "osr": 56.397,
+          "loss": "1.03273"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 79.887,
+          "auroc": 74.311,
+          "fscore": 66.4,
+          "tnr": 94.739,
+          "tpr": 18.165,
+          "osr": 56.452,
+          "loss": "1.02729"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 79.887,
+          "auroc": 74.311,
+          "fscore": 66.4,
+          "tnr": 94.739,
+          "tpr": 18.165,
+          "osr": 56.452,
+          "loss": "1.02729"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 79.887,
+          "auroc": 74.311,
+          "fscore": 66.4,
+          "tnr": 94.739,
+          "tpr": 18.165,
+          "osr": 56.452,
+          "loss": "1.02729"
+        }
+      }
+    },
+    "wo_CIAM_fold2": {
+      "use_ciam": false,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 2,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 80.22,
+          "auroc": 73.69,
+          "fscore": 65.756,
+          "tnr": 94.811,
+          "tpr": 17.976,
+          "osr": 56.393,
+          "loss": "1.03426"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 80.107,
+          "auroc": 70.974,
+          "fscore": 62.874,
+          "tnr": 94.886,
+          "tpr": 17.985,
+          "osr": 56.435,
+          "loss": "1.07432"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 79.753,
+          "auroc": 73.987,
+          "fscore": 66.067,
+          "tnr": 94.757,
+          "tpr": 17.937,
+          "osr": 56.347,
+          "loss": "1.03319"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 79.753,
+          "auroc": 73.987,
+          "fscore": 66.067,
+          "tnr": 94.757,
+          "tpr": 17.937,
+          "osr": 56.347,
+          "loss": "1.03319"
+        }
+      }
+    },
+    "wo_PAM_fold2": {
+      "use_ciam": true,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 2,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 80.447,
+          "auroc": 74.02,
+          "fscore": 66.185,
+          "tnr": 94.822,
+          "tpr": 18.212,
+          "osr": 56.517,
+          "loss": "1.03516"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 80.187,
+          "auroc": 74.562,
+          "fscore": 66.681,
+          "tnr": 94.816,
+          "tpr": 18.495,
+          "osr": 56.655,
+          "loss": "1.02916"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 80.187,
+          "auroc": 74.562,
+          "fscore": 66.681,
+          "tnr": 94.816,
+          "tpr": 18.495,
+          "osr": 56.655,
+          "loss": "1.02916"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 80.187,
+          "auroc": 74.562,
+          "fscore": 66.681,
+          "tnr": 94.816,
+          "tpr": 18.495,
+          "osr": 56.655,
+          "loss": "1.02916"
+        }
+      }
+    },
+    "wo_NPM_fold2": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": false,
+      "fold": 2,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 80.167,
+          "auroc": 74.135,
+          "fscore": 66.333,
+          "tnr": 94.611,
+          "tpr": 18.161,
+          "osr": 56.386,
+          "loss": "1.0276799"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 79.453,
+          "auroc": 74.429,
+          "fscore": 66.511,
+          "tnr": 94.687,
+          "tpr": 18.297,
+          "osr": 56.492,
+          "loss": "1.03402"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 79.453,
+          "auroc": 74.429,
+          "fscore": 66.511,
+          "tnr": 94.687,
+          "tpr": 18.297,
+          "osr": 56.492,
+          "loss": "1.03402"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 79.453,
+          "auroc": 74.429,
+          "fscore": 66.511,
+          "tnr": 94.687,
+          "tpr": 18.297,
+          "osr": 56.492,
+          "loss": "1.03402"
+        }
+      }
+    },
+    "only_NPM_fold2": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 2,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 80.313,
+          "auroc": 74.252,
+          "fscore": 66.17,
+          "tnr": 94.845,
+          "tpr": 18.596,
+          "osr": 56.72,
+          "loss": "1.0334201"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 80.18,
+          "auroc": 74.941,
+          "fscore": 66.978,
+          "tnr": 94.779,
+          "tpr": 18.862,
+          "osr": 56.821,
+          "loss": "1.02751"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 79.86,
+          "auroc": 74.981,
+          "fscore": 67.163,
+          "tnr": 94.805,
+          "tpr": 18.639,
+          "osr": 56.722,
+          "loss": "1.0293499"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 79.86,
+          "auroc": 74.981,
+          "fscore": 67.163,
+          "tnr": 94.805,
+          "tpr": 18.639,
+          "osr": 56.722,
+          "loss": "1.0293499"
+        }
+      }
+    },
+    "baseline_no_modules_fold2": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": false,
+      "fold": 2,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 80.407,
+          "auroc": 74.708,
+          "fscore": 66.822,
+          "tnr": 94.775,
+          "tpr": 18.631,
+          "osr": 56.703,
+          "loss": "1.02727"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 80.407,
+          "auroc": 74.708,
+          "fscore": 66.822,
+          "tnr": 94.775,
+          "tpr": 18.631,
+          "osr": 56.703,
+          "loss": "1.02727"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 80.327,
+          "auroc": 74.764,
+          "fscore": 66.963,
+          "tnr": 94.816,
+          "tpr": 18.549,
+          "osr": 56.682,
+          "loss": "1.026"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 80.327,
+          "auroc": 74.764,
+          "fscore": 66.963,
+          "tnr": 94.816,
+          "tpr": 18.549,
+          "osr": 56.682,
+          "loss": "1.026"
+        }
+      }
+    },
+    "full_model_fold3": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 3,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 77.953,
+          "auroc": 78.771,
+          "fscore": 69.4,
+          "tnr": 94.907,
+          "tpr": 24.218,
+          "osr": 59.562,
+          "loss": "0.97357005"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 77.827,
+          "auroc": 78.933,
+          "fscore": 69.533,
+          "tnr": 94.855,
+          "tpr": 24.278,
+          "osr": 59.566,
+          "loss": "0.97117996"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 77.827,
+          "auroc": 78.933,
+          "fscore": 69.533,
+          "tnr": 94.855,
+          "tpr": 24.278,
+          "osr": 59.566,
+          "loss": "0.97117996"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 77.827,
+          "auroc": 78.933,
+          "fscore": 69.533,
+          "tnr": 94.855,
+          "tpr": 24.278,
+          "osr": 59.566,
+          "loss": "0.97117996"
+        }
+      }
+    },
+    "wo_CIAM_fold3": {
+      "use_ciam": false,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 3,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 77.973,
+          "auroc": 78.577,
+          "fscore": 69.4,
+          "tnr": 94.904,
+          "tpr": 23.541,
+          "osr": 59.222,
+          "loss": "0.97435"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 77.9,
+          "auroc": 78.754,
+          "fscore": 69.563,
+          "tnr": 94.913,
+          "tpr": 23.839,
+          "osr": 59.376,
+          "loss": "0.97505"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 77.9,
+          "auroc": 78.754,
+          "fscore": 69.563,
+          "tnr": 94.913,
+          "tpr": 23.839,
+          "osr": 59.376,
+          "loss": "0.97505"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 77.9,
+          "auroc": 78.754,
+          "fscore": 69.563,
+          "tnr": 94.913,
+          "tpr": 23.839,
+          "osr": 59.376,
+          "loss": "0.97505"
+        }
+      }
+    },
+    "wo_PAM_fold3": {
+      "use_ciam": true,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 3,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 77.967,
+          "auroc": 77.952,
+          "fscore": 68.711,
+          "tnr": 94.826,
+          "tpr": 23.075,
+          "osr": 58.951,
+          "loss": "0.97617996"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 77.707,
+          "auroc": 78.793,
+          "fscore": 69.607,
+          "tnr": 94.832,
+          "tpr": 23.836,
+          "osr": 59.334,
+          "loss": "0.97060996"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 77.707,
+          "auroc": 78.793,
+          "fscore": 69.607,
+          "tnr": 94.832,
+          "tpr": 23.836,
+          "osr": 59.334,
+          "loss": "0.97060996"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 77.707,
+          "auroc": 78.793,
+          "fscore": 69.607,
+          "tnr": 94.832,
+          "tpr": 23.836,
+          "osr": 59.334,
+          "loss": "0.97060996"
+        }
+      }
+    },
+    "wo_NPM_fold3": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": false,
+      "fold": 3,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 78.02,
+          "auroc": 78.242,
+          "fscore": 69.037,
+          "tnr": 94.811,
+          "tpr": 23.558,
+          "osr": 59.184,
+          "loss": "0.97165"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 77.88,
+          "auroc": 78.794,
+          "fscore": 69.437,
+          "tnr": 94.805,
+          "tpr": 24.598,
+          "osr": 59.702,
+          "loss": "0.97046995"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 77.953,
+          "auroc": 78.909,
+          "fscore": 69.83,
+          "tnr": 94.787,
+          "tpr": 24.091,
+          "osr": 59.439,
+          "loss": "0.96817"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 77.953,
+          "auroc": 78.909,
+          "fscore": 69.83,
+          "tnr": 94.787,
+          "tpr": 24.091,
+          "osr": 59.439,
+          "loss": "0.96817"
+        }
+      }
+    },
+    "only_NPM_fold3": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 3,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 78.053,
+          "auroc": 77.76,
+          "fscore": 68.481,
+          "tnr": 94.796,
+          "tpr": 22.937,
+          "osr": 58.866,
+          "loss": "0.97877"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 77.727,
+          "auroc": 78.41,
+          "fscore": 69.133,
+          "tnr": 94.855,
+          "tpr": 23.982,
+          "osr": 59.419,
+          "loss": "0.98310995"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 78.013,
+          "auroc": 78.747,
+          "fscore": 69.511,
+          "tnr": 94.842,
+          "tpr": 23.849,
+          "osr": 59.346,
+          "loss": "0.97519"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 78.013,
+          "auroc": 78.747,
+          "fscore": 69.511,
+          "tnr": 94.842,
+          "tpr": 23.849,
+          "osr": 59.346,
+          "loss": "0.97519"
+        }
+      }
+    },
+    "baseline_no_modules_fold3": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": false,
+      "fold": 3,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 78.073,
+          "auroc": 78.436,
+          "fscore": 69.074,
+          "tnr": 94.87,
+          "tpr": 23.411,
+          "osr": 59.14,
+          "loss": "0.97327006"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 77.84,
+          "auroc": 79.25,
+          "fscore": 69.889,
+          "tnr": 94.858,
+          "tpr": 24.587,
+          "osr": 59.722,
+          "loss": "0.97229"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 77.84,
+          "auroc": 79.25,
+          "fscore": 69.889,
+          "tnr": 94.858,
+          "tpr": 24.587,
+          "osr": 59.722,
+          "loss": "0.97229"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 77.84,
+          "auroc": 79.25,
+          "fscore": 69.889,
+          "tnr": 94.858,
+          "tpr": 24.587,
+          "osr": 59.722,
+          "loss": "0.97229"
+        }
+      }
+    },
+    "full_model_fold4": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 4,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 86.827,
+          "auroc": 81.98,
+          "fscore": 72.333,
+          "tnr": 94.688,
+          "tpr": 29.422,
+          "osr": 62.055,
+          "loss": "0.8749"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 86.167,
+          "auroc": 83.041,
+          "fscore": 72.674,
+          "tnr": 94.784,
+          "tpr": 32.754,
+          "osr": 63.769,
+          "loss": "0.87281996"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 86.167,
+          "auroc": 83.041,
+          "fscore": 72.674,
+          "tnr": 94.784,
+          "tpr": 32.754,
+          "osr": 63.769,
+          "loss": "0.87281996"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 86.793,
+          "auroc": 82.839,
+          "fscore": 72.926,
+          "tnr": 94.749,
+          "tpr": 31.228,
+          "osr": 62.989,
+          "loss": "0.86466"
+        }
+      }
+    },
+    "wo_CIAM_fold4": {
+      "use_ciam": false,
+      "use_pam": true,
+      "use_npm": true,
+      "fold": 4,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 86.967,
+          "auroc": 82.837,
+          "fscore": 73.015,
+          "tnr": 94.737,
+          "tpr": 30.767,
+          "osr": 62.752,
+          "loss": "0.87285006"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 86.547,
+          "auroc": 83.659,
+          "fscore": 73.163,
+          "tnr": 94.786,
+          "tpr": 34.226,
+          "osr": 64.506,
+          "loss": "0.872"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 86.72,
+          "auroc": 83.661,
+          "fscore": 73.23,
+          "tnr": 94.792,
+          "tpr": 33.855,
+          "osr": 64.324,
+          "loss": "0.86847"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 86.813,
+          "auroc": 83.635,
+          "fscore": 73.311,
+          "tnr": 94.793,
+          "tpr": 33.365,
+          "osr": 64.079,
+          "loss": "0.86646"
+        }
+      }
+    },
+    "wo_PAM_fold4": {
+      "use_ciam": true,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 4,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 87.0,
+          "auroc": 83.193,
+          "fscore": 73.356,
+          "tnr": 94.746,
+          "tpr": 31.847,
+          "osr": 63.296,
+          "loss": "0.86805"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 86.393,
+          "auroc": 83.684,
+          "fscore": 73.289,
+          "tnr": 94.7,
+          "tpr": 34.428,
+          "osr": 64.564,
+          "loss": "0.87251997"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 86.813,
+          "auroc": 83.77,
+          "fscore": 73.63,
+          "tnr": 94.72,
+          "tpr": 33.337,
+          "osr": 64.028,
+          "loss": "0.86449"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 86.92,
+          "auroc": 83.601,
+          "fscore": 73.652,
+          "tnr": 94.738,
+          "tpr": 32.778,
+          "osr": 63.758,
+          "loss": "0.86494005"
+        }
+      }
+    },
+    "wo_NPM_fold4": {
+      "use_ciam": true,
+      "use_pam": true,
+      "use_npm": false,
+      "fold": 4,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 86.907,
+          "auroc": 82.609,
+          "fscore": 72.837,
+          "tnr": 94.749,
+          "tpr": 30.288,
+          "osr": 62.519,
+          "loss": "0.86693"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 86.393,
+          "auroc": 82.57,
+          "fscore": 72.259,
+          "tnr": 94.747,
+          "tpr": 32.124,
+          "osr": 63.436,
+          "loss": "0.87193"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 86.713,
+          "auroc": 82.781,
+          "fscore": 72.77,
+          "tnr": 94.792,
+          "tpr": 31.09,
+          "osr": 62.941,
+          "loss": "0.86407"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 86.813,
+          "auroc": 82.759,
+          "fscore": 72.948,
+          "tnr": 94.762,
+          "tpr": 30.632,
+          "osr": 62.697,
+          "loss": "0.86452"
+        }
+      }
+    },
+    "only_NPM_fold4": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": true,
+      "fold": 4,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 87.04,
+          "auroc": 82.597,
+          "fscore": 72.644,
+          "tnr": 94.617,
+          "tpr": 30.855,
+          "osr": 62.736,
+          "loss": "0.87407"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 86.527,
+          "auroc": 83.646,
+          "fscore": 73.348,
+          "tnr": 94.737,
+          "tpr": 34.128,
+          "osr": 64.432,
+          "loss": "0.87305"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 86.693,
+          "auroc": 83.67,
+          "fscore": 73.326,
+          "tnr": 94.779,
+          "tpr": 33.835,
+          "osr": 64.307,
+          "loss": "0.87027"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 86.527,
+          "auroc": 83.646,
+          "fscore": 73.348,
+          "tnr": 94.737,
+          "tpr": 34.128,
+          "osr": 64.432,
+          "loss": "0.87305"
+        }
+      }
+    },
+    "baseline_no_modules_fold4": {
+      "use_ciam": false,
+      "use_pam": false,
+      "use_npm": false,
+      "fold": 4,
+      "results": {
+        "model_DCASE18_max_acc.pth": {
+          "acc": 86.94,
+          "auroc": 83.232,
+          "fscore": 73.215,
+          "tnr": 94.774,
+          "tpr": 31.565,
+          "osr": 63.169,
+          "loss": "0.8668"
+        },
+        "model_DCASE18_max_osr.pth": {
+          "acc": 86.62,
+          "auroc": 83.421,
+          "fscore": 73.074,
+          "tnr": 94.776,
+          "tpr": 33.23,
+          "osr": 64.003,
+          "loss": "0.86891997"
+        },
+        "model_DCASE18_max_auroc.pth": {
+          "acc": 86.62,
+          "auroc": 83.421,
+          "fscore": 73.074,
+          "tnr": 94.776,
+          "tpr": 33.23,
+          "osr": 64.003,
+          "loss": "0.86891997"
+        },
+        "model_DCASE18_max_fscore.pth": {
+          "acc": 86.853,
+          "auroc": 83.34,
+          "fscore": 73.341,
+          "tnr": 94.775,
+          "tpr": 32.283,
+          "osr": 63.529,
+          "loss": "0.86597"
+        }
+      }
+    }
+  }
+}

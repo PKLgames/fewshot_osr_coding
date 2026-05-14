@@ -23,8 +23,11 @@ def meta_train_dataloader(args):
         trainset = OpenTAU19(args=args, index=class_index, root=args.dataroot, partition='train', fix_seed=True)
     elif args.dataset == 'DCASE18':
         trainset = OpenDCASE18(args=args, index=class_index, root=args.dataroot, partition='train', fix_seed=True)
+    nw = getattr(args, 'num_workers', 8)
+    pf = getattr(args, 'prefetch_factor', 2)
     loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=False,
-                                         num_workers=8, pin_memory=True, persistent_workers=True)
+                                         num_workers=nw, pin_memory=True, persistent_workers=True,
+                                         prefetch_factor=pf)
 
     return loader
 
@@ -42,8 +45,11 @@ def meta_calib_dataloader(args):
         # Non-TAU datasets fall back to test loader
         return meta_test_dataloader(args)
 
+    nw = getattr(args, 'num_workers', 8)
+    pf = getattr(args, 'prefetch_factor', 2)
     loader = torch.utils.data.DataLoader(calibset, batch_size=1, shuffle=False,
-                                         num_workers=8, pin_memory=True, persistent_workers=True)
+                                         num_workers=nw, pin_memory=True, persistent_workers=True,
+                                         prefetch_factor=pf)
     return loader
 
 
@@ -62,7 +68,10 @@ def meta_test_dataloader(args):
     elif args.dataset == 'DCASE18':
         testset = OpenDCASE18(args=args, index=np.arange(9), root=args.dataroot, partition='test', fix_seed=True)
 
+    nw = getattr(args, 'num_workers', 8)
+    pf = getattr(args, 'prefetch_factor', 2)
     loader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False,
-                                         num_workers=8, pin_memory=True, persistent_workers=True)
+                                         num_workers=nw, pin_memory=True, persistent_workers=True,
+                                         prefetch_factor=pf)
 
     return loader

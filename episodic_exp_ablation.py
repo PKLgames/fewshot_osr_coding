@@ -10,6 +10,7 @@ Usage:
   cd /coding
   python episodic_exp_ablation.py --dataset TAU22
   python episodic_exp_ablation.py --dataset TAU19
+  python episodic_exp_ablation.py --dataset DCASE18 --fold all
   python episodic_exp_ablation.py --all
 """
 
@@ -48,18 +49,19 @@ def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
                  base_classes, unknown_classes, dataset_name='TAU22',
                  backbone_choice='yamnet',
                  N_way=6, K_shot=5, Q_query=15, num_episodes=3000,
-                 feature_dim=64, output_root='experiment/episodic_exp'):
+                 feature_dim=64, output_root='experiment/episodic_exp',
+                 fold=1):
     """Run one ablation configuration."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    experiment_dir = f'{output_root}/ablation/{dataset_name}/{config_name}'
+    fold_suffix = f'_fold{fold}' if dataset_name == 'DCASE18' else ''
+    experiment_dir = f'{output_root}/ablation/{dataset_name}{fold_suffix}/{config_name}'
 
     print(f"\n{'='*60}")
-    print(f"Ablation: {config_name}")
+    print(f"Ablation: {config_name}  |  dataset={dataset_name}" + (f" fold={fold}" if dataset_name == 'DCASE18' else ""))
     print(f"  flow={use_flow}, ood={use_ood}, recip={use_recip}, thresh={use_thresh}")
     print(f"{'='*60}")
 
     # --- Phase 0: Feature extractor (reuse existing) ---
-    # Find existing pretrained backbone
     pretrained_candidates = [
         'experiment/yamnet_fewshot_osr22/base_feature_extractor.pth',
         'experiment/yamnet_fewshot_osr13/base_feature_extractor.pth',
@@ -83,20 +85,29 @@ def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
     feature_extractor = feature_extractor.to(device).freeze()
 
     # --- Phase 1: Feature extraction ---
-    # TAUDataset is None in the module (set lazily in main()), import directly
-    from utils.TAU22 import TAUDataset as TAU22Dataset
-    from utils.TAU19 import TAUDataset as TAU19Dataset
-    TAUDataset = TAU19Dataset if dataset_name == 'TAU19' else TAU22Dataset
+    if dataset_name == 'DCASE18':
+        from functools import partial
+        from utils.DCASE18 import DCASE18Dataset
+        TAUDataset = partial(DCASE18Dataset, fold=fold)
+        cache_name = f'dcase18_fold{fold}'
+    elif dataset_name == 'TAU19':
+        from utils.TAU19 import TAUDataset as TAU19Dataset
+        TAUDataset = TAU19Dataset
+        cache_name = dataset_name.lower()
+    else:
+        from utils.TAU22 import TAUDataset as TAU22Dataset
+        TAUDataset = TAU22Dataset
+        cache_name = dataset_name.lower()
 
     train_dataset = TAUDataset(split='train')
     calib_dataset = TAUDataset(split='calib')
     test_dataset = TAUDataset(split='test')
 
-    train_cache = mod.FeatureCache(dataset_name=dataset_name.lower())
+    train_cache = mod.FeatureCache(dataset_name=cache_name)
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
-    calib_cache = mod.FeatureCache(dataset_name=dataset_name.lower())
+    calib_cache = mod.FeatureCache(dataset_name=cache_name)
     calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
-    test_cache = mod.FeatureCache(dataset_name=dataset_name.lower())
+    test_cache = mod.FeatureCache(dataset_name=cache_name)
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
 
     # --- Phase 2: Episodic training ---
@@ -186,37 +197,54 @@ def run_ablation(mod, config_name, use_flow, use_ood, use_recip, use_thresh,
 
 def main():
     parser = argparse.ArgumentParser(description='Episodic Trainer Ablation Experiments')
-    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'all'], default='all')
+    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'DCASE18', 'all'], default='all')
     parser.add_argument('--configs', type=str, nargs='*', default=None,
                         help='Run only specific configs (e.g. full_model wo_ood_head)')
     parser.add_argument('--num_episodes', type=int, default=3000)
     parser.add_argument('--quick', action='store_true', help='Fewer episodes for debugging')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
+    parser.add_argument('--fold', type=str, default='1',
+                        help='Fold for DCASE18: 1-4 or "all" for 4-fold CV (default: 1)')
     cl_args = parser.parse_args()
 
     if cl_args.quick:
         cl_args.num_episodes = 500
 
-    datasets = ['TAU22', 'TAU19'] if cl_args.dataset == 'all' else [cl_args.dataset]
+    if cl_args.dataset == 'all':
+        datasets = ['TAU22', 'TAU19']
+    else:
+        datasets = [cl_args.dataset]
     all_results = {}
 
     for dataset in datasets:
         mod = get_trainer_module(dataset)
-        base_classes = [0, 1, 2, 3, 4, 5]
-        unknown_classes = [6, 7, 8, 9]
+        if dataset == 'DCASE18':
+            base_classes = [0, 1, 2, 3, 4]
+            unknown_classes = [5, 6, 7, 8]
+            n_way = 4
+            folds = [1, 2, 3, 4] if cl_args.fold == 'all' else [int(cl_args.fold)]
+        else:
+            base_classes = [0, 1, 2, 3, 4, 5]
+            unknown_classes = [6, 7, 8, 9]
+            n_way = 6
+            folds = [None]
 
         all_results[dataset] = {}
         for name, flow, ood, recip, thresh in ABLATION_CONFIGS:
             if cl_args.configs and name not in cl_args.configs:
                 continue
-            r = run_ablation(mod, name, flow, ood, recip, thresh,
-                             base_classes, unknown_classes,
-                             dataset_name=dataset,
-                             num_episodes=cl_args.num_episodes,
-                             output_root=cl_args.output_dir)
-            if r:
-                all_results[dataset][name] = r
+            for fold in folds:
+                r = run_ablation(mod, name, flow, ood, recip, thresh,
+                                 base_classes, unknown_classes,
+                                 dataset_name=dataset,
+                                 num_episodes=cl_args.num_episodes,
+                                 output_root=cl_args.output_dir,
+                                 N_way=n_way,
+                                 fold=(fold if fold is not None else 1))
+                if r:
+                    fold_tag = f'_fold{fold}' if fold is not None else ''
+                    all_results[dataset][f"{name}{fold_tag}"] = r
 
     # Save
     os.makedirs(cl_args.output_dir, exist_ok=True)
@@ -230,25 +258,38 @@ def main():
     print("ABLATION SUMMARY")
     print(f"{'='*80}")
     osr_methods_short = ['anti_proto', 'mahalanobis', 'osr23', 'ext_v2', 'cluster_v2', 'fusion_v2']
+    osr_keys = ['anti_prototype', 'feature_mahalanobis',
+               'ood_head_osr23', 'ood_head_extended_v2',
+               'ood_head_cluster_v2', 'ood_head_fusion_v2']
     for dataset in all_results:
         print(f"\n  Dataset: {dataset}")
-        # Header
         header = f"  {'Config':<25s} {'Base5s':>7s}"
         for m in osr_methods_short:
             header += f" {m:>10s}"
         print(header)
-        for name, r in all_results[dataset].items():
-            acc = r.get('base_5shot', {}).get('mean_acc', 0)
-            osr = r.get('osr', {})
-            row = f"  {name:<25s} {acc:>6.2%}"
-            # Map to short names in same order as osr_methods list
-            osr_keys = ['anti_prototype', 'feature_mahalanobis',
-                        'ood_head_osr23', 'ood_head_extended_v2',
-                        'ood_head_cluster_v2', 'ood_head_fusion_v2']
-            for ok in osr_keys:
-                v = osr.get(ok, {})
-                row += f" {v.get('osr_score', 0):>9.2%}"
-            print(row)
+        if dataset == 'DCASE18' and cl_args.fold == 'all':
+            # Aggregate across folds
+            for name, _, _, _, _ in ABLATION_CONFIGS:
+                fold_results = [all_results[dataset].get(f'{name}_fold{f}', {}) for f in [1,2,3,4]]
+                fold_results = [v for v in fold_results if v]
+                if not fold_results:
+                    continue
+                accs = [r.get('base_5shot', {}).get('mean_acc', 0) for r in fold_results]
+                acc_m, acc_s = np.mean(accs), np.std(accs)
+                row = f"  {name:<25s} {acc_m:>6.2%}"
+                for ok in osr_keys:
+                    vals = [r.get('osr', {}).get(ok, {}).get('osr_score', 0) for r in fold_results]
+                    row += f" {np.mean(vals):>9.2%}"
+                print(row)
+        else:
+            for name, r in all_results[dataset].items():
+                acc = r.get('base_5shot', {}).get('mean_acc', 0)
+                osr = r.get('osr', {})
+                row = f"  {name:<25s} {acc:>6.2%}"
+                for ok in osr_keys:
+                    v = osr.get(ok, {})
+                    row += f" {v.get('osr_score', 0):>9.2%}"
+                print(row)
 
 
 if __name__ == '__main__':

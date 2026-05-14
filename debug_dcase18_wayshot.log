@@ -1,0 +1,78 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+Using backbone: experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Extracting features (fold=1)...
+Dynamic-load mode: 25000 segments across 2500 files
+Dynamic-load mode: 1620 segments across 162 files
+Dynamic-load mode: 40960 segments across 4096 files
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_train_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_calib_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    Class 0: 300 samples
+    Class 1: 300 samples
+    Class 2: 300 samples
+    Class 3: 300 samples
+    Class 4: 300 samples
+    Class 5: 30 samples
+    Class 6: 30 samples
+    Class 7: 30 samples
+    Class 8: 30 samples
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_test_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 3560 samples
+    Class 6: 5000 samples
+    Class 7: 5000 samples
+    Class 8: 2400 samples
+
+--- 5w1s_f1 ---
+Real OOD exposure: 15960 samples from classes [5, 6, 7, 8]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(5) on 25000 samples, dim=64
+  GMM train log-likelihood: mean=124.69, 10th percentile=82.22
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/wayshot_fold1/wayshot/way5_shot1/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 5-way 1-shot
+Base classes:     [0, 1, 2, 3, 4]
+Unknown classes:  [5, 6, 7, 8]
+Episodes:         500
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/500 | CE: 1.5943 Total: 1.5943 Acc: 25.80% | Val Loss: 2.2415 Acc: 35.60% | LR: 2.00e-04 cls:0.0
+  -> Best model saved (Val Acc: 35.60%)
+
+Loaded best model (Val Acc: 35.60%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 35.60%
+======================================================================
+Episode history saved: experiment/episodic_exp/wayshot_fold1/wayshot/way5_shot1/episodic_history.json
+5w1s eval:   0%|          | 0/100 [00:00<?, ?it/s]5w1s eval:  13%|█▎        | 13/100 [00:00<00:00, 122.06it/s]5w1s eval:  27%|██▋       | 27/100 [00:00<00:00, 131.66it/s]5w1s eval:  41%|████      | 41/100 [00:00<00:00, 135.25it/s]5w1s eval:  56%|█████▌    | 56/100 [00:00<00:00, 137.77it/s]5w1s eval:  70%|███████   | 70/100 [00:00<00:00, 138.50it/s]5w1s eval:  84%|████████▍ | 84/100 [00:00<00:00, 138.93it/s]5w1s eval:  98%|█████████▊| 98/100 [00:00<00:00, 139.00it/s]5w1s eval: 100%|██████████| 100/100 [00:00<00:00, 137.18it/s]

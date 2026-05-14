@@ -1,0 +1,112 @@
+# ==============================================================================
+# 实验 3: 缩减模型维度 (解决近输入层梯度消失)
+#
+# 启用条件 (在 exp1 中观察到以下任一模式):
+#   [ ] 模式 A "前端冻死":
+#         grad_output/spectrogram_extractor/mean  < 1e-7
+#         grad_output/logmel_extractor/mean       < 1e-7
+#         grad_output/bn0/mean                    < 1e-6
+#         但 enc_layer3/4, PAM 仍有正常梯度
+#         → 本实验: mel_bins 128→64, fmax 8000→4000
+#
+#   [ ] 模式 B "全层微弱":
+#         grad_output/*/mean 所有层 < 1e-6
+#         仅 PAM/NPM/fc 有微弱梯度
+#         → 本实验: resnet_width 64→32 (通道数减半)
+#
+#   [ ] 模式 C "深层截断":
+#         enc_conv1/layer1 梯度正常，layer3/layer4 mean < 1e-7
+#         → 本实验: 同时减 mel_bins + resnet_width (AB组合)
+#
+# 运行:
+#   在 exp1 确认问题后:
+#     (1) 根据观察到的模式取消下方对应配置的注释
+#     (2) 需要重新 pretrain (模型结构已变):
+#         python pretrain.py --config ./tau22_exp3_small_model.yml
+#     (3) python main.py --config ./tau22_exp3_small_model.yml
+#
+# 对比: TensorBoard 中 exp1 vs exp3 的:
+#   grad_output/spectrogram_extractor/mean → 应从近零恢复到 1e-4 以上
+#   grad_output/enc_layer*/mean             → 各层梯度应进入合理区间
+# ==============================================================================
+train:
+  # ========== Audio feature extractor ==========
+  # 模式 A / C 时启用此行组 (当前注释 = 与基线相同):
+  extractor:
+    window_size: 1024
+    hop_size: 256
+    sample_rate: 16000
+    mel_bins: 64              # 模式 C: 128 → 64
+    fmin: 0
+    fmax: 4000                # 模式 C: 8000 → 4000
+    window: 'hann'
+
+  # ========== Episode structure ==========
+  n_ways: 6
+  n_open_ways: 4
+  test_n_ways: 6
+  test_n_open_ways: 4
+  n_shots: 5
+  n_queries: 15
+  train_classes: 6
+
+  n_train_runs: 400
+  n_test_runs: 200
+  test_times: 200
+
+  # ========== Training hyper-parameters (Cosine Annealing) ==========
+  epoch: 15                      # 小模型收敛更快
+  epochs_pre: 80
+  batch_size: 256
+  learning_rate: 0.05
+  lr: 0.001
+  gamma: 0.1                     # cosine 下忽略，改用 eta_min
+  weight_decay: 5.0e-4
+  # lr_decay_epochs / lr_decay_rate 在 cosine 下忽略
+  lr_scheduler: 'cosine'         # 替代默认 multistep，平滑退火防过拟合
+  T_max: 15                      # cosine 半周期 = epoch 数
+  eta_min: 1.0e-6                # 退火最低学习率
+  nesterov: true
+  seed: 42
+  val_epoch: 1
+
+  # ========== Model ==========
+  test_way: 6
+  train_way: 6
+  train_shot: 5
+  test_shot:
+    - 5
+  train_query_shot: 15
+  test_query_shot: 15
+  resnet: true
+  # 模式 B / C 时启用此项:
+  resnet_width: 32               # 标准宽度; 模式 B/C 改为 32
+
+  temp: 10.0
+  weight_pl: 0.2
+  beta: 0.05
+  open_weight_sum_cali: 0.3
+
+  # ========== Paths ==========
+  save_folder: './tau22_exp3_small'
+  dataroot: '/coding/TAU-urban-acoustic-scenes-2022-mobile-development'
+  pretrained_model_path1: ''
+  pretrained_model_path: './tau22_exp3_small/pretrain_model_tau22.pth'
+
+  # ========== Loss ==========
+  num-centers: 1
+
+  # ========== OSR evaluation ==========
+  osr_num_rounds: 10
+  osr_k_shot: 5
+
+  # ========== Misc ==========
+  dataset: 'TAU22'
+  pretrain: false
+  test: false
+  finetune: false
+  no_val: false
+
+  # ========== Gradient Monitor ==========
+  grad_monitor: true
+  grad_monitor_interval: 5

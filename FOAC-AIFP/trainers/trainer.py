@@ -22,6 +22,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.integrate import simpson as simps
 from sklearn.manifold import TSNE
+from utils.grad_monitor import GradientMonitor
 
 
 def check_dir(path):
@@ -97,23 +98,47 @@ def get_opt(model, args):
 
     elif args.opt == 'sgd':
         other_params = [param for name, param in model.named_parameters() if not name.startswith('encoder')]
+        encoder_lr = getattr(args, 'encoder_lr', 0.0002)
         optim_param = [{'params': other_params},
-                     {'params': model.encoder.parameters(), 'lr': 0.0002}]
+                     {'params': model.encoder.parameters(), 'lr': encoder_lr}]
 
         optimizer = optim.SGD(optim_param,lr=args.lr,momentum=0.9,weight_decay=args.weight_decay,nesterov=args.nesterov)
-    iterations = args.lr_decay_epochs.split(',')
-    args.lr_decay_epochs = list([])
-    for it in iterations:
-            args.lr_decay_epochs.append(int(it))
-    if args.lr_decay_epochs is not None:
+
+    # Scheduler selection
+    lr_mode = getattr(args, 'lr_scheduler', 'multistep')
+
+    if lr_mode == 'cosine_warmup':
+        from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
+        warmup_epochs = getattr(args, 'warmup_epochs', 5)
+        T_max = getattr(args, 'T_max', args.epoch)
+        eta_min = getattr(args, 'eta_min', 1e-6)
+        warmup_start_lr = getattr(args, 'warmup_start_lr', 1e-5)
+        # Warmup: linear from warmup_start_lr → lr over warmup_epochs
+        def warmup_fn(epoch):
+            if epoch < warmup_epochs:
+                return warmup_start_lr / args.lr + (1.0 - warmup_start_lr / args.lr) * (epoch / warmup_epochs)
+            return 1.0  # CosineAnnealingLR handles decay after warmup
+        warmup_scheduler = LambdaLR(optimizer, lr_lambda=warmup_fn)
+        cosine_scheduler = CosineAnnealingLR(optimizer, T_max=T_max - warmup_epochs, eta_min=eta_min)
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, cosine_scheduler],
+            milestones=[warmup_epochs]
+        )
+
+    elif lr_mode == 'cosine':
+        from torch.optim.lr_scheduler import CosineAnnealingLR
+        T_max = getattr(args, 'T_max', args.epoch)
+        eta_min = getattr(args, 'eta_min', 1e-6)
+        scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=eta_min)
+
+    else:  # 'multistep' (default)
+        iterations = args.lr_decay_epochs.split(',')
+        args.lr_decay_epochs = list([])
+        for it in iterations:
+                args.lr_decay_epochs.append(int(it))
         scheduler = optim.lr_scheduler.MultiStepLR(
             optimizer, milestones=args.lr_decay_epochs, gamma=args.gamma)
-
-    else:
-        scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer, milestones=[10, 30], gamma=args.gamma)
-
-    
 
     return optimizer, scheduler
 
@@ -150,7 +175,14 @@ class Train_Manager:
 
         self.args = args
         self.train_func = train_func
-        
+
+        # Gradient monitor (enabled via YAML: grad_monitor: true)
+        if getattr(args, 'grad_monitor', False):
+            self.grad_monitor = GradientMonitor(None, self.logger, self.writer, enabled=True,
+                                                log_interval=getattr(args, 'grad_monitor_interval', 5))
+        else:
+            self.grad_monitor = None
+
 
     def train(self, model,eval_loader):
         args = self.args
@@ -158,6 +190,12 @@ class Train_Manager:
         writer = self.writer
         save_path = self.save_path
         logger = self.logger
+
+        # Wire the GradientMonitor to the current model
+        grad_mon = self.grad_monitor
+        if grad_mon is not None:
+            grad_mon.model = model
+            grad_mon._register_hooks()
 
         optimizer, scheduler = get_opt(model, args)
 
@@ -180,7 +218,8 @@ class Train_Manager:
                                                      optimizer=optimizer,
                                                      writer=writer,
                                                      iter_counter=iter_counter,
-                                                     args = args)
+                                                     args = args,
+                                                     grad_monitor=grad_mon)
             # adjust_learning_rate(e, self.args, optimizer)
             if (e+1) % args.val_epoch == 0:
 
@@ -234,6 +273,8 @@ class Train_Manager:
             print(f"Epoch {e+1}/{total_epoch}, Current Learning Rate: {current_lr:.6f}")
 
         logger.info('training finished!')
+        if grad_mon is not None:
+            grad_mon.close()
         if args.no_val:
             torch.save(model.state_dict(), save_path)
 

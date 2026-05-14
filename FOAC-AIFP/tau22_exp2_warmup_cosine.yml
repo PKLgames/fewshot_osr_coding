@@ -1,0 +1,104 @@
+# ==============================================================================
+# 实验 2: Warmup + Cosine Annealing (解决梯度不稳定性/过拟合)
+#
+# 启用条件 (在 exp1 中观察到):
+#   [ ] grad_output/*/sign_flip > 0.30 持续到 epoch 3+  → warmup 缓解初期震荡
+#   [ ] epoch 10+ val_auroc 停滞而 train_acc 上升,
+#       同时 sign_flip > 0.25 且 mean 趋零           → cosine 替代阶梯衰减
+#   [ ] MultiStepLR 在 lr_decay_epoch 处 loss 出现尖峰 → cosine 平滑衰减
+#
+# 运行:
+#   先完成 exp1 (基线) 并确认上述现象后:
+#     (1) 若需 pretrain: 将 pretrained_model_path 指回 exp1 的 pretrain 权重
+#          或重新 pretrain: python pretrain.py --config ./tau22_exp2_warmup_cosine.yml
+#     (2) python main.py --config ./tau22_exp2_warmup_cosine.yml
+#
+# 对比: TensorBoard 中 exp1 vs exp2 的:
+#   grad_output/*/sign_flip    → warmup 后应降至 0.10~0.20
+#   grad_output/*/std           → cosine 下应平滑下降而非阶梯跳变
+#   val_auroc / val_osr         → 曲线应更平滑、峰值可能更高
+# ==============================================================================
+train:
+  # ========== Audio feature extractor (unchanged) ==========
+  extractor:
+    window_size: 1024
+    hop_size: 256
+    sample_rate: 16000
+    mel_bins: 128
+    fmin: 0
+    fmax: 8000
+    window: 'hann'
+
+  # ========== Episode structure ==========
+  n_ways: 6
+  n_open_ways: 4
+  test_n_ways: 6
+  test_n_open_ways: 4
+  n_shots: 5
+  n_queries: 15
+  train_classes: 6
+
+  n_train_runs: 400
+  n_test_runs: 200
+  test_times: 200
+
+  # ========== Training hyper-parameters (Warmup + Cosine) ==========
+  epoch: 20
+  epochs_pre: 80
+  batch_size: 256
+  learning_rate: 0.05
+  lr: 0.001                     # 目标学习率 (warmup 结束后到达)
+  gamma: 0.1                    # cosine 模式下忽略，改用 eta_min
+  weight_decay: 5.0e-4
+
+  # --- Scheduler: Warmup + Cosine Annealing ---
+  lr_scheduler: 'cosine_warmup' # 替代默认 'multistep'
+  warmup_epochs: 5              # 前 N epoch 线性从 warmup_start_lr 升至 lr
+  warmup_start_lr: 1.0e-5       # warmup 起始学习率
+  T_max: 20                     # cosine 半周期长度 (= epoch 总数)
+  eta_min: 1.0e-6               # cosine 退火最低学习率
+  # lr_decay_epochs / lr_decay_rate 在 cosine 下忽略
+
+  nesterov: true
+  seed: 42
+  val_epoch: 1
+
+  # ========== Model ==========
+  test_way: 6
+  train_way: 6
+  train_shot: 5
+  test_shot:
+    - 5
+  train_query_shot: 15
+  test_query_shot: 15
+  resnet: true
+  resnet_width: 64              # 标准宽度
+
+  temp: 10.0
+  weight_pl: 0.2
+  beta: 0.05
+  open_weight_sum_cali: 0.3
+
+  # ========== Paths ==========
+  save_folder: './tau22_exp2_warmup_cosine'
+  dataroot: '/coding/TAU-urban-acoustic-scenes-2022-mobile-development'
+  pretrained_model_path1: ''
+  pretrained_model_path: './tau22_exp1_baseline/pretrain_model_tau22.pth'
+
+  # ========== Loss ==========
+  num-centers: 1
+
+  # ========== OSR evaluation ==========
+  osr_num_rounds: 10
+  osr_k_shot: 5
+
+  # ========== Misc ==========
+  dataset: 'TAU22'
+  pretrain: false
+  test: false
+  finetune: false
+  no_val: false
+
+  # ========== Gradient Monitor ==========
+  grad_monitor: true
+  grad_monitor_interval: 1      # warmup 期每步记录，观察 sign_flip 变化趋势

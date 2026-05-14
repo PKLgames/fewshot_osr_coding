@@ -65,3 +65,7 @@ train:
   test: false
   finetune: false
   no_val: false
+
+  # ========== Gradient Monitor ==========
+  grad_monitor: false           # set true to enable gradient statistics logging
+  grad_monitor_interval: 5      # log gradient stats every N training iterations

@@ -1,0 +1,207 @@
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+/usr/local/miniconda3/envs/py312/lib/python3.12/site-packages/sklearn/mixture/_base.py:468: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  rng.multivariate_normal(mean, covariance, int(sample))
+FeatureExtractor: loaded YAMNet pretrained weights from yamnet.pth (FC layers random)
+FeatureExtractor: loaded 193/193 parameters from experiment/yamnet_fewshot_osr22/base_feature_extractor.pth
+Extracting features (fold=1)...
+Dynamic-load mode: 25000 segments across 2500 files
+Dynamic-load mode: 1620 segments across 162 files
+Dynamic-load mode: 40960 segments across 4096 files
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_train_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_calib_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    Class 0: 300 samples
+    Class 1: 300 samples
+    Class 2: 300 samples
+    Class 3: 300 samples
+    Class 4: 300 samples
+    Class 5: 30 samples
+    Class 6: 30 samples
+    Class 7: 30 samples
+    Class 8: 30 samples
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_test_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 3560 samples
+    Class 6: 5000 samples
+    Class 7: 5000 samples
+    Class 8: 2400 samples
+
+  n_open=2, unknown=[5, 6]
+Real OOD exposure: 8560 samples from classes [5, 6]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(5) on 25000 samples, dim=64
+  GMM train log-likelihood: mean=124.69, 10th percentile=82.22
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness_fold1/openness/open2/fewshot_best.pth, starting from scratch
+Curriculum OOD Sampler configured with classifier
+
+======================================================================
+Episodic Meta-Training: 4-way 5-shot
+Base classes:     [0, 1, 2, 3, 4]
+Unknown classes:  [5, 6]
+Episodes:         500
+Accum steps:      1 (eff.batch=1x)
+Eval every:       500 episodes
+Proto noise std:  0.15
+OOD ratio:          0.3
+LR warmup:        500 episodes
+Stage2 (cls):     1000 episodes
+Gaussian prior:   delayed to Phase 2 (ep 501)
+Patience:         3000 episodes (6 evals)
+======================================================================
+
+Ep   500/500 | CE: 1.3685 Total: 1.3685 Acc: 33.41% | Val Loss: 1.9649 Acc: 48.33% | LR: 2.00e-04 cls:0.0
+  -> Best model saved (Val Acc: 48.33%)
+
+Loaded best model (Val Acc: 48.33%, Ep 500)
+
+======================================================================
+Episodic training complete!
+Best validation accuracy: 48.33%
+======================================================================
+Episode history saved: experiment/episodic_exp/openness_fold1/openness/open2/episodic_history.json
+
+======================================================================
+OSR Calibration (ANTI_PROTOTYPE)
+======================================================================
+Prototypes: torch.Size([5, 64]) from 5 base classes
+Computing feature-space statistics...
+Known samples:   1500
+Unknown samples: 60
+Known scores:   [-1.23, 2.42] mean=0.37
+Unknown scores: [-0.59, 1.52] mean=0.18
+Mean separation: 0.19 (positive = known higher = good)
+
+Threshold (tau): -0.6685
+Known accepted (TNR): 95.00%
+Unknown detected (TPR): 0.00%
+
+======================================================================
+OSR Evaluation (ANTI_PROTOTYPE)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   0.00%
+  OSR Score (mean):         47.50%
+  AUROC:                    0.4547
+
+======================================================================
+OSR Calibration (OOD_HEAD_FUSION_V2)
+======================================================================
+Prototypes: torch.Size([5, 64]) from 5 base classes
+Computing feature-space statistics...
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (1500 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -1.0624
+              dist_ratio: +1.2964
+             softmax_max: +0.0773
+                 entropy: +2.0149
+               feat_norm: -1.3936
+                2nd_dist: -0.7797
+               score_gap: +1.0117
+          dist_to_center: +2.4269
+         proto_score_var: +1.3683
+         norm_dist_ratio: +0.2901
+           cluster_mahal: -1.3829
+        cluster_post_max: +0.1514
+             cluster_ent: +0.1743
+        anti_proto_score: +1.1968 ← NEW
+  Calib TNR: 95.00%  TPR: 43.33%  (threshold=0.2214)
+Mean separation: 0.23 (positive = known higher = good)
+
+Threshold (tau): 0.1463
+
+======================================================================
+OSR Evaluation (OOD_HEAD_FUSION_V2)
+Mode: per-round recalibration (TNR-fixed at 95%)
+======================================================================
+Training osr24b fusion OOD head (14-dim: 13 cluster_v2 + 1 anti_proto)...
+  osr23 GMM: fitting on calib set (25000 samples), n_components=12, covariance=full
+  osr23 GMM converged: True
+  osr24b fusion OOD head weights:
+                min_dist: -0.7551
+              dist_ratio: -0.1662
+             softmax_max: -0.2484
+                 entropy: +0.3801
+               feat_norm: -0.2424
+                2nd_dist: -0.8624
+               score_gap: -0.2736
+          dist_to_center: +1.7556
+         proto_score_var: +0.6668
+         norm_dist_ratio: +0.3716
+           cluster_mahal: -0.5024
+        cluster_post_max: -0.0979
+             cluster_ent: -0.1836
+        anti_proto_score: +0.1330 ← NEW
+  Calib TNR: 95.00%  TPR: 13.19%  (threshold=0.3265)
+
+Results over 10 rounds:
+  Known accepted (TNR):     95.00%
+  Unknown detected (TPR):   13.57%
+  OSR Score (mean):         54.28%
+  AUROC:                    0.6626
+Extracting features (fold=1)...
+Dynamic-load mode: 25000 segments across 2500 files
+Dynamic-load mode: 1620 segments across 162 files
+Dynamic-load mode: 40960 segments across 4096 files
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_train_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_calib_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    Class 0: 300 samples
+    Class 1: 300 samples
+    Class 2: 300 samples
+    Class 3: 300 samples
+    Class 4: 300 samples
+    Class 5: 30 samples
+    Class 6: 30 samples
+    Class 7: 30 samples
+    Class 8: 30 samples
+Loading cached features from experiment/fewshot_cache/dcase18_fold1_test_features.pt (version: v22_fewshot_yamnet_normalized)
+  Classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    Class 0: 5000 samples
+    Class 1: 5000 samples
+    Class 2: 5000 samples
+    Class 3: 5000 samples
+    Class 4: 5000 samples
+    Class 5: 3560 samples
+    Class 6: 5000 samples
+    Class 7: 5000 samples
+    Class 8: 2400 samples
+
+  n_open=4, unknown=[5, 6, 7, 8]
+Real OOD exposure: 15960 samples from classes [5, 6, 7, 8]
+Initializing Curriculum OOD Sampler (3-level progressive training)...
+  CurriculumOODSampler Level 1: Simple perturbations (mixup + noise)
+  CurriculumOODSampler Level 2: Initializing GMM boundary sampler...
+  GMM Boundary Sampler: fitting GMM(5) on 25000 samples, dim=64
+  GMM train log-likelihood: mean=124.69, 10th percentile=82.22
+  GMM boundary pool: 5000 samples, dim=64, device=cuda
+Flow classifier params: 14,756
+
+Checkpoint not found at experiment/episodic_exp/openness_fold1/openness/open4/fewshot_best.pth, starting from scratch

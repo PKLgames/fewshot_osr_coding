@@ -9,6 +9,7 @@ then sweeps Phase 2 (episodic training) and Phase 3 (evaluation).
 Usage:
   cd /coding
   python episodic_exp_way_shot.py --dataset TAU22
+  python episodic_exp_way_shot.py --dataset DCASE18 --fold all
   python episodic_exp_way_shot.py --quick   # debug mode
 """
 
@@ -26,6 +27,7 @@ from episodic_trainer import (
 )
 from utils.TAU22 import TAUDataset as TAU22Dataset
 from utils.TAU19 import TAUDataset as TAU19Dataset
+from utils.DCASE18 import DCASE18Dataset
 
 
 WAY_VALUES = [5, 6]
@@ -43,20 +45,30 @@ def find_pretrained():
     return None
 
 
-def get_features(feature_extractor, device, dataset_name='TAU22'):
+def get_features(feature_extractor, device, dataset_name='TAU22', fold=1):
     """Extract and cache features for train/calib/test."""
-    TAUDataset = TAU19Dataset if dataset_name == 'TAU19' else TAU22Dataset
+    if dataset_name == 'DCASE18':
+        from functools import partial
+        TAUDataset = partial(DCASE18Dataset, fold=fold)
+        cache_name = f'dcase18_fold{fold}'
+    elif dataset_name == 'TAU19':
+        TAUDataset = TAU19Dataset
+        cache_name = dataset_name.lower()
+    else:
+        TAUDataset = TAU22Dataset
+        cache_name = dataset_name.lower()
+
     train_dataset = TAUDataset(split='train')
     calib_dataset = TAUDataset(split='calib')
     test_dataset = TAUDataset(split='test')
 
-    train_cache = FeatureCache(dataset_name=dataset_name.lower())
+    train_cache = FeatureCache(dataset_name=cache_name)
     train_cache.extract_and_cache(feature_extractor, train_dataset, 'train', device, batch_size=64)
 
-    calib_cache = FeatureCache(dataset_name=dataset_name.lower())
+    calib_cache = FeatureCache(dataset_name=cache_name)
     calib_cache.extract_and_cache(feature_extractor, calib_dataset, 'calib', device, batch_size=64)
 
-    test_cache = FeatureCache(dataset_name=dataset_name.lower())
+    test_cache = FeatureCache(dataset_name=cache_name)
     test_cache.extract_and_cache(feature_extractor, test_dataset, 'test', device, batch_size=64)
 
     return train_cache, calib_cache, test_cache
@@ -143,7 +155,7 @@ def run_way_shot(train_cache, calib_cache, test_cache, feature_extractor,
 
 def main():
     parser = argparse.ArgumentParser(description='Episodic Way-Shot Sweep')
-    parser.add_argument('--dataset', choices=['TAU22', 'TAU19'], default='TAU22')
+    parser.add_argument('--dataset', choices=['TAU22', 'TAU19', 'DCASE18'], default='TAU22')
     parser.add_argument('--ways', type=int, nargs='*', default=WAY_VALUES)
     parser.add_argument('--shots', type=int, nargs='*', default=SHOT_VALUES)
     parser.add_argument('--num_episodes', type=int, default=3000)
@@ -152,6 +164,8 @@ def main():
                         help='Comma-separated OSR methods, or "all" for all 6')
     parser.add_argument('--output_dir', type=str, default='experiment/episodic_exp',
                         help='Root output directory for all results')
+    parser.add_argument('--fold', type=str, default='1',
+                        help='Fold for DCASE18: 1-4 or "all" for 4-fold CV (default: 1)')
     cl_args = parser.parse_args()
 
     if cl_args.osr_methods == 'all':
@@ -176,26 +190,38 @@ def main():
     feature_extractor = FeatureExtractor(pretrained_path=pretrained_path)
     feature_extractor = feature_extractor.to(device).freeze()
 
-    # Extract features (once, reused for all configs)
-    print("Extracting features...")
-    train_cache, calib_cache, test_cache = get_features(feature_extractor, device,
-                                                         dataset_name=cl_args.dataset)
-
-    base_classes = [0, 1, 2, 3, 4, 5]
-    unknown_classes = [6, 7, 8, 9]
+    if cl_args.dataset == 'DCASE18':
+        base_classes = [0, 1, 2, 3, 4]
+        unknown_classes = [5, 6, 7, 8]
+        folds = [1, 2, 3, 4] if cl_args.fold == 'all' else [int(cl_args.fold)]
+    else:
+        base_classes = [0, 1, 2, 3, 4, 5]
+        unknown_classes = [6, 7, 8, 9]
+        folds = [None]
 
     all_results = {}
     for n_way in cl_args.ways:
         for k_shot in cl_args.shots:
-            key = f"{n_way}w{k_shot}s"
-            print(f"\n--- {key} ---")
-            result = run_way_shot(
-                train_cache, calib_cache, test_cache, feature_extractor,
-                base_classes, unknown_classes, n_way, k_shot,
-                num_episodes=cl_args.num_episodes, device=device,
-                output_root=cl_args.output_dir, osr_methods=osr_methods)
-            if result:
-                all_results[key] = result
+            for fold in folds:
+                # Extract features (per-fold for DCASE18)
+                print(f"Extracting features" + (f" (fold={fold})" if fold is not None else "") + "...")
+                train_cache, calib_cache, test_cache = get_features(
+                    feature_extractor, device,
+                    dataset_name=cl_args.dataset,
+                    fold=(fold if fold is not None else 1))
+
+                key = f"{n_way}w{k_shot}s"
+                fold_tag = f'_f{fold}' if fold is not None else ''
+                print(f"\n--- {key}{fold_tag} ---")
+                result = run_way_shot(
+                    train_cache, calib_cache, test_cache, feature_extractor,
+                    base_classes, unknown_classes, n_way, k_shot,
+                    num_episodes=cl_args.num_episodes, device=device,
+                    output_root=os.path.join(cl_args.output_dir,
+                        f'wayshot_fold{fold}' if fold is not None else ''),
+                    osr_methods=osr_methods)
+                if result:
+                    all_results[f"{key}{fold_tag}"] = result
 
     # Save
     os.makedirs(os.path.join(cl_args.output_dir, 'wayshot'), exist_ok=True)
@@ -208,18 +234,36 @@ def main():
     print(f"\n{'='*60}")
     print("WAY-SHOT SWEEP SUMMARY")
     print(f"{'='*60}")
-    print(f"  {'Config':<10s} {'Acc':>7s} {'CI95':>7s} {'AP':>7s} {'Mah':>7s} {'O23':>7s} {'ExtV2':>7s} {'CluV2':>7s} {'FusV2':>7s}")
-    for key, r in sorted(all_results.items()):
-        acc = r.get('acc', 0)
-        ci = r.get('ci95', 0)
-        osr = r.get('osr', {})
-        osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
-        osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
-        osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
-        osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
-        osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
-        osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
-        print(f"  {key:<10s} {acc:>6.2%} {ci:>6.2%} {osr_ap:>6.2%} {osr_mah:>6.2%} {osr_o23:>6.2%} {osr_ext:>6.2%} {osr_clu:>6.2%} {osr_fv2:>6.2%}")
+    if cl_args.dataset == 'DCASE18' and cl_args.fold == 'all':
+        print(f"  {'Config':<10s} {'Acc':>12s} {'AP':>8s} {'Mah':>8s} {'O23':>8s} {'ExtV2':>8s} {'CluV2':>8s} {'FusV2':>8s}")
+        way_shot_combos = sorted(set(k.rsplit('_f', 1)[0] for k in all_results.keys()))
+        for ws in way_shot_combos:
+            fold_vals = [all_results.get(f'{ws}_f{f}', {}) for f in [1,2,3,4]]
+            fold_vals = [v for v in fold_vals if v]
+            if not fold_vals:
+                continue
+            accs = [v.get('acc', 0) for v in fold_vals]
+            acc_m, acc_s = np.mean(accs), np.std(accs)
+            row = f"  {ws:<10s} {acc_m:>6.2%}±{acc_s:<4.2%}"
+            osr_keys_short = ['anti_prototype', 'feature_mahalanobis', 'ood_head_osr23',
+                             'ood_head_extended_v2', 'ood_head_cluster_v2', 'ood_head_fusion_v2']
+            for ok in osr_keys_short:
+                vals = [v.get('osr', {}).get(ok, {}).get('osr_score', 0) for v in fold_vals]
+                row += f" {np.mean(vals):>7.2%}"
+            print(row)
+    else:
+        print(f"  {'Config':<10s} {'Acc':>7s} {'CI95':>7s} {'AP':>7s} {'Mah':>7s} {'O23':>7s} {'ExtV2':>7s} {'CluV2':>7s} {'FusV2':>7s}")
+        for key, r in sorted(all_results.items()):
+            acc = r.get('acc', 0)
+            ci = r.get('ci95', 0)
+            osr = r.get('osr', {})
+            osr_ap  = osr.get('anti_prototype', {}).get('osr_score', 0)
+            osr_mah = osr.get('feature_mahalanobis', {}).get('osr_score', 0)
+            osr_o23 = osr.get('ood_head_osr23', {}).get('osr_score', 0)
+            osr_ext = osr.get('ood_head_extended_v2', {}).get('osr_score', 0)
+            osr_clu = osr.get('ood_head_cluster_v2', {}).get('osr_score', 0)
+            osr_fv2 = osr.get('ood_head_fusion_v2', {}).get('osr_score', 0)
+            print(f"  {key:<10s} {acc:>6.2%} {ci:>6.2%} {osr_ap:>6.2%} {osr_mah:>6.2%} {osr_o23:>6.2%} {osr_ext:>6.2%} {osr_clu:>6.2%} {osr_fv2:>6.2%}")
 
 
 if __name__ == '__main__':

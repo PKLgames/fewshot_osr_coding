@@ -169,7 +169,8 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        # inplace=False required for gradient-monitor backward hooks
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -210,7 +211,8 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        # inplace=False required for gradient-monitor backward hooks
+        self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
         self.stride = stride
 
@@ -241,13 +243,16 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None):
+                 norm_layer=None, base_width=64):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
 
-        self.inplanes = 64
+        # base_width scales the whole network width (default 64; halve to 32 for smaller model)
+        self.base_width = base_width
+        wf = base_width / 64.0  # width factor relative to standard ResNet
+        self.inplanes = int(64 * wf)
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -261,14 +266,15 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
+        # inplace=False required for gradient-monitor backward hooks
+        self.relu = nn.ReLU(inplace=False)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
+        self.layer1 = self._make_layer(block, int(64 * wf), layers[0])
+        self.layer2 = self._make_layer(block, int(128 * wf), layers[1], stride=2,
                                        dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+        self.layer3 = self._make_layer(block, int(256 * wf), layers[2], stride=2,
                                        dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+        self.layer4 = self._make_layer(block, int(512 * wf), layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         
@@ -345,7 +351,13 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
         state_dict = {k: v for k, v in state_dict.items() if k not in ['fc.weight', 'fc.bias']}
-        model_dict.update(state_dict)
+        # Filter: keep only params with matching shapes (supports non-standard base_width)
+        matched = {k: v for k, v in state_dict.items()
+                   if k in model_dict and v.shape == model_dict[k].shape}
+        skipped = len(state_dict) - len(matched)
+        if skipped > 0:
+            print(f"  Skipped {skipped}/{len(state_dict)} pretrained params (shape mismatch)")
+        model_dict.update(matched)
         model.load_state_dict(model_dict)
     return model
 
@@ -357,6 +369,7 @@ def resnet18(pretrained=False, progress=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
+        base_width (int): Network width (default 64; use 32 for half-width)
     """
     return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
                    **kwargs)
